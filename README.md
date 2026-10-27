@@ -1,0 +1,188 @@
+# Java-ORM：现代无 APT 字段感知与级联流式 ORM
+
+[![Java 8+](https://img.shields.io/badge/Java-8%2B-blue.svg)](#)
+[![Maven Central](https://img.shields.io/badge/Maven-1.0.0-green.svg)](#)
+[![Zero-APT](https://img.shields.io/badge/APT-None-orange.svg)](#)
+
+> **Java-ORM** 是一个面向 Java 8+ 的轻量级现代关系型数据库 ORM 框架。
+> 它借鉴了 **Easy-Query** 的设计哲学，但**彻底摒弃了编译期 APT（代码生成器）技术**。
+> 通过基于 **ByteBuddy 的运行时代理调用录制（Invocation Recording）**，实现了类似 `s.getTeacher().getAge()` 的多级级联字段感知、编译期类型安全与纯粹的 SQL 链式流，实体保持纯净 POJO（`@Column` 完全可选）。
+
+---
+
+## 核心特性
+
+- 🚀 **零 APT 编译依赖**：无需在 `pom.xml` 中配置任何 annotation processor，无须生成 `QUser` 或 `UserProxy` 冗余代码，代码随写随测，实体即改即用。
+- 🔍 **多级字段感知与 IDE 原生重构**：直接写 `s -> s.getTeacher().getAge()`，IDE 自动补全字段，字段重命名时全局安全重构。
+- 🌊 **纯粹贴近 SQL 的链式流**：抛弃繁琐难看的 `$(...)` 包裹语法，操作符直接跟在字段后面：`.where().and(s -> s.getAge()).ge(18).and(s -> s.getTeacher().getAge()).gt(30)`。
+- 🔗 **智能导航与多表自动 JOIN**：在条件或排序列中点号调用外键关联实体属性，框架自动基于 JPA / 外键约定生成对应表的 `LEFT JOIN`。
+- 📦 **高性能 Split/Batch IN 装配（Include）**：一对一/多对一/一对多关系通过 `.include()` 显式批量加载（IN 查询），从根源杜绝 SQL 笛卡尔积膨胀与分页失效问题。
+- 🏷️ **极低侵入性（@Column 完全可选）**：预设全局 `NameConversion` 策略（默认驼峰转下划线），标准 POJO 无需任何额外标记即可映射数据表。
+- 🛡️ **无感逻辑删除与多租户**：标记 `@LogicDelete` 或全局配置后，所有查询自动追加未删除过滤，删除操作自动重写为 `UPDATE`。
+- ☕ **向下兼容 Java 8**：基线面向 Java 8，无缝向上兼容运行于 Java 11 / 17 / 21 / 25。
+
+---
+
+## 快速上手
+
+### 1. 引入 Maven 依赖
+
+```xml
+<dependency>
+    <groupId>com.javaorm</groupId>
+    <artifactId>java-orm-core</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+```
+
+### 2. 实体定义（无需生成任何代理代码）
+
+```java
+import com.javaorm.core.annotation.*;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Table(name = "t_teacher")
+public class Teacher {
+    @Id
+    private Long id;
+    
+    private String teacherName; // 自动映射为 teacher_name
+    private Integer age;
+    private String title;
+
+    private List<Student> students; // 一对多关联
+
+    // Getter / Setter ...
+}
+
+@Table(name = "t_student")
+public class Student {
+    @Id
+    private Long id;
+
+    private String studentName; // 自动映射为 student_name
+    private Integer age;
+    private Long teacherId;
+
+    private Teacher teacher; // 多对一关联（默认匹配 teacherId -> Teacher.id）
+
+    @LogicDelete(normalValue = "0", deletedValue = "1")
+    private Integer isDeleted;
+
+    private LocalDateTime createTime;
+
+    // Getter / Setter ...
+}
+```
+
+### 3. 初始化客户端
+
+```java
+DataSource dataSource = ...; // 任何 JDBC DataSource (HikariCP / Druid / SQLite 等)
+JavaOrm orm = JavaOrm.create(dataSource);
+```
+
+---
+
+## 常用操作代码示例
+
+### 1. 基础单表查询
+
+```java
+List<Student> list = orm.select(Student.class)
+    .where()
+        .and(s -> s.getAge()).ge(18)
+        .and(s -> s.getStudentName()).like("张%")
+    .orderBy(s -> s.getAge()).desc()
+    .page(1, 10)
+    .list();
+```
+
+### 2. 级联导航字段过滤（自动隐式 LEFT JOIN）
+
+直接点出两层实体关系，框架自动根据外键生成 `LEFT JOIN t_teacher t1 ON t0.teacher_id = t1.id`：
+
+```java
+List<Student> students = orm.select(Student.class)
+    .where()
+        .and(s -> s.getTeacher().getAge()).gt(35)
+    .list();
+```
+
+### 3. 关联作用域子块（whereRelation）
+
+```java
+List<Student> students = orm.select(Student.class)
+    .whereRelation(s -> s.getTeacher(), t -> t
+        .where()
+            .and(Teacher::getTitle).eq("教授")
+    )
+    .list();
+```
+
+### 4. 关联数据装配（Include 模式，避免笛卡尔积）
+
+```java
+// 多对一：查出学生，并装配每个学生的指导老师对象
+List<Student> students = orm.select(Student.class)
+    .include(s -> s.getTeacher())
+    .where()
+        .and(s -> s.getAge()).ge(18)
+    .list();
+
+// 一对多：查出老师，并装配名下的所有学生集合 List<Student>
+List<Teacher> teachers = orm.select(Teacher.class)
+    .include(t -> t.getStudents())
+    .list();
+```
+
+### 5. 增删改（CUD 操作）
+
+```java
+// 实体级插入（自增主键自动回填）
+Student s = new Student();
+s.setStudentName("王小明");
+s.setAge(20);
+orm.insert(s);
+
+// 实体级更新（仅更新非空字段）
+s.setAge(21);
+orm.update(s);
+
+// 实体级删除（标有 @LogicDelete 则自动执行 UPDATE is_deleted = 1）
+orm.delete(s);
+
+// 纯 SQL 批量流式条件更新（无需先查出实体）
+orm.update(Student.class)
+    .set(s -> s.getAge(), 22)
+    .where()
+        .and(s -> s.getStudentName()).eq("王大锤")
+    .execute();
+
+// 纯 SQL 批量流式条件删除
+orm.delete(Student.class)
+    .where()
+        .and(s -> s.getAge()).lt(10)
+    .execute();
+```
+
+---
+
+## 运行录制原理解析
+
+```
+业务代码                                  ByteBuddy 拦截器                     ThreadLocal 录制栈
+   |                                              |                                   |
+   |-- and(s -> s.getTeacher().getAge()) -------->|                                   |
+   |                                              |-- 拦截 getTeacher() ------------->| 记录: "teacher"
+   |                                              |-- 返回 Teacher 代理 ------------->|
+   |                                              |-- 拦截 teacher.getAge() --------->| 记录: "age"
+   |                                              |-- 返回默认值 (0) -----------------|
+   |<-- 返回 PropertyOperator(teacher.age) -------|                                   |
+   |                                                                                  |
+   |-- .gt(30) ----------------------------------> 构建 SQL: t1.age > 30               |
+```
+
+1. **单例代理池**：每个实体的代理子类仅在首次使用时生成一次，且实例在内存中单例复用，执行查询录制时**零额外 GC 分配**。
+2. **纳秒级开销**：录制调用仅执行空方法拦截与 ThreadLocal 字符串记录，每次条件构建仅需数十纳秒，性能无限逼近手写 SQL。

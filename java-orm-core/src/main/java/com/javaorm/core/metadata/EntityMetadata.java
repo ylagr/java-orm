@@ -1,0 +1,79 @@
+package com.javaorm.core.metadata;
+
+import java.util.*;
+
+public class EntityMetadata {
+    private Class<?> entityClass;
+    private String tableName;
+    private String schema;
+    private ColumnMetadata idColumn;
+    private final Map<String, ColumnMetadata> propertyColumns = new LinkedHashMap<>();
+    private final Map<String, ColumnMetadata> columnToProperty = new LinkedHashMap<>();
+    private final Map<String, RelationMetadata> relations = new LinkedHashMap<>();
+    private ColumnMetadata logicDeleteColumn;
+    private ColumnMetadata tenantColumn;
+
+    public EntityMetadata(Class<?> entityClass) {
+        this.entityClass = entityClass;
+    }
+
+    public void addColumn(ColumnMetadata column) {
+        propertyColumns.put(column.getPropertyName(), column);
+        if (column.getColumnName() != null) {
+            columnToProperty.put(column.getColumnName().toLowerCase(), column);
+        }
+        if (column.isPrimaryKey()) {
+            this.idColumn = column;
+        }
+        if (column.isLogicDelete()) {
+            this.logicDeleteColumn = column;
+        }
+        if (column.isTenant()) {
+            this.tenantColumn = column;
+        }
+    }
+
+    public void addRelation(RelationMetadata relation) {
+        relations.put(relation.getPropertyName(), relation);
+    }
+
+    public ColumnMetadata getColumnByProperty(String propertyName) {
+        return propertyColumns.get(propertyName);
+    }
+
+    public ColumnMetadata getColumnByDbName(String dbColumnName) {
+        if (dbColumnName == null) return null;
+        return columnToProperty.get(dbColumnName.toLowerCase());
+    }
+
+    public RelationMetadata getRelation(String propertyName) {
+        return relations.get(propertyName);
+    }
+
+    public Collection<ColumnMetadata> getColumns() {
+        return propertyColumns.values();
+    }
+
+    public Collection<RelationMetadata> getRelations() {
+        return relations.values();
+    }
+
+    // Getters and Setters
+    public Class<?> getEntityClass() { return entityClass; }
+    public void setEntityClass(Class<?> entityClass) { this.entityClass = entityClass; }
+
+    public String getTableName() { return tableName; }
+    public void setTableName(String tableName) { this.tableName = tableName; }
+
+    public String getSchema() { return schema; }
+    public void setSchema(String schema) { this.schema = schema; }
+
+    public ColumnMetadata getIdColumn() { return idColumn; }
+    public void setIdColumn(ColumnMetadata idColumn) { this.idColumn = idColumn; }
+
+    public boolean hasLogicDelete() { return logicDeleteColumn != null; }
+    public ColumnMetadata getLogicDeleteColumn() { return logicDeleteColumn; }
+
+    public boolean hasTenant() { return tenantColumn != null; }
+    public ColumnMetadata getTenantColumn() { return tenantColumn; }
+}
