@@ -178,4 +178,65 @@ public class JavaOrmFullFeatureTest {
         long count = orm.select(Student.class).count();
         assertEquals(2L, count);
     }
+
+    @Test
+    public void testDirectProxyWhereSyntax() {
+        Teacher t = new Teacher();
+        t.setTeacherName("孙教授");
+        t.setAge(50);
+        orm.insert(t);
+
+        Student s1 = new Student();
+        s1.setStudentName("赵六");
+        s1.setAge(25);
+        s1.setTeacherId(t.getId());
+        orm.insert(s1);
+
+        Student s2 = new Student();
+        s2.setStudentName("钱七");
+        s2.setAge(16);
+        s2.setTeacherId(t.getId());
+        orm.insert(s2);
+
+        // 场景 1：用户诉求的 andGroup((w, s) -> ...) 直接使用 s.getAge()
+        List<Student> list1 = orm.select(Student.class)
+                .where()
+                .andGroup((w, s) -> {
+                    w.and(s.getAge()).gt(18);
+                    w.or(s.getStudentName()).like("钱%");
+                })
+                .list();
+        assertEquals(2, list1.size());
+
+        // 场景 2：用户诉求的 andGroup(w -> { Student s = w.proxy(); w.and(s.getAge())... })
+        List<Student> list2 = orm.select(Student.class)
+                .where()
+                .andGroup(w -> {
+                    Student s = w.proxy();
+                    w.and(s.getAge()).gt(20);
+                })
+                .list();
+        assertEquals(1, list2.size());
+        assertEquals("赵六", list2.get(0).getStudentName());
+
+        // 场景 3：外部直接定义代理 Student s = orm.proxy(Student.class);
+        Student s = orm.proxy(Student.class);
+        List<Student> list3 = orm.select(Student.class)
+                .where()
+                .and(s.getAge()).ge(25)
+                .and(s.getTeacher().getAge()).gt(40) // 级联外键直接点号！
+                .list();
+        assertEquals(1, list3.size());
+        assertEquals("赵六", list3.get(0).getStudentName());
+
+        // 场景 4：orm.select(Student.class).where((w, s) -> ...) 顶级双参
+        List<Student> list4 = orm.select(Student.class)
+                .where((w, sp) -> {
+                    w.and(sp.getAge()).gt(18);
+                    w.and(sp.getTeacher().getTeacherName()).eq("孙教授");
+                })
+                .list();
+        assertEquals(1, list4.size());
+        assertEquals("赵六", list4.get(0).getStudentName());
+    }
 }

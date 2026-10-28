@@ -55,10 +55,34 @@ public class Query<T> {
     }
 
     /**
+     * 获取当前实体类型的录制代理对象
+     */
+    public T proxy() {
+        return ProxyFactory.getProxy(rootEntityClass);
+    }
+
+    /**
      * 开启 WHERE 条件构建块
      */
     public WhereBuilder<T> where() {
         return new WhereBuilder<>(this);
+    }
+
+    /**
+     * 作用域 WHERE 块：orm.select(Student.class).where(w -> { w.and(...); })
+     */
+    public Query<T> where(Consumer<WhereBuilder<T>> consumer) {
+        consumer.accept(where());
+        return this;
+    }
+
+    /**
+     * 双参数作用域 WHERE 块：orm.select(Student.class).where((w, s) -> { w.and(s.getAge()).gt(18); })
+     */
+    public Query<T> where(WhereBuilder.BiWhereConsumer<T> consumer) {
+        WhereBuilder<T> w = where();
+        consumer.accept(w, w.proxy());
+        return this;
     }
 
     /**

@@ -17,9 +17,16 @@ import java.util.function.Function;
 
 /**
  * WHERE 条件链式构造器。
- * 支持 .and(s -> s.getAge()).gt(18) 无包裹流式调用，以及 andGroup 嵌套。
+ * 支持两种断言方式：
+ * 1. 代理值直接调用：w.and(s.getAge()).gt(18)
+ * 2. Lambda 表达式调用：w.and(s -> s.getAge()).gt(18)
  */
 public class WhereBuilder<T> {
+
+    @FunctionalInterface
+    public interface BiWhereConsumer<T> {
+        void accept(WhereBuilder<T> w, T s);
+    }
 
     private final Class<T> entityClass;
     private final Query<?> rootQuery;
@@ -49,17 +56,52 @@ public class WhereBuilder<T> {
     }
 
     /**
+     * 获取当前实体类型的录制代理对象
+     */
+    public T proxy() {
+        return ProxyFactory.getProxy(entityClass);
+    }
+
+    /**
      * 允许语法糖调用 .where()
      */
     public WhereBuilder<T> where() {
         return this;
     }
 
+    /**
+     * 方式 1：直接传入代理 getter 调用结果，如 w.and(s.getAge()).gt(18)
+     */
+    public <R> PropertyOperator<WhereBuilder<T>, R> and(R val) {
+        PropertyPath path = RecordingContext.finish();
+        if (path == null) {
+            throw new IllegalStateException("No proxy property accessed before calling and(...)! Did you call s.getFoo()?");
+        }
+        return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.AND, p, op, vals));
+    }
+
+    /**
+     * 方式 2：传入 Lambda 表达式，如 w.and(s -> s.getAge()).gt(18)
+     */
     public <R> PropertyOperator<WhereBuilder<T>, R> and(Function<T, R> getter) {
         PropertyPath path = recordPath(getter);
         return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.AND, p, op, vals));
     }
 
+    /**
+     * 方式 1：直接传入代理 getter 调用结果，如 w.or(s.getAge()).lt(10)
+     */
+    public <R> PropertyOperator<WhereBuilder<T>, R> or(R val) {
+        PropertyPath path = RecordingContext.finish();
+        if (path == null) {
+            throw new IllegalStateException("No proxy property accessed before calling or(...)! Did you call s.getFoo()?");
+        }
+        return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.OR, p, op, vals));
+    }
+
+    /**
+     * 方式 2：传入 Lambda 表达式，如 w.or(s -> s.getAge()).lt(10)
+     */
     public <R> PropertyOperator<WhereBuilder<T>, R> or(Function<T, R> getter) {
         PropertyPath path = recordPath(getter);
         return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.OR, p, op, vals));
@@ -75,10 +117,30 @@ public class WhereBuilder<T> {
         return this;
     }
 
+    public WhereBuilder<T> andGroup(BiWhereConsumer<T> groupConsumer) {
+        GroupCondition group = new GroupCondition(LogicalOperator.AND);
+        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition);
+        groupConsumer.accept(sub, sub.proxy());
+        if (!group.getChildren().isEmpty()) {
+            conditionReceiver.accept(group);
+        }
+        return this;
+    }
+
     public WhereBuilder<T> orGroup(Consumer<WhereBuilder<T>> groupConsumer) {
         GroupCondition group = new GroupCondition(LogicalOperator.OR);
         WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition);
         groupConsumer.accept(sub);
+        if (!group.getChildren().isEmpty()) {
+            conditionReceiver.accept(group);
+        }
+        return this;
+    }
+
+    public WhereBuilder<T> orGroup(BiWhereConsumer<T> groupConsumer) {
+        GroupCondition group = new GroupCondition(LogicalOperator.OR);
+        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition);
+        groupConsumer.accept(sub, sub.proxy());
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
         }

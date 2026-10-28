@@ -41,6 +41,20 @@ public class JavaOrm {
     }
 
     /**
+     * 获取指定实体的录制代理单例对象
+     */
+    public <T> T proxy(Class<T> entityClass) {
+        return com.javaorm.core.proxy.ProxyFactory.getProxy(entityClass);
+    }
+
+    /**
+     * 快捷静态方法：获取实体的录制代理单例对象
+     */
+    public static <T> T $(Class<T> entityClass) {
+        return com.javaorm.core.proxy.ProxyFactory.getProxy(entityClass);
+    }
+
+    /**
      * 开启流式查询：orm.select(Student.class).where().and(s -> s.getAge()).gt(18)...
      */
     public <T> Query<T> select(Class<T> entityClass) {
