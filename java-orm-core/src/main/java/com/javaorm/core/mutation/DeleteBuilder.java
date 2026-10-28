@@ -38,6 +38,7 @@ public class DeleteBuilder<T> {
     private final DataSource dataSource;
     private final Dialect dialect;
     private final OrmConfig config;
+    private Boolean printSqlOverride = null;
     private final List<Condition> whereConditions = new ArrayList<>();
     private final Query<T> queryHelper;
 
@@ -55,8 +56,48 @@ public class DeleteBuilder<T> {
         return ProxyFactory.getProxy(entityClass);
     }
 
+    public DeleteBuilder<T> printSql() {
+        this.printSqlOverride = config.isPrintSql();
+        return this;
+    }
+
+    public DeleteBuilder<T> printSql(boolean print) {
+        this.printSqlOverride = print;
+        return this;
+    }
+
+    public SqlAndParams toSqlAndParams() {
+        if (metadata.hasLogicDelete()) {
+            ColumnMetadata ld = metadata.getLogicDeleteColumn();
+            com.javaorm.core.ast.UpdateStatement updateStmt = new com.javaorm.core.ast.UpdateStatement(entityClass, metadata.getTableName());
+            updateStmt.addSet(ld.getColumnName(), ld.getLogicDeleteDeletedValue());
+            for (Condition c : whereConditions) {
+                updateStmt.addWhereCondition(c);
+            }
+            updateStmt.addWhereCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+            return dialect.buildUpdate(updateStmt);
+        }
+        DeleteStatement stmt = new DeleteStatement(entityClass, metadata.getTableName());
+        for (Condition c : whereConditions) {
+            stmt.addWhereCondition(c);
+        }
+        return dialect.buildDelete(stmt);
+    }
+
+    public String toSql() {
+        return toSqlAndParams().getSql();
+    }
+
+    @Override
+    public String toString() {
+        return toSql();
+    }
+
     public WhereBuilder<T> where() {
-        return new WhereBuilder<>(entityClass, queryHelper, null, whereConditions::add, this::execute);
+        return new WhereBuilder<>(entityClass, queryHelper, null, whereConditions::add, null, this::execute, this::toSqlAndParams, val -> {
+            if (val == null) this.printSql();
+            else this.printSql(val);
+        });
     }
 
     public DeleteBuilder<T> where(Consumer<WhereBuilder<T>> consumer) {
@@ -74,9 +115,6 @@ public class DeleteBuilder<T> {
         // 如果存在逻辑删除，自动重写为 UPDATE t SET is_deleted = 1 WHERE ...
         if (metadata.hasLogicDelete()) {
             ColumnMetadata ld = metadata.getLogicDeleteColumn();
-            UpdateBuilder<T> updateBuilder = new UpdateBuilder<>(entityClass, dataSource, dialect, config);
-            updateBuilder.set(t -> null, null); // 占位
-            // 清空占位并赋逻辑删除值
             return performLogicDelete(ld);
         }
 
@@ -87,7 +125,8 @@ public class DeleteBuilder<T> {
         }
 
         SqlAndParams sqlAndParams = dialect.buildDelete(stmt);
-        if (config.isPrintSql()) {
+        boolean shouldPrint = (printSqlOverride != null) ? printSqlOverride : config.isPrintSql();
+        if (shouldPrint) {
             log.info("==>  Preparing: {}", sqlAndParams.getSql());
             log.info("==> Parameters: {}", sqlAndParams.getParams());
         }
@@ -106,8 +145,6 @@ public class DeleteBuilder<T> {
     }
 
     private int performLogicDelete(ColumnMetadata ld) {
-        UpdateBuilder<T> updateBuilder = new UpdateBuilder<>(entityClass, dataSource, dialect, config);
-        // 通过直接修改内部语句避免反射占位
         return executeLogicDeleteUpdate(ld);
     }
 
@@ -123,7 +160,8 @@ public class DeleteBuilder<T> {
         updateStmt.addWhereCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
 
         SqlAndParams sqlAndParams = dialect.buildUpdate(updateStmt);
-        if (config.isPrintSql()) {
+        boolean shouldPrint = (printSqlOverride != null) ? printSqlOverride : config.isPrintSql();
+        if (shouldPrint) {
             log.info("==> [LogicDelete] Preparing: {}", sqlAndParams.getSql());
             log.info("==> [LogicDelete] Parameters: {}", sqlAndParams.getParams());
         }

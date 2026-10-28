@@ -86,9 +86,46 @@ public class HavingBuilder<T> {
         return new OrderByBuilder<>(this, query.getStatement(), alias, colName);
     }
 
+    public OrderByBuilder<HavingBuilder<T>> orderBy(String propertyOrColumn) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            String alias = query.resolveTableAlias(path);
+            String colName = query.resolveColumnName(path);
+            return new OrderByBuilder<>(this, query.getStatement(), alias, colName);
+        }
+        if (propertyOrColumn == null) {
+            throw new IllegalArgumentException("Order by column cannot be null");
+        }
+        com.javaorm.core.ast.ColumnExpression ce = query.stringToColumnExpression(propertyOrColumn);
+        return new OrderByBuilder<>(this, query.getStatement(), ce.getTableAlias(), ce.getColumnName());
+    }
+
     public OrderByBuilder<HavingBuilder<T>> orderBy(SqlExpression expr) {
         query.resolveExpression(expr);
         return new OrderByBuilder<>(this, query.getStatement(), expr);
+    }
+
+    public HavingBuilder<T> printSql() {
+        query.printSql();
+        return this;
+    }
+
+    public HavingBuilder<T> printSql(boolean print) {
+        query.printSql(print);
+        return this;
+    }
+
+    public com.javaorm.core.dialect.SqlAndParams toSqlAndParams() {
+        return query.toSqlAndParams();
+    }
+
+    public String toSql() {
+        return query.toSql();
+    }
+
+    @Override
+    public String toString() {
+        return toSql();
     }
 
     public Query<T> union(Query<?> other) {
@@ -112,6 +149,10 @@ public class HavingBuilder<T> {
     }
 
     public List<Map<String, Object>> listMaps() {
+        return query.listMaps();
+    }
+
+    public List<Map<String, Object>> maps() {
         return query.listMaps();
     }
 

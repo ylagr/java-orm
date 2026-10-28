@@ -11,6 +11,20 @@ import java.util.List;
  */
 public class OracleDialect extends AbstractDialect {
 
+    private final boolean oracle11;
+
+    public OracleDialect() {
+        this(false);
+    }
+
+    public OracleDialect(boolean oracle11) {
+        this.oracle11 = oracle11;
+    }
+
+    public boolean isOracle11() {
+        return oracle11;
+    }
+
     @Override
     public String quote(String identifier) {
         if (identifier == null) return null;
@@ -23,11 +37,55 @@ public class OracleDialect extends AbstractDialect {
         if (stmt.getRootTableName() == null || stmt.getRootTableName().isEmpty()) {
             stmt.setRootTableName("DUAL");
         }
+        if (oracle11 && (stmt.getLimit() != null || (stmt.getOffset() != null && stmt.getOffset() > 0))) {
+            return buildOracle11Select(stmt);
+        }
         return super.buildSelect(stmt);
+    }
+
+    private SqlAndParams buildOracle11Select(SelectStatement stmt) {
+        Integer limit = stmt.getLimit();
+        Integer offset = stmt.getOffset();
+        stmt.setLimit(null);
+        stmt.setOffset(null);
+        SqlAndParams inner;
+        try {
+            inner = super.buildSelect(stmt);
+        } finally {
+            stmt.setLimit(limit);
+            stmt.setOffset(offset);
+        }
+
+        StringBuilder sql = new StringBuilder();
+        java.util.List<Object> params = new java.util.ArrayList<>(inner.getParams());
+
+        int off = (offset != null && offset > 0) ? offset : 0;
+        if (off > 0) {
+            sql.append("SELECT * FROM (SELECT tt.*, ROWNUM AS \"row_num\" FROM (")
+               .append(inner.getSql())
+               .append(") tt");
+            if (limit != null) {
+                sql.append(" WHERE ROWNUM <= ?");
+                params.add(off + limit);
+            }
+            sql.append(") WHERE \"row_num\" > ?");
+            params.add(off);
+        } else if (limit != null) {
+            sql.append("SELECT * FROM (")
+               .append(inner.getSql())
+               .append(") WHERE ROWNUM <= ?");
+            params.add(limit);
+        } else {
+            return inner;
+        }
+        return new SqlAndParams(sql.toString(), params);
     }
 
     @Override
     protected void renderPagination(StringBuilder sql, List<Object> params, Integer limit, Integer offset) {
+        if (oracle11) {
+            return;
+        }
         if (limit != null) {
             int off = (offset != null && offset > 0) ? offset : 0;
             sql.append(" OFFSET ? ROWS FETCH NEXT ? ROWS ONLY");

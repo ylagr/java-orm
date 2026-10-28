@@ -30,6 +30,7 @@ public class Query<T> {
     private final DataSource dataSource;
     private final Dialect dialect;
     private final OrmConfig config;
+    private Boolean printSqlOverride = null;
 
     private final SelectStatement statement;
     private final Map<String, String> relationJoinAliases = new LinkedHashMap<>();
@@ -53,6 +54,108 @@ public class Query<T> {
             ColumnMetadata ld = rootMetadata.getLogicDeleteColumn();
             statement.addWhereCondition(new BinaryCondition(rootAlias, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
         }
+    }
+
+    /**
+     * 链式配置：本次执行按照当前全局配置决定是否打印 SQL
+     */
+    public Query<T> printSql() {
+        this.printSqlOverride = config.isPrintSql();
+        return this;
+    }
+
+    /**
+     * 链式配置：本次执行强制指定是否打印 SQL（忽略全局配置）
+     */
+    public Query<T> printSql(boolean print) {
+        this.printSqlOverride = print;
+        return this;
+    }
+
+    public OrmConfig getEffectiveConfig() {
+        if (printSqlOverride == null) {
+            return config;
+        }
+        OrmConfig effective = new OrmConfig();
+        effective.setNameConversion(config.getNameConversion());
+        effective.setDefaultLogicDeleteProperty(config.getDefaultLogicDeleteProperty());
+        effective.setDefaultLogicDeleteNormalValue(config.getDefaultLogicDeleteNormalValue());
+        effective.setDefaultLogicDeleteDeletedValue(config.getDefaultLogicDeleteDeletedValue());
+        effective.setPrintSql(printSqlOverride);
+        return effective;
+    }
+
+    /**
+     * 随时获取当前生成的 SQL 及参数对象
+     */
+    public com.javaorm.core.dialect.SqlAndParams toSqlAndParams() {
+        return dialect.buildSelect(statement);
+    }
+
+    /**
+     * 随时获取当前生成的 SQL 字符串
+     */
+    public String toSql() {
+        return toSqlAndParams().getSql();
+    }
+
+    @Override
+    public String toString() {
+        return toSql();
+    }
+
+    public ColumnExpression stringToColumnExpression(String str) {
+        if (str == null) return null;
+        str = str.trim();
+        String alias = null;
+        String colPart = str;
+        String[] parts = str.split(" (?i)as ");
+        if (parts.length == 2) {
+            colPart = parts[0].trim();
+            alias = parts[1].trim();
+        } else {
+            int spaceIdx = str.lastIndexOf(' ');
+            if (spaceIdx > 0 && !str.contains("(")) {
+                colPart = str.substring(0, spaceIdx).trim();
+                alias = str.substring(spaceIdx + 1).trim();
+            }
+        }
+
+        String tableAlias;
+        String colName;
+        if (colPart.contains(".")) {
+            int dot = colPart.lastIndexOf('.');
+            tableAlias = colPart.substring(0, dot);
+            colName = colPart.substring(dot + 1);
+            boolean isRoot = tableAlias.equalsIgnoreCase(statement.getRootTableAlias())
+                    || (rootEntityClass != null && tableAlias.equalsIgnoreCase(rootEntityClass.getSimpleName()))
+                    || (rootMetadata != null && tableAlias.equalsIgnoreCase(rootMetadata.getTableName()))
+                    || statement.getJoins().isEmpty();
+            if (isRoot) {
+                tableAlias = statement.getRootTableAlias();
+            }
+        } else {
+            tableAlias = statement.getRootTableAlias();
+            colName = colPart;
+        }
+        if (rootMetadata != null) {
+            ColumnMetadata cm = rootMetadata.getColumnByProperty(colName);
+            if (cm != null) {
+                colName = cm.getColumnName();
+            } else {
+                ColumnMetadata dbCol = rootMetadata.getColumnByDbName(colName);
+                if (dbCol != null) {
+                    colName = dbCol.getColumnName();
+                } else if (config != null && config.getNameConversion() != null) {
+                    colName = config.getNameConversion().convert(colName);
+                }
+            }
+        }
+        ColumnExpression ce = new ColumnExpression(tableAlias, colName);
+        if (alias != null && !alias.isEmpty()) {
+            ce.as(alias);
+        }
+        return ce;
     }
 
     /**
@@ -82,6 +185,8 @@ public class Query<T> {
                     PropertyPath p = RecordingContext.finish();
                     if (p != null) {
                         expr = pathToColumnExpression(p);
+                    } else if (item instanceof String) {
+                        expr = stringToColumnExpression((String) item);
                     } else if (item != null) {
                         expr = new RawSqlExpression("?", item);
                     } else {
@@ -143,6 +248,8 @@ public class Query<T> {
                     PropertyPath p = RecordingContext.finish();
                     if (p != null) {
                         expr = pathToColumnExpression(p);
+                    } else if (item instanceof String) {
+                        expr = stringToColumnExpression((String) item);
                     } else if (item != null) {
                         expr = new RawSqlExpression("?", item);
                     } else {
@@ -242,11 +349,28 @@ public class Query<T> {
         }
         PropertyPath path = RecordingContext.finish();
         if (path == null) {
+            if (val instanceof String) {
+                return orderBy((String) val);
+            }
             throw new IllegalStateException("No proxy property accessed before calling orderBy(...)");
         }
         String alias = resolveTableAlias(path);
         String colName = resolveColumnName(path);
         return new OrderByBuilder<>(this, statement, alias, colName);
+    }
+
+    public OrderByBuilder<Query<T>> orderBy(String propertyOrColumn) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            String alias = resolveTableAlias(path);
+            String colName = resolveColumnName(path);
+            return new OrderByBuilder<>(this, statement, alias, colName);
+        }
+        if (propertyOrColumn == null) {
+            throw new IllegalArgumentException("Order by column cannot be null");
+        }
+        ColumnExpression ce = stringToColumnExpression(propertyOrColumn);
+        return new OrderByBuilder<>(this, statement, ce.getTableAlias(), ce.getColumnName());
     }
 
     public OrderByBuilder<Query<T>> orderBy(SqlExpression expr) {
@@ -289,9 +413,9 @@ public class Query<T> {
     // 执行方法
     public List<T> list() {
         try (Connection conn = dataSource.getConnection()) {
-            List<T> result = EntityHydrator.queryList(conn, statement, rootMetadata, dialect, config);
+            List<T> result = EntityHydrator.queryList(conn, statement, rootMetadata, dialect, getEffectiveConfig());
             if (!includes.isEmpty() && !result.isEmpty()) {
-                IncludeProcessor.processIncludes(conn, result, rootMetadata, includes, dialect, config);
+                IncludeProcessor.processIncludes(conn, result, rootMetadata, includes, dialect, getEffectiveConfig());
             }
             return result;
         } catch (Exception e) {
@@ -301,7 +425,7 @@ public class Query<T> {
 
     public List<Map<String, Object>> listMaps() {
         try (Connection conn = dataSource.getConnection()) {
-            return EntityHydrator.queryMaps(conn, statement, dialect, config);
+            return EntityHydrator.queryMaps(conn, statement, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute listMaps query", e);
         }
@@ -314,7 +438,7 @@ public class Query<T> {
     public <V> V fetchOne(Class<V> targetType) {
         statement.setLimit(1);
         try (Connection conn = dataSource.getConnection()) {
-            return EntityHydrator.queryScalar(conn, statement, targetType, dialect, config);
+            return EntityHydrator.queryScalar(conn, statement, targetType, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to fetch one scalar", e);
         }
@@ -322,7 +446,7 @@ public class Query<T> {
 
     public <V> List<V> fetchList(Class<V> targetType) {
         try (Connection conn = dataSource.getConnection()) {
-            return EntityHydrator.queryScalarList(conn, statement, targetType, dialect, config);
+            return EntityHydrator.queryScalarList(conn, statement, targetType, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to fetch scalar list", e);
         }
@@ -349,7 +473,7 @@ public class Query<T> {
         }
 
         try (Connection conn = dataSource.getConnection()) {
-            return EntityHydrator.queryCount(conn, countStmt, dialect, config);
+            return EntityHydrator.queryCount(conn, countStmt, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute count query", e);
         }
@@ -377,6 +501,21 @@ public class Query<T> {
             if (ce.getTableAlias() == null && ce.getPath() != null) {
                 ce.setTableAlias(resolveTableAlias(ce.getPath()));
                 ce.setColumnName(resolveColumnName(ce.getPath()));
+            } else if (ce.getTableAlias() == null && ce.getColumnName() != null) {
+                ce.setTableAlias(statement.getRootTableAlias());
+                if (rootMetadata != null) {
+                    ColumnMetadata cm = rootMetadata.getColumnByProperty(ce.getColumnName());
+                    if (cm != null) {
+                        ce.setColumnName(cm.getColumnName());
+                    } else {
+                        ColumnMetadata dbCol = rootMetadata.getColumnByDbName(ce.getColumnName());
+                        if (dbCol != null) {
+                            ce.setColumnName(dbCol.getColumnName());
+                        } else if (config != null && config.getNameConversion() != null) {
+                            ce.setColumnName(config.getNameConversion().convert(ce.getColumnName()));
+                        }
+                    }
+                }
             } else if (ce.getTableAlias() == null && ce.getColumnName() == null) {
                 PropertyPath path = RecordingContext.finish();
                 if (path != null) {

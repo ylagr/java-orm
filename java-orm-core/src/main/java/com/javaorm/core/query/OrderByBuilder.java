@@ -41,4 +41,31 @@ public class OrderByBuilder<TQuery> {
         }
         return query;
     }
+
+    public com.javaorm.core.dialect.SqlAndParams toSqlAndParams() {
+        asc();
+        if (query instanceof Query) {
+            return ((Query<?>) query).toSqlAndParams();
+        } else if (query instanceof WhereBuilder) {
+            return ((WhereBuilder<?>) query).toSqlAndParams();
+        } else if (query instanceof DtoQuery) {
+            return ((DtoQuery<?, ?>) query).toSqlAndParams();
+        } else if (query instanceof HavingBuilder) {
+            return ((HavingBuilder<?>) query).toSqlAndParams();
+        }
+        throw new UnsupportedOperationException("toSqlAndParams() not supported on " + query.getClass());
+    }
+
+    public String toSql() {
+        return toSqlAndParams().getSql();
+    }
+
+    @Override
+    public String toString() {
+        try {
+            return toSql();
+        } catch (Exception e) {
+            return super.toString();
+        }
+    }
 }

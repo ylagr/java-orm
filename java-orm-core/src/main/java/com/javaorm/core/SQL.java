@@ -22,15 +22,56 @@ public class SQL {
     }
 
     /**
-     * 将代理属性调用转为列引用表达式（支持链式设置别名，如 col(s.getId()).as("myId")）
+     * 将代理属性调用或动态列字符串转为列引用表达式（支持链式设置别名，如 col(s.getId()).as("myId") 或 col("age") 或 col("t0.age")）
      */
     public static ColumnExpression col(Object prop) {
         return column(prop);
     }
 
+    public static ColumnExpression col(String propertyOrColumn) {
+        List<PropertyPath> paths = RecordingContext.finishLast(1);
+        if (!paths.isEmpty()) {
+            return new ColumnExpression(paths.get(0));
+        }
+        if (propertyOrColumn == null) return null;
+        String str = propertyOrColumn.trim();
+        String alias = null;
+        String colPart = str;
+        String[] parts = str.split(" (?i)as ");
+        if (parts.length == 2) {
+            colPart = parts[0].trim();
+            alias = parts[1].trim();
+        } else {
+            int spaceIdx = str.lastIndexOf(' ');
+            if (spaceIdx > 0 && !str.contains("(")) {
+                colPart = str.substring(0, spaceIdx).trim();
+                alias = str.substring(spaceIdx + 1).trim();
+            }
+        }
+        String tableAlias = null;
+        String colName = colPart;
+        if (colPart.contains(".")) {
+            int dot = colPart.lastIndexOf('.');
+            tableAlias = colPart.substring(0, dot);
+            colName = colPart.substring(dot + 1);
+        }
+        ColumnExpression ce = new ColumnExpression(tableAlias, colName);
+        if (alias != null && !alias.isEmpty()) {
+            ce.as(alias);
+        }
+        return ce;
+    }
+
+    public static ColumnExpression col(String tableAlias, String propertyOrColumn) {
+        return new ColumnExpression(tableAlias, propertyOrColumn);
+    }
+
     public static ColumnExpression column(Object prop) {
         if (prop instanceof ColumnExpression) {
             return (ColumnExpression) prop;
+        }
+        if (prop instanceof String) {
+            return col((String) prop);
         }
         List<PropertyPath> paths = RecordingContext.finishLast(1);
         if (!paths.isEmpty()) {

@@ -36,6 +36,7 @@ public class UpdateBuilder<T> {
     private final DataSource dataSource;
     private final Dialect dialect;
     private final OrmConfig config;
+    private Boolean printSqlOverride = null;
     private final UpdateStatement statement;
     private final Query<T> queryHelper;
 
@@ -60,12 +61,68 @@ public class UpdateBuilder<T> {
         return ProxyFactory.getProxy(entityClass);
     }
 
+    public UpdateBuilder<T> printSql() {
+        this.printSqlOverride = config.isPrintSql();
+        return this;
+    }
+
+    public UpdateBuilder<T> printSql(boolean print) {
+        this.printSqlOverride = print;
+        return this;
+    }
+
+    public SqlAndParams toSqlAndParams() {
+        return dialect.buildUpdate(statement);
+    }
+
+    public String toSql() {
+        return toSqlAndParams().getSql();
+    }
+
+    @Override
+    public String toString() {
+        return toSql();
+    }
+
+    public UpdateBuilder<T> set(String propertyOrColumn, Object value) {
+        PropertyPath path = RecordingContext.finishCurrent();
+        if (path == null) {
+            path = RecordingContext.finish();
+        }
+        if (path != null) {
+            ColumnMetadata col = metadata.getColumnByProperty(path.getTerminalProperty());
+            String colName = col != null ? col.getColumnName() : config.getNameConversion().convert(path.getTerminalProperty());
+            statement.addSet(colName, value);
+            return this;
+        }
+        if (propertyOrColumn == null) {
+            throw new IllegalArgumentException("Set column or property name cannot be null");
+        }
+        String colName = propertyOrColumn;
+        ColumnMetadata col = metadata.getColumnByProperty(propertyOrColumn);
+        if (col != null) {
+            colName = col.getColumnName();
+        } else {
+            ColumnMetadata dbCol = metadata.getColumnByDbName(propertyOrColumn);
+            if (dbCol != null) {
+                colName = dbCol.getColumnName();
+            } else if (config != null && config.getNameConversion() != null) {
+                colName = config.getNameConversion().convert(propertyOrColumn);
+            }
+        }
+        statement.addSet(colName, value);
+        return this;
+    }
+
     public UpdateBuilder<T> set(Object propVal, Object value) {
         PropertyPath path = RecordingContext.finishCurrent();
         if (path == null) {
             path = RecordingContext.finish();
         }
         if (path == null) {
+            if (propVal instanceof String) {
+                return set((String) propVal, value);
+            }
             throw new IllegalStateException("No proxy property accessed before calling set(...)! E.g. set(s.getAge(), 20)");
         }
         ColumnMetadata col = metadata.getColumnByProperty(path.getTerminalProperty());
@@ -83,7 +140,10 @@ public class UpdateBuilder<T> {
     }
 
     public WhereBuilder<T> where() {
-        return new WhereBuilder<>(entityClass, queryHelper, null, statement::addWhereCondition, this::execute);
+        return new WhereBuilder<>(entityClass, queryHelper, null, statement::addWhereCondition, null, this::execute, this::toSqlAndParams, val -> {
+            if (val == null) this.printSql();
+            else this.printSql(val);
+        });
     }
 
     public UpdateBuilder<T> where(Consumer<WhereBuilder<T>> consumer) {
@@ -102,8 +162,9 @@ public class UpdateBuilder<T> {
             return 0;
         }
 
-        SqlAndParams sqlAndParams = dialect.buildUpdate(statement);
-        if (config.isPrintSql()) {
+        SqlAndParams sqlAndParams = toSqlAndParams();
+        boolean shouldPrint = (printSqlOverride != null) ? printSqlOverride : config.isPrintSql();
+        if (shouldPrint) {
             log.info("==>  Preparing: {}", sqlAndParams.getSql());
             log.info("==> Parameters: {}", sqlAndParams.getParams());
         }

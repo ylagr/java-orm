@@ -204,8 +204,10 @@ public abstract class AbstractDialect implements Dialect {
         } else if (cond instanceof ExpressionCondition) {
             ExpressionCondition ec = (ExpressionCondition) cond;
             renderExpression(ec.getExpression(), sql, params);
-            sql.append(" ").append(ec.getOperator().getSql());
-            renderOperatorValues(ec.getOperator(), ec.getValues(), sql, params);
+            if (ec.getOperator() != null) {
+                sql.append(" ").append(ec.getOperator().getSql());
+                renderOperatorValues(ec.getOperator(), ec.getValues(), sql, params);
+            }
         } else if (cond instanceof ColumnEqualityCondition) {
             ColumnEqualityCondition cec = (ColumnEqualityCondition) cond;
             if (cec.getLeftTableAlias() != null && !cec.getLeftTableAlias().isEmpty()) {

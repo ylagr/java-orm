@@ -313,24 +313,26 @@ List<StudentWindowDto> dtoList = orm.select(StudentWindowDto.class).from(Student
 ).list();
 ```
 
-### 6. 多数据库方言支持与 Oracle 12c+
+### 6. 多数据库方言支持与 Oracle 11g / 12c+
 
-支持主流数据库方言切换：`MySQLDialect`, `PostgreSQLDialect`, `OracleDialect`, `SQLiteDialect`, `H2Dialect`。
+支持主流数据库方言切换：`MySQLDialect`, `PostgreSQLDialect`, `OracleDialect`, `Oracle11Dialect`, `SQLiteDialect`, `H2Dialect`。
 
-针对 Oracle 提供专属方言支持：
-- 严格遵循 Oracle 双引号标识符转义（`"TABLE"`、`"COLUMN"`）
-- 原生 Oracle 12c+ ANSI 分页语法（`OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`）
-- 无表虚拟查询自动注入 `FROM DUAL`
-- 函数智能映射：`NOW()` -> `SYSDATE`，`IFNULL()` -> `NVL()`，`CONCAT()` -> `||`，`SUBSTRING()` -> `SUBSTR()`
+针对 Oracle 提供两套专属方言支持：
+- **Oracle 12c+ (`OracleDialect`)**：严格遵循 Oracle 双引号标识符转义，原生 ANSI 分页（`OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`）。
+- **Oracle 11g (`Oracle11Dialect`)**：自动适配经典 ROWNUM 三层/两层嵌套分页算法，完美兼容老旧 Oracle 11g 数据库环境：
+  - 单 limit / offset=0 时：两层嵌套 `SELECT * FROM ( ... ) WHERE ROWNUM <= ?`
+  - 带有 offset + limit 时：三层嵌套 `SELECT * FROM (SELECT tt.*, ROWNUM AS "row_num" FROM ( ... ) tt WHERE ROWNUM <= ?) WHERE "row_num" > ?`
+- 无表虚拟查询自动注入 `FROM DUAL`。
+- 函数智能映射：`NOW()` -> `SYSDATE`，`IFNULL()` -> `NVL()`，`CONCAT()` -> `||`，`SUBSTRING()` -> `SUBSTR()`。
 
 ```java
-// 初始化 Oracle 方言 ORM 客户端
-JavaOrm orm = JavaOrm.create(dataSource, new OracleDialect());
+// 初始化 Oracle 11g 方言 ORM 客户端（亦可通过 JDBC 元数据自动侦测识别）
+JavaOrm orm = JavaOrm.create(dataSource, new Oracle11Dialect());
 
-// 原生支持 Oracle 12c+ 链式分页
+// 原生支持 Oracle 11g ROWNUM 嵌套链式分页
 List<Student> pageStudents = orm.select(Student.class)
     .orderBy(s.getId()).asc()
-    .page(1, 10) // 生成 OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY
+    .page(1, 10)
     .list();
 ```
 
@@ -353,6 +355,72 @@ orm.update(Student.class)
 orm.delete(Student.class)
     .where((w, s) -> w.and(s.getAge()).ge(60))
     .execute();
+```
+
+### 8. 完全动态字符串格式 (Dynamic String Syntax)
+
+除了强类型代理方式外，框架全面支持纯字符串传参（动态列名、表别名、复杂表达式），适用于高度动态的报表配置与前端条件直通：
+
+```java
+// 1. 动态条件与原生 Raw SQL
+orm.select(Student.class)
+    .where()
+        .and("age").ge(18)
+        .and("student_name").like("张%")
+        .andRaw("status IN (?, ?)", 1, 2)
+    .list();
+
+// 2. 动态投影选择 (支持别名映射)
+List<Map<String, Object>> dynamicCols = orm.select(Student.class)
+    .select("id", "student_name as name", "age")
+    .where()
+        .and("age").gt(20)
+    .groupBy("age")
+    .orderBy("age").desc()
+    .maps();
+
+// 3. 动态更新与删除
+orm.update(Student.class)
+    .set("student_name", "动态李四")
+    .set("age", 22)
+    .where()
+        .and("id").eq(1L)
+    .execute();
+
+orm.delete(Student.class)
+    .where()
+        .and("age").le(10)
+    .execute();
+```
+
+### 9. 随时获取当前 SQL 与链式 SQL 打印 (toSql & printSql)
+
+#### 随时获取当前 SQL (`toSql()`, `toSqlAndParams()`)
+在流式链调用的任何阶段（`Query`, `WhereBuilder`, `UpdateBuilder`, `DeleteBuilder`, `DtoQuery` 等），均可无损输出当前装配的 SQL 和参数，亦可直接调用 `toString()` 查看：
+
+```java
+// 任意链式阶段直接获取当前 SQL 和参数
+String sql = orm.select(Student.class).where().and(s.getAge()).ge(18).toSql();
+SqlAndParams sp = orm.select(Student.class).where().and(s.getAge()).ge(18).toSqlAndParams();
+System.out.println("SQL: " + sp.getSql());
+System.out.println("Params: " + sp.getParams());
+
+// toString() 亦等价于 toSql()
+System.out.println(orm.select(Student.class).where().and(s.getAge()).ge(18));
+```
+
+#### 链式 SQL 打印控制 (`printSql()`)
+- `.printSql(true)`：**无视全局配置**，本次执行强制打印当前 SQL 及其参数绑定。
+- `.printSql(false)`：本次执行强制不打印。
+- `.printSql()`：遵循当前全局配置（`config.isPrintSql()`）决定是否打印。
+
+```java
+// 链式调用控制是否打印
+List<Student> students = orm.select(Student.class)
+    .printSql(true) // 强制打印本次执行的 SQL
+    .where()
+        .and(s.getAge()).ge(18)
+    .list();
 ```
 
 ---

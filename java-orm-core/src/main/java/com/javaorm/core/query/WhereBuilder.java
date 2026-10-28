@@ -34,6 +34,8 @@ public class WhereBuilder<T> {
     private final Consumer<Condition> conditionReceiver;
     private final Supplier<List<?>> customListSupplier;
     private final java.util.function.IntSupplier executeSupplier;
+    private final Supplier<com.javaorm.core.dialect.SqlAndParams> sqlAndParamsSupplier;
+    private final Consumer<Boolean> printSqlConsumer;
 
     public WhereBuilder(Query<T> query) {
         this(query, null);
@@ -41,37 +43,42 @@ public class WhereBuilder<T> {
 
     @SuppressWarnings("unchecked")
     public WhereBuilder(Query<T> query, Supplier<List<?>> customListSupplier) {
-        this.entityClass = (Class<T>) query.getStatement().getRootEntityClass();
-        this.rootQuery = query;
-        this.scopeAlias = query.getStatement().getRootTableAlias();
-        this.conditionReceiver = query.getStatement()::addWhereCondition;
-        this.customListSupplier = customListSupplier;
-        this.executeSupplier = null;
+        this((Class<T>) query.getStatement().getRootEntityClass(), query, query.getStatement().getRootTableAlias(),
+                query.getStatement()::addWhereCondition, customListSupplier, null,
+                query::toSqlAndParams, val -> { if (val == null) query.printSql(); else query.printSql(val); });
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias) {
-        this(entityClass, rootQuery, scopeAlias, rootQuery.getStatement()::addWhereCondition, null, null);
+        this(entityClass, rootQuery, scopeAlias, rootQuery.getStatement()::addWhereCondition, null, null, null, null);
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver) {
-        this(entityClass, rootQuery, scopeAlias, conditionReceiver, null, null);
+        this(entityClass, rootQuery, scopeAlias, conditionReceiver, null, null, null, null);
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver, java.util.function.IntSupplier executeSupplier) {
-        this(entityClass, rootQuery, scopeAlias, conditionReceiver, null, executeSupplier);
+        this(entityClass, rootQuery, scopeAlias, conditionReceiver, null, executeSupplier, null, null);
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver, Supplier<List<?>> customListSupplier) {
-        this(entityClass, rootQuery, scopeAlias, conditionReceiver, customListSupplier, null);
+        this(entityClass, rootQuery, scopeAlias, conditionReceiver, customListSupplier, null, null, null);
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver, Supplier<List<?>> customListSupplier, java.util.function.IntSupplier executeSupplier) {
+        this(entityClass, rootQuery, scopeAlias, conditionReceiver, customListSupplier, executeSupplier, null, null);
+    }
+
+    public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver,
+                        Supplier<List<?>> customListSupplier, java.util.function.IntSupplier executeSupplier,
+                        Supplier<com.javaorm.core.dialect.SqlAndParams> sqlAndParamsSupplier, Consumer<Boolean> printSqlConsumer) {
         this.entityClass = entityClass;
         this.rootQuery = rootQuery;
         this.scopeAlias = scopeAlias;
         this.conditionReceiver = conditionReceiver;
         this.customListSupplier = customListSupplier;
         this.executeSupplier = executeSupplier;
+        this.sqlAndParamsSupplier = sqlAndParamsSupplier;
+        this.printSqlConsumer = printSqlConsumer;
     }
 
     public int execute() {
@@ -107,6 +114,25 @@ public class WhereBuilder<T> {
         });
     }
 
+    public <R> PropertyOperator<WhereBuilder<T>, R> and(String propertyOrColumn) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.AND, p, op, vals));
+        }
+        if (propertyOrColumn == null) {
+            throw new IllegalArgumentException("Column or property name cannot be null");
+        }
+        return new PropertyOperator<>(this, (op, vals) -> appendDynamicCondition(LogicalOperator.AND, propertyOrColumn, op, vals));
+    }
+
+    public WhereBuilder<T> andRaw(String rawSql, Object... params) {
+        RawSqlExpression raw = new RawSqlExpression(rawSql, params);
+        ExpressionCondition cond = new ExpressionCondition(raw, null);
+        cond.setLogicalOperator(LogicalOperator.AND);
+        conditionReceiver.accept(cond);
+        return this;
+    }
+
     /**
      * 方式 1：直接传入代理 getter 调用结果，如 w.and(s.getAge()).gt(18)
      */
@@ -116,6 +142,9 @@ public class WhereBuilder<T> {
         }
         PropertyPath path = RecordingContext.finish();
         if (path == null) {
+            if (val instanceof String) {
+                return and((String) val);
+            }
             throw new IllegalStateException("No proxy property accessed before calling and(...)! Did you call s.getFoo()?");
         }
         return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.AND, p, op, vals));
@@ -127,6 +156,25 @@ public class WhereBuilder<T> {
     public <R> PropertyOperator<WhereBuilder<T>, R> and(Function<T, R> getter) {
         PropertyPath path = recordPath(getter);
         return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.AND, p, op, vals));
+    }
+
+    public <R> PropertyOperator<WhereBuilder<T>, R> or(String propertyOrColumn) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.OR, p, op, vals));
+        }
+        if (propertyOrColumn == null) {
+            throw new IllegalArgumentException("Column or property name cannot be null");
+        }
+        return new PropertyOperator<>(this, (op, vals) -> appendDynamicCondition(LogicalOperator.OR, propertyOrColumn, op, vals));
+    }
+
+    public WhereBuilder<T> orRaw(String rawSql, Object... params) {
+        RawSqlExpression raw = new RawSqlExpression(rawSql, params);
+        ExpressionCondition cond = new ExpressionCondition(raw, null);
+        cond.setLogicalOperator(LogicalOperator.OR);
+        conditionReceiver.accept(cond);
+        return this;
     }
 
     /**
@@ -150,6 +198,9 @@ public class WhereBuilder<T> {
         }
         PropertyPath path = RecordingContext.finish();
         if (path == null) {
+            if (val instanceof String) {
+                return or((String) val);
+            }
             throw new IllegalStateException("No proxy property accessed before calling or(...)! Did you call s.getFoo()?");
         }
         return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.OR, p, op, vals));
@@ -196,7 +247,7 @@ public class WhereBuilder<T> {
 
     public WhereBuilder<T> andGroup(Consumer<WhereBuilder<T>> groupConsumer) {
         GroupCondition group = new GroupCondition(LogicalOperator.AND);
-        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, executeSupplier);
+        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub);
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
@@ -206,7 +257,7 @@ public class WhereBuilder<T> {
 
     public WhereBuilder<T> andGroup(BiWhereConsumer<T> groupConsumer) {
         GroupCondition group = new GroupCondition(LogicalOperator.AND);
-        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, executeSupplier);
+        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub, sub.proxy());
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
@@ -216,7 +267,7 @@ public class WhereBuilder<T> {
 
     public WhereBuilder<T> orGroup(Consumer<WhereBuilder<T>> groupConsumer) {
         GroupCondition group = new GroupCondition(LogicalOperator.OR);
-        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, executeSupplier);
+        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub);
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
@@ -226,7 +277,7 @@ public class WhereBuilder<T> {
 
     public WhereBuilder<T> orGroup(BiWhereConsumer<T> groupConsumer) {
         GroupCondition group = new GroupCondition(LogicalOperator.OR);
-        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, executeSupplier);
+        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub, sub.proxy());
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
@@ -253,6 +304,55 @@ public class WhereBuilder<T> {
                 alias = scopeAlias;
             }
             colName = rootQuery != null ? rootQuery.resolveColumnName(path) : path.getTerminalProperty();
+        }
+
+        if (vals != null && rootQuery != null) {
+            for (Object v : vals) {
+                if (v instanceof SqlExpression) {
+                    rootQuery.resolveExpression((SqlExpression) v);
+                }
+            }
+        }
+
+        BinaryCondition cond = new BinaryCondition(alias, colName, op, vals);
+        cond.setLogicalOperator(logOp);
+        conditionReceiver.accept(cond);
+    }
+
+    private void appendDynamicCondition(LogicalOperator logOp, String propertyOrColumn, SqlOperator op, Object... vals) {
+        String str = propertyOrColumn.trim();
+        String alias;
+        String colName;
+        if (str.contains(".")) {
+            int dot = str.lastIndexOf('.');
+            alias = str.substring(0, dot);
+            colName = str.substring(dot + 1);
+            if (scopeAlias != null) {
+                boolean isRoot = alias.equalsIgnoreCase(scopeAlias)
+                        || (entityClass != null && alias.equalsIgnoreCase(entityClass.getSimpleName()))
+                        || (rootQuery != null && alias.equalsIgnoreCase(rootQuery.getStatement().getRootTableName()))
+                        || (rootQuery != null && rootQuery.getStatement().getJoins().isEmpty());
+                if (isRoot) {
+                    alias = scopeAlias;
+                }
+            }
+        } else {
+            alias = scopeAlias;
+            colName = str;
+        }
+        if (entityClass != null && rootQuery != null) {
+            com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(entityClass, rootQuery.getConfig());
+            com.javaorm.core.metadata.ColumnMetadata cm = meta.getColumnByProperty(colName);
+            if (cm != null) {
+                colName = cm.getColumnName();
+            } else {
+                com.javaorm.core.metadata.ColumnMetadata dbCol = meta.getColumnByDbName(colName);
+                if (dbCol != null) {
+                    colName = dbCol.getColumnName();
+                } else if (rootQuery.getConfig() != null && rootQuery.getConfig().getNameConversion() != null) {
+                    colName = rootQuery.getConfig().getNameConversion().convert(colName);
+                }
+            }
         }
 
         if (vals != null && rootQuery != null) {
@@ -310,11 +410,28 @@ public class WhereBuilder<T> {
         }
         PropertyPath path = RecordingContext.finish();
         if (path == null) {
+            if (val instanceof String) {
+                return orderBy((String) val);
+            }
             throw new IllegalStateException("No proxy property accessed before calling orderBy(...)");
         }
         String alias = path.hasRelations() ? rootQuery.resolveJoinAlias(path) : scopeAlias;
         String colName = rootQuery.resolveColumnName(path);
         return new OrderByBuilder<>(this, rootQuery.getStatement(), alias, colName);
+    }
+
+    public OrderByBuilder<WhereBuilder<T>> orderBy(String propertyOrColumn) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            String alias = path.hasRelations() ? rootQuery.resolveJoinAlias(path) : scopeAlias;
+            String colName = rootQuery.resolveColumnName(path);
+            return new OrderByBuilder<>(this, rootQuery.getStatement(), alias, colName);
+        }
+        if (propertyOrColumn == null) {
+            throw new IllegalArgumentException("Order by column cannot be null");
+        }
+        ColumnExpression ce = rootQuery != null ? rootQuery.stringToColumnExpression(propertyOrColumn) : new ColumnExpression(scopeAlias, propertyOrColumn);
+        return new OrderByBuilder<>(this, rootQuery.getStatement(), ce.getTableAlias(), ce.getColumnName());
     }
 
     public OrderByBuilder<WhereBuilder<T>> orderBy(SqlExpression expr) {
@@ -387,5 +504,46 @@ public class WhereBuilder<T> {
 
     public long count() {
         return rootQuery.count();
+    }
+
+    public com.javaorm.core.dialect.SqlAndParams toSqlAndParams() {
+        if (sqlAndParamsSupplier != null) {
+            return sqlAndParamsSupplier.get();
+        }
+        if (rootQuery != null) {
+            return rootQuery.toSqlAndParams();
+        }
+        throw new UnsupportedOperationException("toSqlAndParams() is not supported on this builder");
+    }
+
+    public String toSql() {
+        return toSqlAndParams().getSql();
+    }
+
+    @Override
+    public String toString() {
+        try {
+            return toSql();
+        } catch (Exception e) {
+            return super.toString();
+        }
+    }
+
+    public WhereBuilder<T> printSql() {
+        if (printSqlConsumer != null) {
+            printSqlConsumer.accept(null);
+        } else if (rootQuery != null) {
+            rootQuery.printSql();
+        }
+        return this;
+    }
+
+    public WhereBuilder<T> printSql(boolean print) {
+        if (printSqlConsumer != null) {
+            printSqlConsumer.accept(print);
+        } else if (rootQuery != null) {
+            rootQuery.printSql(print);
+        }
+        return this;
     }
 }

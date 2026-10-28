@@ -155,6 +155,16 @@ public class JavaOrm {
                 if (lower.contains("h2")) {
                     return new H2Dialect();
                 }
+                if (lower.contains("oracle")) {
+                    try {
+                        int major = conn.getMetaData().getDatabaseMajorVersion();
+                        if (major > 0 && major <= 11) {
+                            return new Oracle11Dialect();
+                        }
+                    } catch (Exception ignored) {
+                    }
+                    return new OracleDialect();
+                }
             }
         } catch (Exception ignored) {
         }

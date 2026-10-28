@@ -90,6 +90,9 @@ public class DtoQuery<DTO, T> {
         }
         com.javaorm.core.proxy.PropertyPath path = com.javaorm.core.proxy.RecordingContext.finish();
         if (path == null) {
+            if (val instanceof String) {
+                return orderBy((String) val);
+            }
             throw new IllegalStateException("No proxy property accessed before calling orderBy(...)");
         }
         String alias = underlyingQuery.resolveTableAlias(path);
@@ -97,9 +100,46 @@ public class DtoQuery<DTO, T> {
         return new OrderByBuilder<>(this, getStatement(), alias, colName);
     }
 
+    public OrderByBuilder<DtoQuery<DTO, T>> orderBy(String propertyOrColumn) {
+        com.javaorm.core.proxy.PropertyPath path = com.javaorm.core.proxy.RecordingContext.finish();
+        if (path != null) {
+            String alias = underlyingQuery.resolveTableAlias(path);
+            String colName = underlyingQuery.resolveColumnName(path);
+            return new OrderByBuilder<>(this, getStatement(), alias, colName);
+        }
+        if (propertyOrColumn == null) {
+            throw new IllegalArgumentException("Order by column cannot be null");
+        }
+        com.javaorm.core.ast.ColumnExpression ce = underlyingQuery.stringToColumnExpression(propertyOrColumn);
+        return new OrderByBuilder<>(this, getStatement(), ce.getTableAlias(), ce.getColumnName());
+    }
+
     public OrderByBuilder<DtoQuery<DTO, T>> orderBy(com.javaorm.core.ast.SqlExpression expr) {
         underlyingQuery.resolveExpression(expr);
         return new OrderByBuilder<>(this, getStatement(), expr);
+    }
+
+    public DtoQuery<DTO, T> printSql() {
+        underlyingQuery.printSql();
+        return this;
+    }
+
+    public DtoQuery<DTO, T> printSql(boolean print) {
+        underlyingQuery.printSql(print);
+        return this;
+    }
+
+    public com.javaorm.core.dialect.SqlAndParams toSqlAndParams() {
+        return underlyingQuery.toSqlAndParams();
+    }
+
+    public String toSql() {
+        return underlyingQuery.toSql();
+    }
+
+    @Override
+    public String toString() {
+        return toSql();
     }
 
     public DtoQuery<DTO, T> page(int pageNum, int pageSize) {
@@ -124,7 +164,7 @@ public class DtoQuery<DTO, T> {
 
     public List<DTO> list() {
         try (Connection conn = dataSource.getConnection()) {
-            return EntityHydrator.queryDtoList(conn, underlyingQuery.getStatement(), dtoClass, dialect, config);
+            return EntityHydrator.queryDtoList(conn, underlyingQuery.getStatement(), dtoClass, dialect, underlyingQuery.getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to query DTO list for " + dtoClass.getName(), e);
         }
