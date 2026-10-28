@@ -289,4 +289,92 @@ public class AdvancedSqlFeaturesTest {
         assertEquals("学生C", names.get(2));
         assertEquals("学生D", names.get(3));
     }
+
+    /**
+     * 7. 测试 UPDATE 高级语法（直接代理 set、increment/decrement、andGroup (w, s)、子查询）
+     */
+    @Test
+    public void testAdvancedUpdate() {
+        Student s = orm.proxy(Student.class);
+        Teacher t = orm.proxy(Teacher.class);
+
+        // 7.1 直接代理属性赋值 + 自增计算 increment(2)
+        int affected1 = orm.update(Student.class)
+                .set(s.getAge(), increment(2))
+                .where()
+                    .and(s.getStudentName()).eq("学生A")
+                .execute();
+        assertEquals(1, affected1);
+
+        Student studentA = orm.select(Student.class).where().and(s.getStudentName()).eq("学生A").single();
+        assertEquals(Integer.valueOf(22), studentA.getAge()); // 20 + 2 = 22
+
+        // 7.2 自减计算 decrement(1) + andGroup((w, stu) -> ...) 无外部 proxy
+        int affected2 = orm.update(Student.class)
+                .set(s.getAge(), decrement(1))
+                .where()
+                    .andGroup((w, stu) -> {
+                        w.and(stu.getStudentName()).eq("学生B");
+                        w.or(stu.getAge()).gt(100);
+                    })
+                .execute();
+        assertEquals(1, affected2);
+
+        Student studentB = orm.select(Student.class).where().and(s.getStudentName()).eq("学生B").single();
+        assertEquals(Integer.valueOf(21), studentB.getAge()); // 22 - 1 = 21
+
+        // 7.3 基于子查询条件的批量更新
+        int affected3 = orm.update(Student.class)
+                .set(s.getAge(), 99)
+                .where()
+                    .and(s.getTeacherId()).in(
+                            orm.select(t.getId())
+                               .from(Teacher.class)
+                               .where()
+                                   .and(t.getTitle()).eq("讲师") // t2 (李讲师) 下的学生是 学生D
+                    )
+                .execute();
+        assertEquals(1, affected3);
+
+        Student studentD = orm.select(Student.class).where().and(s.getStudentName()).eq("学生D").single();
+        assertEquals(Integer.valueOf(99), studentD.getAge());
+    }
+
+    /**
+     * 8. 测试 DELETE 高级语法（andGroup (w, s)、函数条件过滤、EXISTS 子查询）
+     */
+    @Test
+    public void testAdvancedDelete() {
+        Student s = orm.proxy(Student.class);
+        Teacher t = orm.proxy(Teacher.class);
+
+        // 8.1 andGroup((w, stu) -> ...) 逻辑删除
+        int affected1 = orm.delete(Student.class)
+                .where()
+                    .andGroup((w, stu) -> {
+                        w.and(stu.getStudentName()).eq("学生A");
+                    })
+                .execute();
+        assertEquals(1, affected1);
+
+        // 验证逻辑删除生效（is_deleted = 1），查不出来
+        Student deletedA = orm.select(Student.class).where().and(s.getStudentName()).eq("学生A").single();
+        assertNull(deletedA);
+
+        // 8.2 基于 EXISTS 子查询删除
+        int affected2 = orm.delete(Student.class)
+                .where()
+                    .andExists(
+                            orm.select(t.getId())
+                               .from(Teacher.class)
+                               .where()
+                                   .and(t.getId()).eq(s.getTeacherId())
+                                   .and(t.getTitle()).eq("讲师")
+                    )
+                .execute();
+        assertEquals(1, affected2);
+
+        Student deletedD = orm.select(Student.class).where().and(s.getStudentName()).eq("学生D").single();
+        assertNull(deletedD);
+    }
 }

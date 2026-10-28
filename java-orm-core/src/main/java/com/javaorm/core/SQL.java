@@ -153,6 +153,27 @@ public class SQL {
         return new SubQueryExpression(query);
     }
 
+    // 原地自增与算术表达式
+    public static IncrementExpression increment(Number step) {
+        return new IncrementExpression(step, "+");
+    }
+
+    public static IncrementExpression increment() {
+        return increment(1);
+    }
+
+    public static IncrementExpression decrement(Number step) {
+        return new IncrementExpression(step, "-");
+    }
+
+    public static IncrementExpression decrement() {
+        return decrement(1);
+    }
+
+    public static IncrementExpression multiply(Number factor) {
+        return new IncrementExpression(factor, "*");
+    }
+
     public static RawSqlExpression raw(String rawSql, Object... params) {
         return new RawSqlExpression(rawSql, params);
     }

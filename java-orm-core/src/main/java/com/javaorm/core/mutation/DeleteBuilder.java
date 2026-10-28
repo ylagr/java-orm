@@ -18,11 +18,15 @@ import com.javaorm.core.proxy.RecordingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.javaorm.core.query.Query;
+import com.javaorm.core.query.WhereBuilder;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class DeleteBuilder<T> {
@@ -35,6 +39,7 @@ public class DeleteBuilder<T> {
     private final Dialect dialect;
     private final OrmConfig config;
     private final List<Condition> whereConditions = new ArrayList<>();
+    private final Query<T> queryHelper;
 
     public DeleteBuilder(Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
         this.entityClass = entityClass;
@@ -42,10 +47,27 @@ public class DeleteBuilder<T> {
         this.dialect = dialect;
         this.config = config;
         this.metadata = EntityMetadataManager.get(entityClass, config);
+        this.queryHelper = new Query<>(entityClass, dataSource, dialect, config);
+        RecordingContext.registerAlias(entityClass, metadata.getTableName());
     }
 
-    public DeleteWhereBuilder<T> where() {
-        return new DeleteWhereBuilder<>(this);
+    public T proxy() {
+        return ProxyFactory.getProxy(entityClass);
+    }
+
+    public WhereBuilder<T> where() {
+        return new WhereBuilder<>(entityClass, queryHelper, null, whereConditions::add, this::execute);
+    }
+
+    public DeleteBuilder<T> where(Consumer<WhereBuilder<T>> consumer) {
+        consumer.accept(where());
+        return this;
+    }
+
+    public DeleteBuilder<T> where(WhereBuilder.BiWhereConsumer<T> consumer) {
+        WhereBuilder<T> w = where();
+        consumer.accept(w, proxy());
+        return this;
     }
 
     public int execute() {
@@ -154,33 +176,12 @@ public class DeleteBuilder<T> {
         }
     }
 
-    public static class DeleteWhereBuilder<T> {
+    public static class DeleteWhereBuilder<T> extends WhereBuilder<T> {
         private final DeleteBuilder<T> deleteBuilder;
 
-        public DeleteWhereBuilder(DeleteBuilder<T> deleteBuilder) {
+        public DeleteWhereBuilder(Class<T> entityClass, Query<?> rootQuery, Consumer<Condition> receiver, DeleteBuilder<T> deleteBuilder) {
+            super(entityClass, rootQuery, null, receiver);
             this.deleteBuilder = deleteBuilder;
-        }
-
-        public <R> PropertyOperator<DeleteWhereBuilder<T>, R> and(Function<T, R> getter) {
-            PropertyPath path = deleteBuilder.recordPath(getter);
-            ColumnMetadata col = deleteBuilder.metadata.getColumnByProperty(path.getTerminalProperty());
-            String colName = col != null ? col.getColumnName() : deleteBuilder.config.getNameConversion().convert(path.getTerminalProperty());
-            return new PropertyOperator<>(this, path, (p, op, vals) -> {
-                BinaryCondition cond = new BinaryCondition(null, colName, op, vals);
-                cond.setLogicalOperator(LogicalOperator.AND);
-                deleteBuilder.whereConditions.add(cond);
-            });
-        }
-
-        public <R> PropertyOperator<DeleteWhereBuilder<T>, R> or(Function<T, R> getter) {
-            PropertyPath path = deleteBuilder.recordPath(getter);
-            ColumnMetadata col = deleteBuilder.metadata.getColumnByProperty(path.getTerminalProperty());
-            String colName = col != null ? col.getColumnName() : deleteBuilder.config.getNameConversion().convert(path.getTerminalProperty());
-            return new PropertyOperator<>(this, path, (p, op, vals) -> {
-                BinaryCondition cond = new BinaryCondition(null, colName, op, vals);
-                cond.setLogicalOperator(LogicalOperator.OR);
-                deleteBuilder.whereConditions.add(cond);
-            });
         }
 
         public int execute() {

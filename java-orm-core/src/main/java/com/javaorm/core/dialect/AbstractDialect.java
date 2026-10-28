@@ -122,8 +122,19 @@ public abstract class AbstractDialect implements Dialect {
         int i = 0;
         for (Map.Entry<String, Object> entry : stmt.getSetValues().entrySet()) {
             if (i++ > 0) sql.append(", ");
-            sql.append(quote(entry.getKey())).append(" = ?");
-            params.add(entry.getValue());
+            String colName = quote(entry.getKey());
+            Object val = entry.getValue();
+            if (val instanceof IncrementExpression) {
+                IncrementExpression inc = (IncrementExpression) val;
+                sql.append(colName).append(" = ").append(colName).append(" ").append(inc.getOperator()).append(" ?");
+                params.add(inc.getStep());
+            } else if (val instanceof SqlExpression) {
+                sql.append(colName).append(" = ");
+                renderExpression((SqlExpression) val, sql, params);
+            } else {
+                sql.append(colName).append(" = ?");
+                params.add(val);
+            }
         }
 
         if (!stmt.getWhereConditions().isEmpty()) {

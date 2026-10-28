@@ -33,6 +33,7 @@ public class WhereBuilder<T> {
     private final String scopeAlias;
     private final Consumer<Condition> conditionReceiver;
     private final Supplier<List<?>> customListSupplier;
+    private final java.util.function.IntSupplier executeSupplier;
 
     public WhereBuilder(Query<T> query) {
         this(query, null);
@@ -45,22 +46,39 @@ public class WhereBuilder<T> {
         this.scopeAlias = query.getStatement().getRootTableAlias();
         this.conditionReceiver = query.getStatement()::addWhereCondition;
         this.customListSupplier = customListSupplier;
+        this.executeSupplier = null;
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias) {
-        this(entityClass, rootQuery, scopeAlias, rootQuery.getStatement()::addWhereCondition, null);
+        this(entityClass, rootQuery, scopeAlias, rootQuery.getStatement()::addWhereCondition, null, null);
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver) {
-        this(entityClass, rootQuery, scopeAlias, conditionReceiver, null);
+        this(entityClass, rootQuery, scopeAlias, conditionReceiver, null, null);
+    }
+
+    public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver, java.util.function.IntSupplier executeSupplier) {
+        this(entityClass, rootQuery, scopeAlias, conditionReceiver, null, executeSupplier);
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver, Supplier<List<?>> customListSupplier) {
+        this(entityClass, rootQuery, scopeAlias, conditionReceiver, customListSupplier, null);
+    }
+
+    public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver, Supplier<List<?>> customListSupplier, java.util.function.IntSupplier executeSupplier) {
         this.entityClass = entityClass;
         this.rootQuery = rootQuery;
         this.scopeAlias = scopeAlias;
         this.conditionReceiver = conditionReceiver;
         this.customListSupplier = customListSupplier;
+        this.executeSupplier = executeSupplier;
+    }
+
+    public int execute() {
+        if (executeSupplier != null) {
+            return executeSupplier.getAsInt();
+        }
+        throw new UnsupportedOperationException("execute() is only available on UPDATE and DELETE operations");
     }
 
     /**
@@ -178,7 +196,7 @@ public class WhereBuilder<T> {
 
     public WhereBuilder<T> andGroup(Consumer<WhereBuilder<T>> groupConsumer) {
         GroupCondition group = new GroupCondition(LogicalOperator.AND);
-        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition);
+        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, executeSupplier);
         groupConsumer.accept(sub);
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
@@ -188,7 +206,7 @@ public class WhereBuilder<T> {
 
     public WhereBuilder<T> andGroup(BiWhereConsumer<T> groupConsumer) {
         GroupCondition group = new GroupCondition(LogicalOperator.AND);
-        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition);
+        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, executeSupplier);
         groupConsumer.accept(sub, sub.proxy());
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
@@ -198,7 +216,7 @@ public class WhereBuilder<T> {
 
     public WhereBuilder<T> orGroup(Consumer<WhereBuilder<T>> groupConsumer) {
         GroupCondition group = new GroupCondition(LogicalOperator.OR);
-        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition);
+        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, executeSupplier);
         groupConsumer.accept(sub);
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
@@ -208,7 +226,7 @@ public class WhereBuilder<T> {
 
     public WhereBuilder<T> orGroup(BiWhereConsumer<T> groupConsumer) {
         GroupCondition group = new GroupCondition(LogicalOperator.OR);
-        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition);
+        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, executeSupplier);
         groupConsumer.accept(sub, sub.proxy());
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
@@ -221,23 +239,23 @@ public class WhereBuilder<T> {
         String colName;
 
         if (path.hasRelations()) {
-            alias = rootQuery.resolveJoinAlias(path);
-            colName = rootQuery.resolveColumnName(path);
+            alias = rootQuery != null ? rootQuery.resolveJoinAlias(path) : null;
+            colName = rootQuery != null ? rootQuery.resolveColumnName(path) : path.getTerminalProperty();
         } else {
             if (path.getRootEntityClass() != null && path.getRootEntityClass() != entityClass) {
                 String reg = RecordingContext.getAlias(path.getRootEntityClass());
                 if (reg != null) {
                     alias = reg;
                 } else {
-                    alias = scopeAlias != null ? scopeAlias : rootQuery.resolveTableAlias(path);
+                    alias = scopeAlias;
                 }
             } else {
-                alias = scopeAlias != null ? scopeAlias : rootQuery.resolveTableAlias(path);
+                alias = scopeAlias;
             }
-            colName = rootQuery.resolveColumnName(path);
+            colName = rootQuery != null ? rootQuery.resolveColumnName(path) : path.getTerminalProperty();
         }
 
-        if (vals != null) {
+        if (vals != null && rootQuery != null) {
             for (Object v : vals) {
                 if (v instanceof SqlExpression) {
                     rootQuery.resolveExpression((SqlExpression) v);

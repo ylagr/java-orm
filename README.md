@@ -153,17 +153,23 @@ orm.update(s);
 // 实体级删除（标有 @LogicDelete 则自动执行 UPDATE is_deleted = 1）
 orm.delete(s);
 
-// 纯 SQL 批量流式条件更新（无需先查出实体）
+// 纯 SQL 批量流式条件更新（支持直接代理属性、自增/自减计算与表达式）
+Student s = orm.proxy(Student.class);
 orm.update(Student.class)
-    .set(s -> s.getAge(), 22)
+    .set(s.getAge(), increment(1))   // 原地自增 age = age + 1
+    .set(s.getStudentName(), "新名字")
     .where()
-        .and(s -> s.getStudentName()).eq("王大锤")
+        .and(s.getStudentName()).eq("王大锤")
+        .andGroup((w, stu) -> {     // 无需外部 proxy，直接注入 (w, stu)
+            w.and(stu.getAge()).ge(18);
+            w.or(stu.getAge()).isNull();
+        })
     .execute();
 
-// 纯 SQL 批量流式条件删除
+// 纯 SQL 批量流式条件删除（有 @LogicDelete 自动转逻辑删除）
 orm.delete(Student.class)
     .where()
-        .and(s -> s.getAge()).lt(10)
+        .and(s.getAge()).lt(10)
     .execute();
 ```
 

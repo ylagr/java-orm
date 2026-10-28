@@ -18,9 +18,13 @@ import com.javaorm.core.proxy.RecordingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.javaorm.core.query.Query;
+import com.javaorm.core.query.WhereBuilder;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class UpdateBuilder<T> {
@@ -33,6 +37,7 @@ public class UpdateBuilder<T> {
     private final Dialect dialect;
     private final OrmConfig config;
     private final UpdateStatement statement;
+    private final Query<T> queryHelper;
 
     public UpdateBuilder(Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
         this.entityClass = entityClass;
@@ -41,6 +46,8 @@ public class UpdateBuilder<T> {
         this.config = config;
         this.metadata = EntityMetadataManager.get(entityClass, config);
         this.statement = new UpdateStatement(entityClass, metadata.getTableName());
+        this.queryHelper = new Query<>(entityClass, dataSource, dialect, config);
+        RecordingContext.registerAlias(entityClass, metadata.getTableName());
 
         // 自动注入逻辑删除保护（避免误更新已删除记录）
         if (metadata.hasLogicDelete()) {
@@ -49,7 +56,25 @@ public class UpdateBuilder<T> {
         }
     }
 
-    public <R> UpdateBuilder<T> set(Function<T, R> propertyGetter, R value) {
+    public T proxy() {
+        return ProxyFactory.getProxy(entityClass);
+    }
+
+    public UpdateBuilder<T> set(Object propVal, Object value) {
+        PropertyPath path = RecordingContext.finishCurrent();
+        if (path == null) {
+            path = RecordingContext.finish();
+        }
+        if (path == null) {
+            throw new IllegalStateException("No proxy property accessed before calling set(...)! E.g. set(s.getAge(), 20)");
+        }
+        ColumnMetadata col = metadata.getColumnByProperty(path.getTerminalProperty());
+        String colName = col != null ? col.getColumnName() : config.getNameConversion().convert(path.getTerminalProperty());
+        statement.addSet(colName, value);
+        return this;
+    }
+
+    public <R> UpdateBuilder<T> set(Function<T, R> propertyGetter, Object value) {
         PropertyPath path = recordPath(propertyGetter);
         ColumnMetadata col = metadata.getColumnByProperty(path.getTerminalProperty());
         String colName = col != null ? col.getColumnName() : config.getNameConversion().convert(path.getTerminalProperty());
@@ -57,8 +82,19 @@ public class UpdateBuilder<T> {
         return this;
     }
 
-    public UpdateWhereBuilder<T> where() {
-        return new UpdateWhereBuilder<>(this);
+    public WhereBuilder<T> where() {
+        return new WhereBuilder<>(entityClass, queryHelper, null, statement::addWhereCondition, this::execute);
+    }
+
+    public UpdateBuilder<T> where(Consumer<WhereBuilder<T>> consumer) {
+        consumer.accept(where());
+        return this;
+    }
+
+    public UpdateBuilder<T> where(WhereBuilder.BiWhereConsumer<T> consumer) {
+        WhereBuilder<T> w = where();
+        consumer.accept(w, proxy());
+        return this;
     }
 
     public int execute() {
@@ -127,33 +163,12 @@ public class UpdateBuilder<T> {
         }
     }
 
-    public static class UpdateWhereBuilder<T> {
+    public static class UpdateWhereBuilder<T> extends WhereBuilder<T> {
         private final UpdateBuilder<T> updateBuilder;
 
-        public UpdateWhereBuilder(UpdateBuilder<T> updateBuilder) {
+        public UpdateWhereBuilder(Class<T> entityClass, Query<?> rootQuery, Consumer<Condition> receiver, UpdateBuilder<T> updateBuilder) {
+            super(entityClass, rootQuery, null, receiver);
             this.updateBuilder = updateBuilder;
-        }
-
-        public <R> PropertyOperator<UpdateWhereBuilder<T>, R> and(Function<T, R> getter) {
-            PropertyPath path = updateBuilder.recordPath(getter);
-            ColumnMetadata col = updateBuilder.metadata.getColumnByProperty(path.getTerminalProperty());
-            String colName = col != null ? col.getColumnName() : updateBuilder.config.getNameConversion().convert(path.getTerminalProperty());
-            return new PropertyOperator<>(this, path, (p, op, vals) -> {
-                BinaryCondition cond = new BinaryCondition(null, colName, op, vals);
-                cond.setLogicalOperator(LogicalOperator.AND);
-                updateBuilder.statement.addWhereCondition(cond);
-            });
-        }
-
-        public <R> PropertyOperator<UpdateWhereBuilder<T>, R> or(Function<T, R> getter) {
-            PropertyPath path = updateBuilder.recordPath(getter);
-            ColumnMetadata col = updateBuilder.metadata.getColumnByProperty(path.getTerminalProperty());
-            String colName = col != null ? col.getColumnName() : updateBuilder.config.getNameConversion().convert(path.getTerminalProperty());
-            return new PropertyOperator<>(this, path, (p, op, vals) -> {
-                BinaryCondition cond = new BinaryCondition(null, colName, op, vals);
-                cond.setLogicalOperator(LogicalOperator.OR);
-                updateBuilder.statement.addWhereCondition(cond);
-            });
         }
 
         public int execute() {
