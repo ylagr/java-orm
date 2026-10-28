@@ -104,6 +104,11 @@ public class ColumnMetadata {
             if (value instanceof java.time.LocalDateTime) {
                 return value;
             }
+            if (value instanceof Number) {
+                return java.time.LocalDateTime.ofInstant(
+                        java.time.Instant.ofEpochMilli(((Number) value).longValue()),
+                        java.time.ZoneId.systemDefault());
+            }
             String str = value.toString();
             if (str.contains("T")) {
                 return java.time.LocalDateTime.parse(str);

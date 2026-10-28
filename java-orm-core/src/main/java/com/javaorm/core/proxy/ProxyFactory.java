@@ -1,6 +1,7 @@
 package com.javaorm.core.proxy;
 
 import net.bytebuddy.ByteBuddy;
+import net.bytebuddy.dynamic.DynamicType;
 import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.matcher.ElementMatchers;
@@ -25,15 +26,7 @@ public class ProxyFactory {
     @SuppressWarnings("unchecked")
     private static <T> T createProxyInstance(Class<T> entityClass) {
         try {
-            ClassLoadingStrategy<ClassLoader> strategy;
-            try {
-                // 优先尝试注入方式
-                strategy = ClassLoadingStrategy.Default.INJECTION;
-            } catch (Throwable t) {
-                strategy = ClassLoadingStrategy.Default.WRAPPER;
-            }
-
-            Class<? extends T> proxyClass = BYTE_BUDDY
+            DynamicType.Unloaded<T> make = BYTE_BUDDY
                     .subclass(entityClass)
                     .name(entityClass.getName() + "$JavaOrmRecorder")
                     .method(ElementMatchers.isGetter()
@@ -42,9 +35,18 @@ public class ProxyFactory {
                             .or(ElementMatchers.named("hashCode"))
                             .or(ElementMatchers.named("equals")))
                     .intercept(MethodDelegation.to(RecorderInterceptor.class))
-                    .make()
-                    .load(entityClass.getClassLoader(), strategy)
-                    .getLoaded();
+                    .make();
+
+            Class<? extends T> proxyClass;
+            try {
+                // 优先尝试注入方式
+                proxyClass = make.load(entityClass.getClassLoader(), ClassLoadingStrategy.Default.INJECTION)
+                        .getLoaded();
+            } catch (Throwable t) {
+                // JDK 9+ 模块限制时回退为 WRAPPER
+                proxyClass = make.load(entityClass.getClassLoader(), ClassLoadingStrategy.Default.WRAPPER)
+                        .getLoaded();
+            }
 
             return proxyClass.getDeclaredConstructor().newInstance();
         } catch (Exception e) {

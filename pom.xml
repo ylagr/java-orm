@@ -13,6 +13,7 @@
 
     <modules>
         <module>java-orm-core</module>
+        <module>benchmark</module>
     </modules>
 
     <properties>
