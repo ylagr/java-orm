@@ -33,7 +33,6 @@ public class Query<T> {
 
     private final SelectStatement statement;
     private final Map<String, String> relationJoinAliases = new LinkedHashMap<>();
-    private int aliasCounter = 1;
     private final List<PropertyPath> includes = new ArrayList<>();
     private static final ThreadLocal<Integer> ALIAS_SEQ = ThreadLocal.withInitial(() -> 0);
 
@@ -449,7 +448,10 @@ public class Query<T> {
                 throw new IllegalStateException("Relation property '" + step + "' not found on " + currentClass.getName());
             }
 
-            String nextAlias = "t" + (aliasCounter++);
+            int joinSeq = ALIAS_SEQ.get();
+            ALIAS_SEQ.set(joinSeq + 1);
+            String nextAlias = "t" + joinSeq;
+            RecordingContext.registerAlias(rel.getTargetEntityClass(), nextAlias);
             Class<?> targetClass = rel.getTargetEntityClass();
             EntityMetadata targetMeta = EntityMetadataManager.get(targetClass, config);
 
