@@ -37,12 +37,33 @@ public class Query<T> {
     private final List<PropertyPath> includes = new ArrayList<>();
     private static final ThreadLocal<Integer> ALIAS_SEQ = ThreadLocal.withInitial(() -> 0);
 
+    public static void resetAliasSeq() {
+        ALIAS_SEQ.set(0);
+        RecordingContext.clearAliases();
+    }
+
     public Query(Class<T> rootEntityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        this(rootEntityClass, dataSource, dialect, config, true);
+    }
+
+    public Query(Class<T> rootEntityClass, DataSource dataSource, Dialect dialect, OrmConfig config, boolean allocateAlias) {
         this.rootEntityClass = rootEntityClass;
         this.dataSource = dataSource;
         this.dialect = dialect;
         this.config = config;
         this.rootMetadata = EntityMetadataManager.get(rootEntityClass, config);
+
+        if (!allocateAlias) {
+            this.statement = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), null);
+            return;
+        }
+
+        // 如果当前线程没有活跃的表别名，或者当前实体已作为根实体存在（开启新查询），重置别名计数器从 0 开始
+        if (RecordingContext.getActiveAliasCount() == 0 || RecordingContext.getAlias(rootEntityClass) != null) {
+            ALIAS_SEQ.set(0);
+            RecordingContext.clearAliases();
+        }
+
         int seq = ALIAS_SEQ.get();
         ALIAS_SEQ.set(seq + 1);
         String rootAlias = "t" + seq;
@@ -89,7 +110,11 @@ public class Query<T> {
      * 随时获取当前生成的 SQL 及参数对象
      */
     public com.javaorm.core.dialect.SqlAndParams toSqlAndParams() {
-        return dialect.buildSelect(statement);
+        try {
+            return dialect.buildSelect(statement);
+        } finally {
+            resetAliasSeq();
+        }
     }
 
     /**
@@ -295,7 +320,7 @@ public class Query<T> {
                 }
             }
         } finally {
-            RecordingContext.clear();
+            RecordingContext.clearRecording();
         }
         return this;
     }
@@ -313,7 +338,7 @@ public class Query<T> {
                 resolveJoinAlias(path);
             }
         } finally {
-            RecordingContext.clear();
+            RecordingContext.clearRecording();
         }
         return this;
     }
@@ -331,7 +356,7 @@ public class Query<T> {
                 includes.add(path);
             }
         } finally {
-            RecordingContext.clear();
+            RecordingContext.clearRecording();
         }
         return this;
     }
@@ -420,6 +445,8 @@ public class Query<T> {
             return result;
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute query list", e);
+        } finally {
+            resetAliasSeq();
         }
     }
 
@@ -428,6 +455,8 @@ public class Query<T> {
             return EntityHydrator.queryMaps(conn, statement, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute listMaps query", e);
+        } finally {
+            resetAliasSeq();
         }
     }
 
@@ -441,6 +470,8 @@ public class Query<T> {
             return EntityHydrator.queryScalar(conn, statement, targetType, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to fetch one scalar", e);
+        } finally {
+            resetAliasSeq();
         }
     }
 
@@ -449,6 +480,8 @@ public class Query<T> {
             return EntityHydrator.queryScalarList(conn, statement, targetType, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to fetch scalar list", e);
+        } finally {
+            resetAliasSeq();
         }
     }
 
@@ -476,6 +509,8 @@ public class Query<T> {
             return EntityHydrator.queryCount(conn, countStmt, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute count query", e);
+        } finally {
+            resetAliasSeq();
         }
     }
 
@@ -487,7 +522,7 @@ public class Query<T> {
             getter.apply(proxy);
             return RecordingContext.finish();
         } finally {
-            RecordingContext.clear();
+            RecordingContext.clearRecording();
         }
     }
 

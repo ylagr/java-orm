@@ -343,4 +343,63 @@ public class Oracle11AndDynamicFeaturesTest {
         int dCount = orm.delete(Student.class).where().and("id").eq(9999).printSql(true).execute();
         assertEquals(0, dCount);
     }
+
+    @Test
+    public void testTableAliasResetPerSql() {
+        Student s = orm.proxy(Student.class);
+        Teacher t = orm.proxy(Teacher.class);
+
+        // 1. 连续独立查询，每次的根表别名都必须从 t0 开始
+        for (int i = 0; i < 5; i++) {
+            WhereBuilder<Student> q = orm.select(Student.class).where().and(s.getAge()).ge(18);
+            String sql = q.toSql();
+            assertTrue("Query " + i + " should use t0 as root alias, but got: " + sql,
+                    sql.contains("FROM \"t_student\" t0") || sql.contains("FROM (SELECT t0."));
+            assertEquals("t0", q.getStatement().getRootTableAlias());
+            List<Student> list = q.list();
+            assertFalse(list.isEmpty());
+        }
+
+        // 2. 带有 JOIN 的查询：内部表别名从 0 开始连续递增 (t0, t1)，下一次查询恢复从 t0 开始
+        WhereBuilder<Student> joinQuery = orm.select(Student.class)
+                .where()
+                .and(s.getTeacher().getAge()).gt(30);
+        String joinSql = joinQuery.toSql();
+        assertTrue(joinSql.contains("FROM \"t_student\" t0"));
+        assertTrue(joinSql.contains("JOIN \"t_teacher\" t1"));
+        joinQuery.list();
+
+        // 之后的查询必须再次从 t0 开始
+        WhereBuilder<Student> afterJoin = orm.select(Student.class).where().and(s.getAge()).ge(20);
+        assertEquals("t0", afterJoin.getStatement().getRootTableAlias());
+        assertTrue(afterJoin.toSql().contains("FROM \"t_student\" t0"));
+
+        // 3. 带有子查询的语句：内部表别名从 0 开始计算 (t0, t1)，下一次查询恢复从 t0 开始
+        WhereBuilder<Student> subQuery = orm.select(Student.class)
+                .where()
+                .andExists(
+                        orm.select(t.getId())
+                                .from(Teacher.class)
+                                .where()
+                                .and(t.getId()).eq(s.getTeacherId())
+                );
+        String subSql = subQuery.toSql();
+        assertTrue(subSql.contains("FROM \"t_student\" t0"));
+        assertTrue(subSql.contains("FROM \"t_teacher\" t1"));
+        assertTrue(subSql.contains("t1.\"id\" = t0.\"teacher_id\""));
+
+        // 之后的查询必须再次从 t0 开始
+        WhereBuilder<Teacher> afterSub = orm.select(Teacher.class).where().and(t.getAge()).ge(30);
+        assertEquals("t0", afterSub.getStatement().getRootTableAlias());
+        assertTrue(afterSub.toSql().contains("FROM \"t_teacher\" t0"));
+
+        // 4. Update 和 Delete 之后，新查询同样从 t0 开始
+        orm.update(Student.class).set(s.getAge(), 20).where().and(s.getId()).eq(1).execute();
+        Query<Student> afterUpdate = orm.select(Student.class);
+        assertEquals("t0", afterUpdate.getStatement().getRootTableAlias());
+
+        orm.delete(Student.class).where().and(s.getId()).eq(99999).execute();
+        Query<Student> afterDelete = orm.select(Student.class);
+        assertEquals("t0", afterDelete.getStatement().getRootTableAlias());
+    }
 }

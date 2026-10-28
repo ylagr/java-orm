@@ -375,7 +375,7 @@ public class WhereBuilder<T> {
             getter.apply(proxy);
             return RecordingContext.finish();
         } finally {
-            RecordingContext.clear();
+            RecordingContext.clearRecording();
         }
     }
 

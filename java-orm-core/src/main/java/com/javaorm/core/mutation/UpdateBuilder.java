@@ -47,7 +47,7 @@ public class UpdateBuilder<T> {
         this.config = config;
         this.metadata = EntityMetadataManager.get(entityClass, config);
         this.statement = new UpdateStatement(entityClass, metadata.getTableName());
-        this.queryHelper = new Query<>(entityClass, dataSource, dialect, config);
+        this.queryHelper = new Query<>(entityClass, dataSource, dialect, config, false);
         RecordingContext.registerAlias(entityClass, metadata.getTableName());
 
         // 自动注入逻辑删除保护（避免误更新已删除记录）
@@ -179,6 +179,8 @@ public class UpdateBuilder<T> {
             return ps.executeUpdate();
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute update statement", e);
+        } finally {
+            Query.resetAliasSeq();
         }
     }
 
@@ -220,7 +222,7 @@ public class UpdateBuilder<T> {
             getter.apply(proxy);
             return RecordingContext.finish();
         } finally {
-            RecordingContext.clear();
+            RecordingContext.clearRecording();
         }
     }
 

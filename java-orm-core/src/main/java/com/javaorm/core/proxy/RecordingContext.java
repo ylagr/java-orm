@@ -37,6 +37,19 @@ public class RecordingContext {
         return entityClass != null ? ACTIVE_ALIASES.get().get(entityClass) : null;
     }
 
+    public static int getActiveAliasCount() {
+        return ACTIVE_ALIASES.get().size();
+    }
+
+    public static void clearAliases() {
+        ACTIVE_ALIASES.remove();
+    }
+
+    public static void clearRecording() {
+        RECORDED_QUEUE.remove();
+        CURRENT_PATH.remove();
+    }
+
     public static void recordRelation(String relationProperty) {
         PropertyPath path = CURRENT_PATH.get();
         if (path != null) {

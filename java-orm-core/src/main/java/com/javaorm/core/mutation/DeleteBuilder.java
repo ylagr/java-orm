@@ -48,7 +48,7 @@ public class DeleteBuilder<T> {
         this.dialect = dialect;
         this.config = config;
         this.metadata = EntityMetadataManager.get(entityClass, config);
-        this.queryHelper = new Query<>(entityClass, dataSource, dialect, config);
+        this.queryHelper = new Query<>(entityClass, dataSource, dialect, config, false);
         RecordingContext.registerAlias(entityClass, metadata.getTableName());
     }
 
@@ -112,35 +112,39 @@ public class DeleteBuilder<T> {
     }
 
     public int execute() {
-        // 如果存在逻辑删除，自动重写为 UPDATE t SET is_deleted = 1 WHERE ...
-        if (metadata.hasLogicDelete()) {
-            ColumnMetadata ld = metadata.getLogicDeleteColumn();
-            return performLogicDelete(ld);
-        }
-
-        // 物理删除
-        DeleteStatement stmt = new DeleteStatement(entityClass, metadata.getTableName());
-        for (Condition c : whereConditions) {
-            stmt.addWhereCondition(c);
-        }
-
-        SqlAndParams sqlAndParams = dialect.buildDelete(stmt);
-        boolean shouldPrint = (printSqlOverride != null) ? printSqlOverride : config.isPrintSql();
-        if (shouldPrint) {
-            log.info("==>  Preparing: {}", sqlAndParams.getSql());
-            log.info("==> Parameters: {}", sqlAndParams.getParams());
-        }
-
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-
-            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+        try {
+            // 如果存在逻辑删除，自动重写为 UPDATE t SET is_deleted = 1 WHERE ...
+            if (metadata.hasLogicDelete()) {
+                ColumnMetadata ld = metadata.getLogicDeleteColumn();
+                return performLogicDelete(ld);
             }
 
-            return ps.executeUpdate();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute delete statement", e);
+            // 物理删除
+            DeleteStatement stmt = new DeleteStatement(entityClass, metadata.getTableName());
+            for (Condition c : whereConditions) {
+                stmt.addWhereCondition(c);
+            }
+
+            SqlAndParams sqlAndParams = dialect.buildDelete(stmt);
+            boolean shouldPrint = (printSqlOverride != null) ? printSqlOverride : config.isPrintSql();
+            if (shouldPrint) {
+                log.info("==>  Preparing: {}", sqlAndParams.getSql());
+                log.info("==> Parameters: {}", sqlAndParams.getParams());
+            }
+
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
+
+                for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
+                    ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+                }
+
+                return ps.executeUpdate();
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to execute delete statement", e);
+            }
+        } finally {
+            Query.resetAliasSeq();
         }
     }
 
@@ -210,7 +214,7 @@ public class DeleteBuilder<T> {
             getter.apply(proxy);
             return RecordingContext.finish();
         } finally {
-            RecordingContext.clear();
+            RecordingContext.clearRecording();
         }
     }
 

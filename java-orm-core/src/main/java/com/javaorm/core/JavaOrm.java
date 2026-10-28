@@ -89,21 +89,33 @@ public class JavaOrm {
      * 实体级插入（自增主键自动回填）
      */
     public <T> int insert(T entity) {
-        return new InsertBuilder<>(entity, dataSource, dialect, config).execute();
+        try {
+            return new InsertBuilder<>(entity, dataSource, dialect, config).execute();
+        } finally {
+            com.javaorm.core.query.Query.resetAliasSeq();
+        }
     }
 
     /**
      * 实体级选择性更新（按主键更新非 null 属性）
      */
     public <T> int update(T entity) {
-        return UpdateBuilder.updateEntity(entity, dataSource, dialect, config, true);
+        try {
+            return UpdateBuilder.updateEntity(entity, dataSource, dialect, config, true);
+        } finally {
+            com.javaorm.core.query.Query.resetAliasSeq();
+        }
     }
 
     /**
      * 实体级全量更新（按主键更新包括 null 在内的所有属性）
      */
     public <T> int updateAllColumns(T entity) {
-        return UpdateBuilder.updateEntity(entity, dataSource, dialect, config, false);
+        try {
+            return UpdateBuilder.updateEntity(entity, dataSource, dialect, config, false);
+        } finally {
+            com.javaorm.core.query.Query.resetAliasSeq();
+        }
     }
 
     /**
@@ -117,14 +129,22 @@ public class JavaOrm {
      * 实体级删除（按实体主键删除，支持逻辑删除自动重写）
      */
     public <T> int delete(T entity) {
-        return DeleteBuilder.deleteEntity(entity, dataSource, dialect, config);
+        try {
+            return DeleteBuilder.deleteEntity(entity, dataSource, dialect, config);
+        } finally {
+            com.javaorm.core.query.Query.resetAliasSeq();
+        }
     }
 
     /**
      * 根据主键 ID 删除
      */
     public <T> int deleteById(Class<T> entityClass, Object id) {
-        return DeleteBuilder.deleteById(entityClass, id, dataSource, dialect, config);
+        try {
+            return DeleteBuilder.deleteById(entityClass, id, dataSource, dialect, config);
+        } finally {
+            com.javaorm.core.query.Query.resetAliasSeq();
+        }
     }
 
     /**
