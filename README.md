@@ -1,6 +1,7 @@
 # Java-ORM：现代无 APT 字段感知与级联流式 ORM
 
 [![Java 8+](https://img.shields.io/badge/Java-8%2B-blue.svg)](#)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Maven Central](https://img.shields.io/badge/Maven-1.0.0-green.svg)](#)
 [![Zero-APT](https://img.shields.io/badge/APT-None-orange.svg)](#)
 
@@ -373,3 +374,16 @@ orm.delete(Student.class)
 
 1. **单例代理池**：每个实体的代理子类仅在首次使用时生成一次，且实例在内存中单例复用，执行查询录制时**零额外 GC 分配**。
 2. **纳秒级开销**：录制调用仅执行空方法拦截与 ThreadLocal 字符串记录，每次条件构建仅需数十纳秒，性能无限逼近手写 SQL。
+
+---
+
+## 开源协议与版权声明
+
+本项目基于 [Apache License 2.0](LICENSE) 协议开源，完全支持个人及企业闭源商业使用、自由分发与二次修改。
+
+依据 Apache 2.0 规范，商业二次分发或引用时请保留原作者的版权声明及 [NOTICE](NOTICE) 文件。
+
+- **作者 (Author)**: ssuiwp / ylagr
+- **Gitee**: [https://gitee.com/ssuiwp](https://gitee.com/ssuiwp)
+- **GitHub**: [https://github.com/ylagr](https://github.com/ylagr)
+

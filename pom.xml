@@ -11,6 +11,26 @@
     <name>java-orm</name>
     <description>Modern Java ORM with zero-APT field awareness and fluent SQL builder</description>
 
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>ylagr</id>
+            <name>ssuiwp</name>
+            <url>https://github.com/ylagr</url>
+            <properties>
+                <gitee>https://gitee.com/ssuiwp</gitee>
+                <github>https://github.com/ylagr</github>
+            </properties>
+        </developer>
+    </developers>
+
     <modules>
         <module>java-orm-core</module>
         <module>benchmark</module>
