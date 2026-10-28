@@ -265,18 +265,93 @@ List<Map<String, Object>> unionResult = orm.select(s.getStudentName())
     .listMaps();
 ```
 
-### 5. 单标量与列表标量获取 (fetchOne / fetchList)
+### 5. 开窗函数 (Window Functions)
+
+支持 SQL 标准及 Oracle 全量开窗函数，通过链式 `.over().partitionBy(...).orderBy(...).rowsBetween(...)` 构建：
 
 ```java
-// 获取单个聚合标量值
-Integer maxAge = orm.select(max(s.getAge()))
-    .from(Student.class)
-    .fetchOne(Integer.class);
+Student s = orm.proxy(Student.class);
 
-// 获取单列列表
-List<String> names = orm.select(s.getStudentName())
-    .from(Student.class)
-    .fetchList(String.class);
+// 1. 排名开窗函数：ROW_NUMBER, RANK, DENSE_RANK, NTILE, PERCENT_RANK, CUME_DIST
+List<Map<String, Object>> rankList = orm.select(Student.class).select(
+    s.getId(),
+    s.getStudentName(),
+    s.getAge(),
+    rowNumber().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rn"),
+    rank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rk"),
+    denseRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("drk"),
+    ntile(3).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("nt")
+).maps();
+
+// 2. 取值/位移开窗函数：LEAD, LAG, FIRST_VALUE, LAST_VALUE, NTH_VALUE
+List<Map<String, Object>> navList = orm.select(Student.class).select(
+    s.getId(),
+    s.getAge(),
+    lead(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("next_age"),
+    lag(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("prev_age"),
+    firstValue(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("first_age")
+).maps();
+
+// 3. 聚合开窗与滑动窗口 (ROWS BETWEEN)
+List<Map<String, Object>> aggList = orm.select(Student.class).select(
+    s.getId(),
+    s.getAge(),
+    sum(s.getAge()).over().partitionBy(s.getTeacherId()).as("dept_sum"),
+    // 累计求和: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    sum(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().rowsUnboundedPreceding().as("running_sum"),
+    // 全表开窗统计
+    count().over().as("grand_count")
+).maps();
+
+// 4. 自动装配到 DTO
+List<StudentWindowDto> dtoList = orm.select(StudentWindowDto.class).from(Student.class).select(
+    s.getId(),
+    s.getStudentName(),
+    rowNumber().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rowNum"),
+    sum(s.getAge()).over().partitionBy(s.getTeacherId()).as("sumAge")
+).list();
+```
+
+### 6. 多数据库方言支持与 Oracle 12c+
+
+支持主流数据库方言切换：`MySQLDialect`, `PostgreSQLDialect`, `OracleDialect`, `SQLiteDialect`, `H2Dialect`。
+
+针对 Oracle 提供专属方言支持：
+- 严格遵循 Oracle 双引号标识符转义（`"TABLE"`、`"COLUMN"`）
+- 原生 Oracle 12c+ ANSI 分页语法（`OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`）
+- 无表虚拟查询自动注入 `FROM DUAL`
+- 函数智能映射：`NOW()` -> `SYSDATE`，`IFNULL()` -> `NVL()`，`CONCAT()` -> `||`，`SUBSTRING()` -> `SUBSTR()`
+
+```java
+// 初始化 Oracle 方言 ORM 客户端
+JavaOrm orm = JavaOrm.create(dataSource, new OracleDialect());
+
+// 原生支持 Oracle 12c+ 链式分页
+List<Student> pageStudents = orm.select(Student.class)
+    .orderBy(s.getId()).asc()
+    .page(1, 10) // 生成 OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY
+    .list();
+```
+
+### 7. 原地更新与自增算术表达式 (UPDATE / DELETE)
+
+```java
+// 7.1 原地自增/自减更新: age = age + 1, age = age - 5, age = age * 2
+orm.update(Student.class)
+    .set(s.getAge(), increment(1))
+    .where()
+        .and(s.getId()).eq(1L)
+    .execute();
+
+// 7.2 双参数作用域条件更新与删除: (w, s)
+orm.update(Student.class)
+    .set(s.getAge(), 20)
+    .where((w, s) -> w.and(s.getAge()).lt(18))
+    .execute();
+
+orm.delete(Student.class)
+    .where((w, s) -> w.and(s.getAge()).ge(60))
+    .execute();
 ```
 
 ---
