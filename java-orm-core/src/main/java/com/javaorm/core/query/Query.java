@@ -9,8 +9,6 @@ import com.javaorm.core.metadata.ColumnMetadata;
 import com.javaorm.core.metadata.EntityMetadata;
 import com.javaorm.core.metadata.EntityMetadataManager;
 import com.javaorm.core.metadata.RelationMetadata;
-import com.javaorm.core.operator.ConditionAppender;
-import com.javaorm.core.operator.PropertyOperator;
 import com.javaorm.core.operator.SqlOperator;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.ProxyFactory;
@@ -36,8 +34,8 @@ public class Query<T> {
     private final SelectStatement statement;
     private final Map<String, String> relationJoinAliases = new LinkedHashMap<>();
     private int aliasCounter = 1;
-
     private final List<PropertyPath> includes = new ArrayList<>();
+    private static final ThreadLocal<Integer> ALIAS_SEQ = ThreadLocal.withInitial(() -> 0);
 
     public Query(Class<T> rootEntityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
         this.rootEntityClass = rootEntityClass;
@@ -45,12 +43,16 @@ public class Query<T> {
         this.dialect = dialect;
         this.config = config;
         this.rootMetadata = EntityMetadataManager.get(rootEntityClass, config);
-        this.statement = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), "t0");
+        int seq = ALIAS_SEQ.get();
+        ALIAS_SEQ.set(seq + 1);
+        String rootAlias = "t" + seq;
+        this.statement = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), rootAlias);
+        RecordingContext.registerAlias(rootEntityClass, rootAlias);
 
         // 默认自动注入逻辑删除过滤条件
         if (rootMetadata.hasLogicDelete()) {
             ColumnMetadata ld = rootMetadata.getLogicDeleteColumn();
-            statement.addWhereCondition(new BinaryCondition("t0", ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+            statement.addWhereCondition(new BinaryCondition(rootAlias, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
         }
     }
 
@@ -59,6 +61,44 @@ public class Query<T> {
      */
     public T proxy() {
         return ProxyFactory.getProxy(rootEntityClass);
+    }
+
+    /**
+     * 自定义字段投影查询
+     */
+    public Query<T> select(Object... expressions) {
+        statement.getProjectExpressions().clear();
+        if (expressions != null && expressions.length > 0) {
+            List<PropertyPath> paths = RecordingContext.finishAll();
+            int pathIdx = 0;
+            for (Object item : expressions) {
+                SqlExpression expr;
+                if (item instanceof SqlExpression) {
+                    expr = (SqlExpression) item;
+                } else if (pathIdx < paths.size()) {
+                    expr = pathToColumnExpression(paths.get(pathIdx++));
+                } else {
+                    PropertyPath p = RecordingContext.finish();
+                    if (p != null) {
+                        expr = pathToColumnExpression(p);
+                    } else if (item != null) {
+                        expr = new RawSqlExpression("?", item);
+                    } else {
+                        continue;
+                    }
+                }
+                resolveExpression(expr);
+                statement.addProjectExpression(expr);
+            }
+        }
+        return this;
+    }
+
+    /**
+     * 绑定源表，转为 DTO 投影查询（例如 orm.select(StatDto.class).from(Student.class)...）
+     */
+    public <R> DtoQuery<T, R> from(Class<R> fromEntityClass) {
+        return new DtoQuery<>(this.rootEntityClass, fromEntityClass, dataSource, dialect, config);
     }
 
     /**
@@ -86,6 +126,48 @@ public class Query<T> {
     }
 
     /**
+     * 分组查询 GROUP BY
+     */
+    public Query<T> groupBy(Object... expressions) {
+        if (expressions != null && expressions.length > 0) {
+            List<PropertyPath> paths = RecordingContext.finishAll();
+            int pathIdx = 0;
+            for (Object item : expressions) {
+                SqlExpression expr;
+                if (item instanceof SqlExpression) {
+                    expr = (SqlExpression) item;
+                } else if (pathIdx < paths.size()) {
+                    expr = pathToColumnExpression(paths.get(pathIdx++));
+                } else {
+                    PropertyPath p = RecordingContext.finish();
+                    if (p != null) {
+                        expr = pathToColumnExpression(p);
+                    } else if (item != null) {
+                        expr = new RawSqlExpression("?", item);
+                    } else {
+                        continue;
+                    }
+                }
+                resolveExpression(expr);
+                statement.addGroupByExpression(expr);
+            }
+        }
+        return this;
+    }
+
+    /**
+     * HAVING 过滤条件块
+     */
+    public HavingBuilder<T> having() {
+        return new HavingBuilder<>(this);
+    }
+
+    public Query<T> having(Consumer<HavingBuilder<T>> consumer) {
+        consumer.accept(having());
+        return this;
+    }
+
+    /**
      * 级联子表作用域过滤
      */
     public <TSub> Query<T> whereRelation(Function<T, TSub> relationGetter, Consumer<WhereBuilder<TSub>> subBuilderConsumer) {
@@ -96,7 +178,6 @@ public class Query<T> {
             PropertyPath path = RecordingContext.finish();
             if (path != null) {
                 String joinAlias = resolveJoinAlias(path);
-                // 找到子表元数据
                 Class<?> subEntityClass = resolveTargetClass(path);
                 if (subEntityClass != null) {
                     @SuppressWarnings("unchecked")
@@ -147,11 +228,39 @@ public class Query<T> {
         return this;
     }
 
-    public <R> OrderByBuilder<T> orderBy(Function<T, R> propertyGetter) {
+    public <R> OrderByBuilder<Query<T>> orderBy(Function<T, R> propertyGetter) {
         PropertyPath path = recordPath(propertyGetter);
         String alias = resolveTableAlias(path);
         String colName = resolveColumnName(path);
-        return new OrderByBuilder<>(this, alias, colName);
+        return new OrderByBuilder<>(this, statement, alias, colName);
+    }
+
+    public <R> OrderByBuilder<Query<T>> orderBy(R val) {
+        if (val instanceof SqlExpression) {
+            return orderBy((SqlExpression) val);
+        }
+        PropertyPath path = RecordingContext.finish();
+        if (path == null) {
+            throw new IllegalStateException("No proxy property accessed before calling orderBy(...)");
+        }
+        String alias = resolveTableAlias(path);
+        String colName = resolveColumnName(path);
+        return new OrderByBuilder<>(this, statement, alias, colName);
+    }
+
+    public OrderByBuilder<Query<T>> orderBy(SqlExpression expr) {
+        resolveExpression(expr);
+        return new OrderByBuilder<>(this, statement, expr);
+    }
+
+    public Query<T> union(Object other) {
+        statement.addUnion(new UnionClause(other, false));
+        return this;
+    }
+
+    public Query<T> unionAll(Object other) {
+        statement.addUnion(new UnionClause(other, true));
+        return this;
     }
 
     public Query<T> page(int pageNum, int pageSize) {
@@ -189,6 +298,31 @@ public class Query<T> {
         }
     }
 
+    public List<Map<String, Object>> listMaps() {
+        try (Connection conn = dataSource.getConnection()) {
+            return EntityHydrator.queryMaps(conn, statement, dialect, config);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to execute listMaps query", e);
+        }
+    }
+
+    public <V> V fetchOne(Class<V> targetType) {
+        statement.setLimit(1);
+        try (Connection conn = dataSource.getConnection()) {
+            return EntityHydrator.queryScalar(conn, statement, targetType, dialect, config);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch one scalar", e);
+        }
+    }
+
+    public <V> List<V> fetchList(Class<V> targetType) {
+        try (Connection conn = dataSource.getConnection()) {
+            return EntityHydrator.queryScalarList(conn, statement, targetType, dialect, config);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch scalar list", e);
+        }
+    }
+
     public T single() {
         statement.setLimit(1);
         List<T> list = list();
@@ -200,7 +334,7 @@ public class Query<T> {
     }
 
     public long count() {
-        SelectStatement countStmt = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), "t0");
+        SelectStatement countStmt = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), statement.getRootTableAlias());
         countStmt.addSelectColumn("COUNT(1)");
         for (TableJoin join : statement.getJoins()) {
             countStmt.addJoin(join);
@@ -228,8 +362,51 @@ public class Query<T> {
         }
     }
 
+    public void resolveExpression(SqlExpression expr) {
+        if (expr == null) return;
+        if (expr instanceof ColumnExpression) {
+            ColumnExpression ce = (ColumnExpression) expr;
+            if (ce.getTableAlias() == null && ce.getPath() != null) {
+                ce.setTableAlias(resolveTableAlias(ce.getPath()));
+                ce.setColumnName(resolveColumnName(ce.getPath()));
+            } else if (ce.getTableAlias() == null && ce.getColumnName() == null) {
+                PropertyPath path = RecordingContext.finish();
+                if (path != null) {
+                    ce.setPath(path);
+                    ce.setTableAlias(resolveTableAlias(path));
+                    ce.setColumnName(resolveColumnName(path));
+                }
+            }
+        } else if (expr instanceof FunctionExpression) {
+            FunctionExpression fe = (FunctionExpression) expr;
+            for (Object arg : fe.getArguments()) {
+                if (arg instanceof SqlExpression) {
+                    resolveExpression((SqlExpression) arg);
+                }
+            }
+        }
+    }
+
+    public ColumnExpression pathToColumnExpression(PropertyPath path) {
+        if (path == null) {
+            path = RecordingContext.finish();
+        }
+        if (path == null) {
+            throw new IllegalStateException("No property path recorded!");
+        }
+        String tableAlias = resolveTableAlias(path);
+        String columnName = resolveColumnName(path);
+        ColumnExpression col = new ColumnExpression(tableAlias, columnName);
+        col.setPath(path);
+        return col;
+    }
+
     public String resolveTableAlias(PropertyPath path) {
         if (!path.hasRelations()) {
+            if (path.getRootEntityClass() != null && path.getRootEntityClass() != rootEntityClass) {
+                String reg = RecordingContext.getAlias(path.getRootEntityClass());
+                if (reg != null) return reg;
+            }
             return statement.getRootTableAlias();
         }
         return resolveJoinAlias(path);
@@ -237,6 +414,9 @@ public class Query<T> {
 
     public String resolveColumnName(PropertyPath path) {
         Class<?> targetClass = resolveTargetClass(path);
+        if (path.getRootEntityClass() != null && path.getRootEntityClass() != rootEntityClass && !path.hasRelations()) {
+            targetClass = path.getRootEntityClass();
+        }
         EntityMetadata targetMeta = EntityMetadataManager.get(targetClass, config);
         ColumnMetadata col = targetMeta.getColumnByProperty(path.getTerminalProperty());
         if (col != null) {
@@ -282,12 +462,6 @@ public class Query<T> {
             String selfColName = selfCol != null ? selfCol.getColumnName() : config.getNameConversion().convert(rel.getSelfProperty());
             String targetColName = targetCol != null ? targetCol.getColumnName() : config.getNameConversion().convert(rel.getTargetProperty());
 
-            // 联表 ON t0.teacher_id = t1.id
-            join.addOnCondition(new BinaryCondition(currentAlias, selfColName, SqlOperator.EQ) {
-                // 自定义跨表字段比较
-            });
-            // 默认简单跨表赋值
-            join.getOnConditions().clear();
             join.addOnCondition(new ColumnEqualityCondition(currentAlias, selfColName, nextAlias, targetColName));
 
             // 子表逻辑删除自动过滤

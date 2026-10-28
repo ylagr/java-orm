@@ -5,7 +5,7 @@ import com.javaorm.core.dialect.*;
 import com.javaorm.core.mutation.DeleteBuilder;
 import com.javaorm.core.mutation.InsertBuilder;
 import com.javaorm.core.mutation.UpdateBuilder;
-import com.javaorm.core.query.Query;
+import com.javaorm.core.query.*;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -59,6 +59,30 @@ public class JavaOrm {
      */
     public <T> Query<T> select(Class<T> entityClass) {
         return new Query<>(entityClass, dataSource, dialect, config);
+    }
+
+    /**
+     * 开启自定义字段投影查询：orm.select(count(s.getId()), s.getTeacherId()).from(Student.class)...
+     */
+    public FromStageQuery select(Object expr1, Object... moreExpressions) {
+        Object[] all = new Object[1 + (moreExpressions != null ? moreExpressions.length : 0)];
+        all[0] = expr1;
+        if (moreExpressions != null && moreExpressions.length > 0) {
+            System.arraycopy(moreExpressions, 0, all, 1, moreExpressions.length);
+        }
+        return new FromStageQuery(all, dataSource, dialect, config);
+    }
+
+    /**
+     * 开启 DTO 投影查询：orm.select(StatDto.class, count(s.getId()).as("total"), s.getTeacherId()).from(Student.class)...
+     */
+    public <DTO> DtoFromStageQuery<DTO> select(Class<DTO> dtoClass, Object expr1, Object... moreExpressions) {
+        Object[] all = new Object[1 + (moreExpressions != null ? moreExpressions.length : 0)];
+        all[0] = expr1;
+        if (moreExpressions != null && moreExpressions.length > 0) {
+            System.arraycopy(moreExpressions, 0, all, 1, moreExpressions.length);
+        }
+        return new DtoFromStageQuery<>(dtoClass, all, dataSource, dialect, config);
     }
 
     /**

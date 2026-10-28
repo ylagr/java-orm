@@ -3,6 +3,7 @@ package com.javaorm.core.dialect;
 import com.javaorm.core.ast.*;
 import com.javaorm.core.operator.SqlOperator;
 
+import java.lang.reflect.Method;
 import java.util.*;
 
 public abstract class AbstractDialect implements Dialect {
@@ -16,14 +17,23 @@ public abstract class AbstractDialect implements Dialect {
             sql.append("DISTINCT ");
         }
 
-        // 1. SELECT Columns
-        if (stmt.getSelectColumns().isEmpty()) {
-            sql.append(stmt.getRootTableAlias()).append(".*");
-        } else {
+        // 1. SELECT Columns / Expressions
+        if (!stmt.getProjectExpressions().isEmpty()) {
+            for (int i = 0; i < stmt.getProjectExpressions().size(); i++) {
+                if (i > 0) sql.append(", ");
+                SqlExpression expr = stmt.getProjectExpressions().get(i);
+                renderExpression(expr, sql, params);
+                if (expr.getAlias() != null && !expr.getAlias().isEmpty()) {
+                    sql.append(" AS ").append(quote(expr.getAlias()));
+                }
+            }
+        } else if (!stmt.getSelectColumns().isEmpty()) {
             for (int i = 0; i < stmt.getSelectColumns().size(); i++) {
                 if (i > 0) sql.append(", ");
                 sql.append(stmt.getSelectColumns().get(i));
             }
+        } else {
+            sql.append(stmt.getRootTableAlias()).append(".*");
         }
 
         // 2. FROM
@@ -45,21 +55,49 @@ public abstract class AbstractDialect implements Dialect {
             renderConditions(stmt.getWhereConditions(), sql, params);
         }
 
-        // 5. ORDER BY
+        // 5. GROUP BY
+        if (!stmt.getGroupByExpressions().isEmpty()) {
+            sql.append(" GROUP BY ");
+            for (int i = 0; i < stmt.getGroupByExpressions().size(); i++) {
+                if (i > 0) sql.append(", ");
+                renderExpression(stmt.getGroupByExpressions().get(i), sql, params);
+            }
+        }
+
+        // 6. HAVING
+        if (!stmt.getHavingConditions().isEmpty()) {
+            sql.append(" HAVING ");
+            renderConditions(stmt.getHavingConditions(), sql, params);
+        }
+
+        // 7. ORDER BY
         if (!stmt.getOrderBys().isEmpty()) {
             sql.append(" ORDER BY ");
             for (int i = 0; i < stmt.getOrderBys().size(); i++) {
                 if (i > 0) sql.append(", ");
                 OrderBy ob = stmt.getOrderBys().get(i);
-                if (ob.getTableAlias() != null && !ob.getTableAlias().isEmpty()) {
-                    sql.append(ob.getTableAlias()).append(".");
+                if (ob.getExpression() != null) {
+                    renderExpression(ob.getExpression(), sql, params);
+                    sql.append(ob.isAscending() ? " ASC" : " DESC");
+                } else {
+                    if (ob.getTableAlias() != null && !ob.getTableAlias().isEmpty()) {
+                        sql.append(ob.getTableAlias()).append(".");
+                    }
+                    sql.append(quote(ob.getColumnName())).append(ob.isAscending() ? " ASC" : " DESC");
                 }
-                sql.append(quote(ob.getColumnName())).append(ob.isAscending() ? " ASC" : " DESC");
             }
         }
 
-        // 6. LIMIT / OFFSET 分页渲染
+        // 8. LIMIT / OFFSET 分页渲染
         renderPagination(sql, params, stmt.getLimit(), stmt.getOffset());
+
+        // 9. UNION / UNION ALL
+        if (!stmt.getUnions().isEmpty()) {
+            for (UnionClause union : stmt.getUnions()) {
+                sql.append(union.isUnionAll() ? " UNION ALL " : " UNION ");
+                renderSubQuery(union.getQuery(), sql, params);
+            }
+        }
 
         return new SqlAndParams(sql.toString(), params);
     }
@@ -149,46 +187,14 @@ public abstract class AbstractDialect implements Dialect {
                 sql.append(bc.getTableAlias()).append(".");
             }
             sql.append(quote(bc.getColumnName())).append(" ");
-
             SqlOperator op = bc.getOperator();
             sql.append(op.getSql());
-
-            if (op == SqlOperator.IS_NULL || op == SqlOperator.IS_NOT_NULL) {
-                // 不需要参数
-            } else if (op == SqlOperator.BETWEEN) {
-                sql.append(" ? AND ?");
-                if (bc.getValues() != null && bc.getValues().length >= 2) {
-                    params.add(bc.getValues()[0]);
-                    params.add(bc.getValues()[1]);
-                }
-            } else if (op == SqlOperator.IN || op == SqlOperator.NOT_IN) {
-                sql.append(" (");
-                Object val = (bc.getValues() != null && bc.getValues().length > 0) ? bc.getValues()[0] : null;
-                if (val instanceof Collection) {
-                    Collection<?> coll = (Collection<?>) val;
-                    int idx = 0;
-                    for (Object item : coll) {
-                        if (idx++ > 0) sql.append(", ");
-                        sql.append("?");
-                        params.add(item);
-                    }
-                    if (idx == 0) {
-                        sql.append("NULL");
-                    }
-                } else if (bc.getValues() != null) {
-                    for (int k = 0; k < bc.getValues().length; k++) {
-                        if (k > 0) sql.append(", ");
-                        sql.append("?");
-                        params.add(bc.getValues()[k]);
-                    }
-                }
-                sql.append(")");
-            } else {
-                sql.append(" ?");
-                if (bc.getValues() != null && bc.getValues().length > 0) {
-                    params.add(bc.getValues()[0]);
-                }
-            }
+            renderOperatorValues(op, bc.getValues(), sql, params);
+        } else if (cond instanceof ExpressionCondition) {
+            ExpressionCondition ec = (ExpressionCondition) cond;
+            renderExpression(ec.getExpression(), sql, params);
+            sql.append(" ").append(ec.getOperator().getSql());
+            renderOperatorValues(ec.getOperator(), ec.getValues(), sql, params);
         } else if (cond instanceof ColumnEqualityCondition) {
             ColumnEqualityCondition cec = (ColumnEqualityCondition) cond;
             if (cec.getLeftTableAlias() != null && !cec.getLeftTableAlias().isEmpty()) {
@@ -199,11 +205,143 @@ public abstract class AbstractDialect implements Dialect {
                 sql.append(cec.getRightTableAlias()).append(".");
             }
             sql.append(quote(cec.getRightColumn()));
+        } else if (cond instanceof ExistsCondition) {
+            ExistsCondition ec = (ExistsCondition) cond;
+            sql.append(ec.isNotExists() ? "NOT EXISTS (" : "EXISTS (");
+            renderSubQuery(ec.getSubQuery(), sql, params);
+            sql.append(")");
         } else if (cond instanceof GroupCondition) {
             GroupCondition gc = (GroupCondition) cond;
             sql.append("(");
             renderConditions(gc.getChildren(), sql, params);
             sql.append(")");
+        }
+    }
+
+    protected void renderOperatorValues(SqlOperator op, Object[] values, StringBuilder sql, List<Object> params) {
+        if (op == SqlOperator.IS_NULL || op == SqlOperator.IS_NOT_NULL) {
+            return;
+        }
+        if (op == SqlOperator.BETWEEN) {
+            sql.append(" ? AND ?");
+            if (values != null && values.length >= 2) {
+                params.add(values[0]);
+                params.add(values[1]);
+            }
+            return;
+        }
+        if (op == SqlOperator.IN || op == SqlOperator.NOT_IN) {
+            sql.append(" (");
+            Object val = (values != null && values.length > 0) ? values[0] : null;
+            if (val instanceof Collection) {
+                Collection<?> coll = (Collection<?>) val;
+                int idx = 0;
+                for (Object item : coll) {
+                    if (idx++ > 0) sql.append(", ");
+                    sql.append("?");
+                    params.add(item);
+                }
+                if (idx == 0) {
+                    sql.append("NULL");
+                }
+            } else if (isQuery(val)) {
+                renderSubQuery(val, sql, params);
+            } else if (values != null) {
+                for (int k = 0; k < values.length; k++) {
+                    if (k > 0) sql.append(", ");
+                    sql.append("?");
+                    params.add(values[k]);
+                }
+            }
+            sql.append(")");
+            return;
+        }
+
+        // 普通比较 = / > / < 等，右边可能是子查询或列表达式
+        Object val = (values != null && values.length > 0) ? values[0] : null;
+        if (isQuery(val)) {
+            sql.append(" (");
+            renderSubQuery(val, sql, params);
+            sql.append(")");
+        } else if (val instanceof SqlExpression) {
+            sql.append(" ");
+            renderExpression((SqlExpression) val, sql, params);
+        } else {
+            sql.append(" ?");
+            if (val != null) {
+                params.add(val);
+            }
+        }
+    }
+
+    public void renderExpression(SqlExpression expr, StringBuilder sql, List<Object> params) {
+        if (expr instanceof ColumnExpression) {
+            ColumnExpression ce = (ColumnExpression) expr;
+            if (ce.getTableAlias() != null && !ce.getTableAlias().isEmpty()) {
+                sql.append(ce.getTableAlias()).append(".");
+            }
+            sql.append(quote(ce.getColumnName()));
+        } else if (expr instanceof FunctionExpression) {
+            renderFunction((FunctionExpression) expr, sql, params);
+        } else if (expr instanceof SubQueryExpression) {
+            sql.append("(");
+            renderSubQuery(((SubQueryExpression) expr).getQuery(), sql, params);
+            sql.append(")");
+        } else if (expr instanceof RawSqlExpression) {
+            RawSqlExpression raw = (RawSqlExpression) expr;
+            sql.append(raw.getRawSql());
+            if (raw.getParams() != null) {
+                Collections.addAll(params, raw.getParams());
+            }
+        }
+    }
+
+    public void renderFunction(FunctionExpression fn, StringBuilder sql, List<Object> params) {
+        String name = fn.getFunctionName().toUpperCase();
+        List<Object> args = fn.getArguments();
+
+        if (renderDialectSpecificFunction(name, args, sql, params)) {
+            return;
+        }
+
+        sql.append(name).append("(");
+        for (int i = 0; i < args.size(); i++) {
+            if (i > 0) sql.append(", ");
+            Object arg = args.get(i);
+            if (arg instanceof SqlExpression) {
+                renderExpression((SqlExpression) arg, sql, params);
+            } else {
+                sql.append("?");
+                params.add(arg);
+            }
+        }
+        sql.append(")");
+    }
+
+    protected boolean renderDialectSpecificFunction(String name, List<Object> args, StringBuilder sql, List<Object> params) {
+        return false;
+    }
+
+    public void renderSubQuery(Object queryObj, StringBuilder sql, List<Object> params) {
+        if (queryObj == null) return;
+        try {
+            Method getStatement = queryObj.getClass().getMethod("getStatement");
+            SelectStatement subStmt = (SelectStatement) getStatement.invoke(queryObj);
+            SqlAndParams subSqlAndParams = buildSelect(subStmt);
+            sql.append(subSqlAndParams.getSql());
+            params.addAll(subSqlAndParams.getParams());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to render subquery", e);
+        }
+    }
+
+    private boolean isQuery(Object obj) {
+        if (obj == null) return false;
+        try {
+            obj.getClass().getMethod("getStatement");
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
         }
     }
 }

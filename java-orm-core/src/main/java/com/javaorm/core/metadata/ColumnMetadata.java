@@ -57,7 +57,11 @@ public class ColumnMetadata {
         }
     }
 
-    private Object convertValue(Object value, Class<?> targetType) {
+    public static Object convertValue(Class<?> targetType, Object value) {
+        return convertValue(value, targetType);
+    }
+
+    public static Object convertValue(Object value, Class<?> targetType) {
         if (value == null) {
             return null;
         }

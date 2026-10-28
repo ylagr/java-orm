@@ -169,6 +169,112 @@ orm.delete(Student.class)
 
 ---
 
+## 高级 SQL 特性支持
+
+### 1. SQL 函数与 Group By / Having
+
+支持 `count`、`sum`、`avg`、`min`、`max`、`length` 等标准 SQL 函数，并可直接在投影、`where`、`having` 中使用：
+
+```java
+import static com.javaorm.core.SQL.*;
+
+Student s = orm.proxy(Student.class);
+
+// 自定义投影 + GROUP BY + HAVING
+List<Map<String, Object>> list = orm.select(count(s.getId()).as("total"), s.getTeacherId())
+    .from(Student.class)
+    .groupBy(s.getTeacherId())
+    .having()
+        .and(count(s.getId())).ge(2)
+    .orderBy(s.getTeacherId()).asc()
+    .listMaps();
+```
+
+### 2. DTO 投影模式
+
+支持直接映射到业务 DTO（自动驼峰/下划线字段映射与类型转换）：
+
+```java
+// 方式 A：orm.select(DTO.class).from(Entity.class).select(...)
+List<StatDto> dtoListA = orm.select(StatDto.class)
+    .from(Student.class)
+    .select(count(s.getId()).as("total"), s.getTeacherId(), avg(s.getAge()).as("avgAge"))
+    .groupBy(s.getTeacherId())
+    .having()
+        .and(count(s.getId())).ge(2)
+    .list();
+
+// 方式 B：orm.select(DTO.class, expr1, expr2...).from(Entity.class)
+List<StatDto> dtoListB = orm.select(StatDto.class, count(s.getId()).as("total"), s.getTeacherId())
+    .from(Student.class)
+    .groupBy(s.getTeacherId())
+    .list();
+```
+
+### 3. 子查询与 EXISTS
+
+支持类型安全的 IN 子查询与相关联 EXISTS 语法：
+
+```java
+Student s = orm.proxy(Student.class);
+Teacher t = orm.proxy(Teacher.class);
+
+// 3.1 IN 子查询
+List<Student> students = orm.select(Student.class)
+    .where()
+        .and(s.getTeacherId()).in(
+            orm.select(t.getId())
+               .from(Teacher.class)
+               .where()
+                   .and(t.getAge()).gt(40)
+        )
+    .list();
+
+// 3.2 EXISTS 关联子查询
+List<Student> existsStudents = orm.select(Student.class)
+    .where()
+        .andExists(
+            orm.select(t.getId())
+               .from(Teacher.class)
+               .where()
+                   .and(t.getId()).eq(s.getTeacherId())
+                   .and(t.getTitle()).eq("讲师")
+        )
+    .list();
+```
+
+### 4. UNION / UNION ALL
+
+```java
+List<Map<String, Object>> unionResult = orm.select(s.getStudentName())
+    .from(Student.class)
+    .where()
+        .and(s.getAge()).le(20)
+    .union(
+        orm.select(s.getStudentName())
+           .from(Student.class)
+           .where()
+               .and(s.getAge()).ge(22)
+    )
+    .listMaps();
+```
+
+### 5. 单标量与列表标量获取 (fetchOne / fetchList)
+
+```java
+// 获取单个聚合标量值
+Integer maxAge = orm.select(max(s.getAge()))
+    .from(Student.class)
+    .fetchOne(Integer.class);
+
+// 获取单列列表
+List<String> names = orm.select(s.getStudentName())
+    .from(Student.class)
+    .fetchList(String.class);
+```
+
+---
+
 ## 运行录制原理解析
 
 ```

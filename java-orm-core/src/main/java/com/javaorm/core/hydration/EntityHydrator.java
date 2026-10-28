@@ -9,12 +9,13 @@ import com.javaorm.core.metadata.EntityMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class EntityHydrator {
 
@@ -54,6 +55,186 @@ public class EntityHydrator {
                         }
                     }
                     list.add(entity);
+                }
+            }
+        }
+        return list;
+    }
+
+    public static <DTO> List<DTO> queryDtoList(Connection conn, SelectStatement stmt, Class<DTO> dtoClass, Dialect dialect, OrmConfig config) throws Exception {
+        SqlAndParams sqlAndParams = dialect.buildSelect(stmt);
+        if (config.isPrintSql()) {
+            log.info("==> [DTO] Preparing: {}", sqlAndParams.getSql());
+            log.info("==> [DTO] Parameters: {}", sqlAndParams.getParams());
+        }
+
+        List<DTO> list = new ArrayList<>();
+        Map<String, Field> fieldMap = new HashMap<>();
+        Class<?> curr = dtoClass;
+        while (curr != null && curr != Object.class) {
+            for (Field f : curr.getDeclaredFields()) {
+                if (Modifier.isStatic(f.getModifiers())) continue;
+                f.setAccessible(true);
+                fieldMap.put(f.getName().toLowerCase(), f);
+                fieldMap.put(f.getName().toLowerCase().replace("_", ""), f);
+            }
+            curr = curr.getSuperclass();
+        }
+
+        try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
+            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
+                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+            }
+
+            try (ResultSet rs = ps.executeQuery()) {
+                ResultSetMetaData rsmd = rs.getMetaData();
+                int colCount = rsmd.getColumnCount();
+
+                while (rs.next()) {
+                    DTO dto = dtoClass.getDeclaredConstructor().newInstance();
+                    for (int i = 1; i <= colCount; i++) {
+                        String colLabel = rsmd.getColumnLabel(i);
+                        if (colLabel == null || colLabel.isEmpty()) {
+                            colLabel = rsmd.getColumnName(i);
+                        }
+                        String key = colLabel.toLowerCase();
+                        if (key.contains(".")) {
+                            key = key.substring(key.lastIndexOf('.') + 1);
+                        }
+                        Field f = fieldMap.get(key);
+                        if (f == null) {
+                            f = fieldMap.get(key.replace("_", ""));
+                        }
+                        if (f != null) {
+                            Object val = rs.getObject(i);
+                            if (val != null) {
+                                Object converted = ColumnMetadata.convertValue(f.getType(), val);
+                                f.set(dto, converted);
+                            }
+                        }
+                    }
+                    list.add(dto);
+                }
+            }
+        }
+        return list;
+    }
+
+    public static List<Map<String, Object>> queryMaps(Connection conn, SelectStatement stmt, Dialect dialect, OrmConfig config) throws Exception {
+        SqlAndParams sqlAndParams = dialect.buildSelect(stmt);
+        if (config.isPrintSql()) {
+            log.info("==> [Maps] Preparing: {}", sqlAndParams.getSql());
+            log.info("==> [Maps] Parameters: {}", sqlAndParams.getParams());
+        }
+
+        List<Map<String, Object>> list = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
+            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
+                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+            }
+
+            try (ResultSet rs = ps.executeQuery()) {
+                ResultSetMetaData rsmd = rs.getMetaData();
+                int colCount = rsmd.getColumnCount();
+
+                while (rs.next()) {
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    for (int i = 1; i <= colCount; i++) {
+                        String colLabel = rsmd.getColumnLabel(i);
+                        if (colLabel == null || colLabel.isEmpty()) {
+                            colLabel = rsmd.getColumnName(i);
+                        }
+                        Object val = rs.getObject(i);
+                        map.put(colLabel, val);
+                        if (colLabel.contains(".")) {
+                            String shortKey = colLabel.substring(colLabel.lastIndexOf('.') + 1);
+                            map.putIfAbsent(shortKey, val);
+                            map.putIfAbsent(toCamelCase(shortKey), val);
+                            map.putIfAbsent(toUnderscore(shortKey), val);
+                        } else {
+                            map.putIfAbsent(toCamelCase(colLabel), val);
+                            map.putIfAbsent(toUnderscore(colLabel), val);
+                        }
+                    }
+                    list.add(map);
+                }
+            }
+        }
+        return list;
+    }
+
+    private static String toCamelCase(String s) {
+        if (s == null || !s.contains("_")) return s;
+        StringBuilder sb = new StringBuilder();
+        boolean upper = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '_') {
+                upper = true;
+            } else if (upper) {
+                sb.append(Character.toUpperCase(c));
+                upper = false;
+            } else {
+                sb.append(Character.toLowerCase(c));
+            }
+        }
+        return sb.toString();
+    }
+
+    private static String toUnderscore(String s) {
+        if (s == null) return null;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isUpperCase(c)) {
+                if (i > 0) sb.append('_');
+                sb.append(Character.toLowerCase(c));
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <V> V queryScalar(Connection conn, SelectStatement stmt, Class<V> targetType, Dialect dialect, OrmConfig config) throws Exception {
+        SqlAndParams sqlAndParams = dialect.buildSelect(stmt);
+        if (config.isPrintSql()) {
+            log.info("==> [Scalar] Preparing: {}", sqlAndParams.getSql());
+            log.info("==> [Scalar] Parameters: {}", sqlAndParams.getParams());
+        }
+
+        try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
+            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
+                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Object val = rs.getObject(1);
+                    return (V) ColumnMetadata.convertValue(targetType, val);
+                }
+            }
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <V> List<V> queryScalarList(Connection conn, SelectStatement stmt, Class<V> targetType, Dialect dialect, OrmConfig config) throws Exception {
+        SqlAndParams sqlAndParams = dialect.buildSelect(stmt);
+        if (config.isPrintSql()) {
+            log.info("==> [ScalarList] Preparing: {}", sqlAndParams.getSql());
+            log.info("==> [ScalarList] Parameters: {}", sqlAndParams.getParams());
+        }
+
+        List<V> list = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
+            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
+                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Object val = rs.getObject(1);
+                    list.add((V) ColumnMetadata.convertValue(targetType, val));
                 }
             }
         }
