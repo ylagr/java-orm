@@ -363,6 +363,10 @@ public class WhereBuilder<T> {
         return rootQuery.listMaps();
     }
 
+    public List<Map<String, Object>> maps() {
+        return rootQuery.listMaps();
+    }
+
     public <V> V fetchOne(Class<V> targetType) {
         return rootQuery.fetchOne(targetType);
     }

@@ -6,4 +6,8 @@ package com.javaorm.core.ast;
 public interface SqlExpression {
     String getAlias();
     SqlExpression as(String alias);
+
+    default WindowFunctionExpression over() {
+        return new WindowFunctionExpression(this);
+    }
 }

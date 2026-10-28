@@ -144,6 +144,10 @@ public class DtoQuery<DTO, T> {
         return underlyingQuery.listMaps();
     }
 
+    public List<Map<String, Object>> maps() {
+        return underlyingQuery.listMaps();
+    }
+
     public <V> V fetchOne(Class<V> targetType) {
         return underlyingQuery.fetchOne(targetType);
     }

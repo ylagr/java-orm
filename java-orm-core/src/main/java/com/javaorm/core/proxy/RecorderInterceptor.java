@@ -43,7 +43,7 @@ public class RecorderInterceptor {
         EntityMetadata metadata = EntityMetadataManager.get(entityClass);
 
         if (RecordingContext.get() == null) {
-            RecordingContext.start(entityClass);
+            RecordingContext.ensureStarted(entityClass);
         }
 
         // 检查该属性名是否为关联关系

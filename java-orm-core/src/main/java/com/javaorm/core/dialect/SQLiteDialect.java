@@ -56,13 +56,4 @@ public class SQLiteDialect extends AbstractDialect {
         }
         return false;
     }
-
-    private void renderArg(Object arg, StringBuilder sql, List<Object> params) {
-        if (arg instanceof SqlExpression) {
-            renderExpression((SqlExpression) arg, sql, params);
-        } else {
-            sql.append("?");
-            params.add(arg);
-        }
-    }
 }

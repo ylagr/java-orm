@@ -97,7 +97,8 @@ public class EntityHydrator {
                         if (colLabel == null || colLabel.isEmpty()) {
                             colLabel = rsmd.getColumnName(i);
                         }
-                        String key = colLabel.toLowerCase();
+                        String clean = colLabel.replace("\"", "").replace("`", "");
+                        String key = clean.toLowerCase();
                         if (key.contains(".")) {
                             key = key.substring(key.lastIndexOf('.') + 1);
                         }
@@ -146,15 +147,16 @@ public class EntityHydrator {
                         }
                         Object val = rs.getObject(i);
                         map.put(colLabel, val);
-                        if (colLabel.contains(".")) {
-                            String shortKey = colLabel.substring(colLabel.lastIndexOf('.') + 1);
-                            map.putIfAbsent(shortKey, val);
-                            map.putIfAbsent(toCamelCase(shortKey), val);
-                            map.putIfAbsent(toUnderscore(shortKey), val);
-                        } else {
-                            map.putIfAbsent(toCamelCase(colLabel), val);
-                            map.putIfAbsent(toUnderscore(colLabel), val);
-                        }
+                        String clean = colLabel.replace("\"", "").replace("`", "");
+                        map.putIfAbsent(clean, val);
+                        map.putIfAbsent(clean.toLowerCase(), val);
+                        map.putIfAbsent(clean.toUpperCase(), val);
+                        String shortKey = clean.contains(".") ? clean.substring(clean.lastIndexOf('.') + 1) : clean;
+                        map.putIfAbsent(shortKey, val);
+                        map.putIfAbsent(shortKey.toLowerCase(), val);
+                        map.putIfAbsent(shortKey.toUpperCase(), val);
+                        map.putIfAbsent(toCamelCase(shortKey.toLowerCase()), val);
+                        map.putIfAbsent(toUnderscore(shortKey), val);
                     }
                     list.add(map);
                 }

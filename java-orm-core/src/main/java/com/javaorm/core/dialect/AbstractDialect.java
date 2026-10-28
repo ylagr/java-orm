@@ -292,6 +292,10 @@ public abstract class AbstractDialect implements Dialect {
                 sql.append(ce.getTableAlias()).append(".");
             }
             sql.append(quote(ce.getColumnName()));
+        } else if (expr instanceof WindowOrderByBuilder) {
+            renderWindowFunction(((WindowOrderByBuilder) expr).getWindowExpr(), sql, params);
+        } else if (expr instanceof WindowFunctionExpression) {
+            renderWindowFunction((WindowFunctionExpression) expr, sql, params);
         } else if (expr instanceof FunctionExpression) {
             renderFunction((FunctionExpression) expr, sql, params);
         } else if (expr instanceof SubQueryExpression) {
@@ -307,6 +311,51 @@ public abstract class AbstractDialect implements Dialect {
         }
     }
 
+    public void renderWindowFunction(WindowFunctionExpression wfe, StringBuilder sql, List<Object> params) {
+        renderExpression(wfe.getFunctionExpr(), sql, params);
+        sql.append(" OVER (");
+        boolean hasPartition = false;
+        if (!wfe.getPartitionBys().isEmpty()) {
+            sql.append("PARTITION BY ");
+            for (int i = 0; i < wfe.getPartitionBys().size(); i++) {
+                if (i > 0) sql.append(", ");
+                renderExpression(wfe.getPartitionBys().get(i), sql, params);
+            }
+            hasPartition = true;
+        }
+        if (!wfe.getOrderBys().isEmpty()) {
+            if (hasPartition) {
+                sql.append(" ");
+            }
+            sql.append("ORDER BY ");
+            for (int i = 0; i < wfe.getOrderBys().size(); i++) {
+                if (i > 0) sql.append(", ");
+                OrderBy ob = wfe.getOrderBys().get(i);
+                if (ob.getExpression() != null) {
+                    renderExpression(ob.getExpression(), sql, params);
+                } else {
+                    if (ob.getTableAlias() != null && !ob.getTableAlias().isEmpty()) {
+                        sql.append(ob.getTableAlias()).append(".");
+                    }
+                    sql.append(quote(ob.getColumnName()));
+                }
+                sql.append(ob.isAscending() ? " ASC" : " DESC");
+            }
+        }
+        if (wfe.getFrameClause() != null && !wfe.getFrameClause().isEmpty()) {
+            if (hasPartition || !wfe.getOrderBys().isEmpty()) {
+                sql.append(" ");
+            }
+            String frame = wfe.getFrameClause().trim();
+            if (!frame.toUpperCase().startsWith("ROWS") && !frame.toUpperCase().startsWith("RANGE")) {
+                sql.append("ROWS BETWEEN ").append(frame);
+            } else {
+                sql.append(frame);
+            }
+        }
+        sql.append(")");
+    }
+
     public void renderFunction(FunctionExpression fn, StringBuilder sql, List<Object> params) {
         String name = fn.getFunctionName().toUpperCase();
         List<Object> args = fn.getArguments();
@@ -319,14 +368,18 @@ public abstract class AbstractDialect implements Dialect {
         for (int i = 0; i < args.size(); i++) {
             if (i > 0) sql.append(", ");
             Object arg = args.get(i);
-            if (arg instanceof SqlExpression) {
-                renderExpression((SqlExpression) arg, sql, params);
-            } else {
-                sql.append("?");
-                params.add(arg);
-            }
+            renderArg(arg, sql, params);
         }
         sql.append(")");
+    }
+
+    protected void renderArg(Object arg, StringBuilder sql, List<Object> params) {
+        if (arg instanceof SqlExpression) {
+            renderExpression((SqlExpression) arg, sql, params);
+        } else {
+            sql.append("?");
+            params.add(arg);
+        }
     }
 
     protected boolean renderDialectSpecificFunction(String name, List<Object> args, StringBuilder sql, List<Object> params) {

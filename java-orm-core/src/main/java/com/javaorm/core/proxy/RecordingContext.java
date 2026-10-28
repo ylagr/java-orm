@@ -8,13 +8,19 @@ import java.util.*;
  */
 public class RecordingContext {
 
-    private static final ThreadLocal<Queue<PropertyPath>> RECORDED_QUEUE = ThreadLocal.withInitial(LinkedList::new);
+    private static final ThreadLocal<LinkedList<PropertyPath>> RECORDED_QUEUE = ThreadLocal.withInitial(LinkedList::new);
     private static final ThreadLocal<PropertyPath> CURRENT_PATH = new ThreadLocal<>();
     private static final ThreadLocal<Map<Class<?>, String>> ACTIVE_ALIASES = ThreadLocal.withInitial(HashMap::new);
 
     public static void start(Class<?> rootEntityClass) {
         RECORDED_QUEUE.get().clear();
         CURRENT_PATH.set(new PropertyPath(rootEntityClass));
+    }
+
+    public static void ensureStarted(Class<?> rootEntityClass) {
+        if (CURRENT_PATH.get() == null) {
+            CURRENT_PATH.set(new PropertyPath(rootEntityClass));
+        }
     }
 
     public static PropertyPath get() {
@@ -58,7 +64,7 @@ public class RecordingContext {
     }
 
     public static PropertyPath finish() {
-        Queue<PropertyPath> queue = RECORDED_QUEUE.get();
+        LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
         if (!queue.isEmpty()) {
             PropertyPath polled = queue.poll();
             if (queue.isEmpty() && CURRENT_PATH.get() == null) {
@@ -72,9 +78,44 @@ public class RecordingContext {
         return path;
     }
 
+    /**
+     * 获取最近录制的指定数量的属性（按调用先后正序返回），常用于多参数函数如 concat(a, b)、partitionBy(a, b)
+     */
+    public static List<PropertyPath> finishLast(int count) {
+        List<PropertyPath> list = new ArrayList<>();
+        if (count <= 0) return list;
+
+        PropertyPath cur = CURRENT_PATH.get();
+        if (cur == null) {
+            // 没有当前属性调用，说明不是通过 proxy getter 调用的，绝不偷取外层的 RECORDED_QUEUE
+            return list;
+        }
+
+        CURRENT_PATH.remove();
+        list.add(cur);
+        count--;
+
+        if (count > 0) {
+            LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
+            List<PropertyPath> fromQueue = new ArrayList<>();
+            while (count > 0 && !queue.isEmpty()) {
+                fromQueue.add(queue.removeLast());
+                count--;
+            }
+            if (queue.isEmpty()) {
+                RECORDED_QUEUE.remove();
+            }
+            Collections.reverse(fromQueue);
+            fromQueue.addAll(list);
+            return fromQueue;
+        }
+
+        return list;
+    }
+
     public static List<PropertyPath> finishAll() {
         List<PropertyPath> result = new ArrayList<>();
-        Queue<PropertyPath> queue = RECORDED_QUEUE.get();
+        LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
         while (!queue.isEmpty()) {
             result.add(queue.poll());
         }

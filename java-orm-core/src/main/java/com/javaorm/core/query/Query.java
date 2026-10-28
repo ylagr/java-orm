@@ -72,7 +72,9 @@ public class Query<T> {
             int pathIdx = 0;
             for (Object item : expressions) {
                 SqlExpression expr;
-                if (item instanceof SqlExpression) {
+                if (item instanceof WindowOrderByBuilder) {
+                    expr = ((WindowOrderByBuilder) item).getWindowExpr();
+                } else if (item instanceof SqlExpression) {
                     expr = (SqlExpression) item;
                 } else if (pathIdx < paths.size()) {
                     expr = pathToColumnExpression(paths.get(pathIdx++));
@@ -305,6 +307,10 @@ public class Query<T> {
         }
     }
 
+    public List<Map<String, Object>> maps() {
+        return listMaps();
+    }
+
     public <V> V fetchOne(Class<V> targetType) {
         statement.setLimit(1);
         try (Connection conn = dataSource.getConnection()) {
@@ -363,6 +369,9 @@ public class Query<T> {
 
     public void resolveExpression(SqlExpression expr) {
         if (expr == null) return;
+        if (expr instanceof WindowOrderByBuilder) {
+            expr = ((WindowOrderByBuilder) expr).getWindowExpr();
+        }
         if (expr instanceof ColumnExpression) {
             ColumnExpression ce = (ColumnExpression) expr;
             if (ce.getTableAlias() == null && ce.getPath() != null) {
@@ -381,6 +390,17 @@ public class Query<T> {
             for (Object arg : fe.getArguments()) {
                 if (arg instanceof SqlExpression) {
                     resolveExpression((SqlExpression) arg);
+                }
+            }
+        } else if (expr instanceof WindowFunctionExpression) {
+            WindowFunctionExpression wfe = (WindowFunctionExpression) expr;
+            resolveExpression(wfe.getFunctionExpr());
+            for (SqlExpression part : wfe.getPartitionBys()) {
+                resolveExpression(part);
+            }
+            for (OrderBy ob : wfe.getOrderBys()) {
+                if (ob.getExpression() != null) {
+                    resolveExpression(ob.getExpression());
                 }
             }
         }

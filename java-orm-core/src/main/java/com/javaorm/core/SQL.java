@@ -32,12 +32,9 @@ public class SQL {
         if (prop instanceof ColumnExpression) {
             return (ColumnExpression) prop;
         }
-        PropertyPath path = RecordingContext.finishCurrent();
-        if (path == null) {
-            path = RecordingContext.finish();
-        }
-        if (path != null) {
-            return new ColumnExpression(path);
+        List<PropertyPath> paths = RecordingContext.finishLast(1);
+        if (!paths.isEmpty()) {
+            return new ColumnExpression(paths.get(0));
         }
         throw new IllegalStateException("No proxy column accessed before calling col(...)");
     }
@@ -47,7 +44,7 @@ public class SQL {
         return expr.as(alias);
     }
 
-    // 聚合函数
+    // ==================== 聚合函数 ====================
     public static FunctionExpression count() {
         return new FunctionExpression("COUNT", new RawSqlExpression("1"));
     }
@@ -72,7 +69,78 @@ public class SQL {
         return new FunctionExpression("MIN", toExpression(prop));
     }
 
-    // 日期时间函数
+    public static FunctionExpression stddev(Object prop) {
+        return new FunctionExpression("STDDEV", toExpression(prop));
+    }
+
+    public static FunctionExpression variance(Object prop) {
+        return new FunctionExpression("VARIANCE", toExpression(prop));
+    }
+
+    // ==================== 开窗函数 (Window Functions) ====================
+    // 排名函数
+    public static WindowFunctionExpression rowNumber() {
+        return new WindowFunctionExpression(new FunctionExpression("ROW_NUMBER"));
+    }
+
+    public static WindowFunctionExpression rank() {
+        return new WindowFunctionExpression(new FunctionExpression("RANK"));
+    }
+
+    public static WindowFunctionExpression denseRank() {
+        return new WindowFunctionExpression(new FunctionExpression("DENSE_RANK"));
+    }
+
+    public static WindowFunctionExpression percentRank() {
+        return new WindowFunctionExpression(new FunctionExpression("PERCENT_RANK"));
+    }
+
+    public static WindowFunctionExpression cumeDist() {
+        return new WindowFunctionExpression(new FunctionExpression("CUME_DIST"));
+    }
+
+    public static WindowFunctionExpression ntile(int n) {
+        return new WindowFunctionExpression(new FunctionExpression("NTILE", new RawSqlExpression(String.valueOf(n))));
+    }
+
+    // 导航/取值函数
+    public static WindowFunctionExpression lead(Object prop) {
+        return new WindowFunctionExpression(new FunctionExpression("LEAD", toExpression(prop)));
+    }
+
+    public static WindowFunctionExpression lead(Object prop, int offset) {
+        return new WindowFunctionExpression(new FunctionExpression("LEAD", toExpression(prop), new RawSqlExpression(String.valueOf(offset))));
+    }
+
+    public static WindowFunctionExpression lead(Object prop, int offset, Object def) {
+        return new WindowFunctionExpression(new FunctionExpression("LEAD", toExpression(prop), new RawSqlExpression(String.valueOf(offset)), toExpression(def)));
+    }
+
+    public static WindowFunctionExpression lag(Object prop) {
+        return new WindowFunctionExpression(new FunctionExpression("LAG", toExpression(prop)));
+    }
+
+    public static WindowFunctionExpression lag(Object prop, int offset) {
+        return new WindowFunctionExpression(new FunctionExpression("LAG", toExpression(prop), new RawSqlExpression(String.valueOf(offset))));
+    }
+
+    public static WindowFunctionExpression lag(Object prop, int offset, Object def) {
+        return new WindowFunctionExpression(new FunctionExpression("LAG", toExpression(prop), new RawSqlExpression(String.valueOf(offset)), toExpression(def)));
+    }
+
+    public static WindowFunctionExpression firstValue(Object prop) {
+        return new WindowFunctionExpression(new FunctionExpression("FIRST_VALUE", toExpression(prop)));
+    }
+
+    public static WindowFunctionExpression lastValue(Object prop) {
+        return new WindowFunctionExpression(new FunctionExpression("LAST_VALUE", toExpression(prop)));
+    }
+
+    public static WindowFunctionExpression nthValue(Object prop, int n) {
+        return new WindowFunctionExpression(new FunctionExpression("NTH_VALUE", toExpression(prop), new RawSqlExpression(String.valueOf(n))));
+    }
+
+    // ==================== 日期时间函数 ====================
     public static FunctionExpression year(Object prop) {
         return new FunctionExpression("YEAR", toExpression(prop));
     }
@@ -97,7 +165,7 @@ public class SQL {
         return new FunctionExpression("CURDATE");
     }
 
-    // 字符串函数
+    // ==================== 字符串函数 ====================
     public static FunctionExpression length(Object prop) {
         return new FunctionExpression("LENGTH", toExpression(prop));
     }
@@ -122,7 +190,7 @@ public class SQL {
         return new FunctionExpression("SUBSTRING", toExpression(prop), start, len);
     }
 
-    // 数值函数
+    // ==================== 数值函数 ====================
     public static FunctionExpression abs(Object prop) {
         return new FunctionExpression("ABS", toExpression(prop));
     }
@@ -139,7 +207,7 @@ public class SQL {
         return new FunctionExpression("FLOOR", toExpression(prop));
     }
 
-    // 空值控制函数
+    // ==================== 空值控制函数 ====================
     public static FunctionExpression ifNull(Object prop, Object def) {
         return new FunctionExpression("IFNULL", toExpression(prop), def);
     }
@@ -148,12 +216,12 @@ public class SQL {
         return new FunctionExpression("COALESCE", toExpressions(props));
     }
 
-    // 子查询与原生片段
+    // ==================== 子查询与原生片段 ====================
     public static SubQueryExpression subQuery(Object query) {
         return new SubQueryExpression(query);
     }
 
-    // 原地自增与算术表达式
+    // ==================== 原地自增与算术表达式 ====================
     public static IncrementExpression increment(Number step) {
         return new IncrementExpression(step, "+");
     }
@@ -182,12 +250,9 @@ public class SQL {
         if (obj instanceof SqlExpression) {
             return (SqlExpression) obj;
         }
-        PropertyPath path = RecordingContext.finishCurrent();
-        if (path == null) {
-            path = RecordingContext.finish();
-        }
-        if (path != null) {
-            return new ColumnExpression(path);
+        List<PropertyPath> paths = RecordingContext.finishLast(1);
+        if (!paths.isEmpty()) {
+            return new ColumnExpression(paths.get(0));
         }
         if (obj != null) {
             return new RawSqlExpression("?", obj);
@@ -197,9 +262,23 @@ public class SQL {
 
     private static Object[] toExpressions(Object... objs) {
         if (objs == null) return new Object[0];
-        List<Object> list = new ArrayList<>();
+        int proxyCount = 0;
         for (Object obj : objs) {
-            list.add(toExpression(obj));
+            if (!(obj instanceof SqlExpression)) {
+                proxyCount++;
+            }
+        }
+        List<PropertyPath> paths = RecordingContext.finishLast(proxyCount);
+        List<Object> list = new ArrayList<>();
+        int pathIdx = 0;
+        for (Object obj : objs) {
+            if (obj instanceof SqlExpression) {
+                list.add(obj);
+            } else if (pathIdx < paths.size()) {
+                list.add(new ColumnExpression(paths.get(pathIdx++)));
+            } else {
+                list.add(toExpression(obj));
+            }
         }
         return list.toArray();
     }
