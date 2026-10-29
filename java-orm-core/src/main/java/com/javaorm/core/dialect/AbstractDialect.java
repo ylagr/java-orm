@@ -50,10 +50,7 @@ public abstract class AbstractDialect implements Dialect {
         }
 
         // 4. WHERE
-        if (!stmt.getWhereConditions().isEmpty()) {
-            sql.append(" WHERE ");
-            renderConditions(stmt.getWhereConditions(), sql, params);
-        }
+        renderWhereClause(stmt.getSystemConditions(), stmt.getWhereConditions(), sql, params);
 
         // 5. GROUP BY
         if (!stmt.getGroupByExpressions().isEmpty()) {
@@ -141,10 +138,7 @@ public abstract class AbstractDialect implements Dialect {
             }
         }
 
-        if (!stmt.getWhereConditions().isEmpty()) {
-            sql.append(" WHERE ");
-            renderConditions(stmt.getWhereConditions(), sql, params);
-        }
+        renderWhereClause(stmt.getSystemConditions(), stmt.getWhereConditions(), sql, params);
 
         return new SqlAndParams(sql.toString(), params);
     }
@@ -156,10 +150,7 @@ public abstract class AbstractDialect implements Dialect {
 
         sql.append(quote(stmt.getTableName()));
 
-        if (!stmt.getWhereConditions().isEmpty()) {
-            sql.append(" WHERE ");
-            renderConditions(stmt.getWhereConditions(), sql, params);
-        }
+        renderWhereClause(stmt.getSystemConditions(), stmt.getWhereConditions(), sql, params);
 
         return new SqlAndParams(sql.toString(), params);
     }
@@ -185,6 +176,35 @@ public abstract class AbstractDialect implements Dialect {
         return new SqlAndParams(sql.toString(), params);
     }
 
+    @Override
+    public String quote(String identifier) {
+        if (identifier == null) return null;
+        String clean = identifier;
+        if (clean.length() >= 2 && clean.startsWith("\"") && clean.endsWith("\"")) {
+            clean = clean.substring(1, clean.length() - 1);
+        }
+        return "\"" + clean.replace("\"", "\"\"") + "\"";
+    }
+
+    protected void renderWhereClause(List<Condition> systemConditions, List<Condition> userConditions, StringBuilder sql, List<Object> params) {
+        boolean hasSystem = systemConditions != null && !systemConditions.isEmpty();
+        boolean hasUser = userConditions != null && !userConditions.isEmpty();
+        if (!hasSystem && !hasUser) {
+            return;
+        }
+        sql.append(" WHERE ");
+        if (hasSystem && !hasUser) {
+            renderConditions(systemConditions, sql, params);
+        } else if (!hasSystem && hasUser) {
+            renderConditions(userConditions, sql, params);
+        } else {
+            renderConditions(systemConditions, sql, params);
+            sql.append(" AND (");
+            renderConditions(userConditions, sql, params);
+            sql.append(")");
+        }
+    }
+
     protected void renderConditions(List<Condition> conditions, StringBuilder sql, List<Object> params) {
         for (int i = 0; i < conditions.size(); i++) {
             Condition cond = conditions.get(i);
@@ -208,11 +228,33 @@ public abstract class AbstractDialect implements Dialect {
     protected void renderSingleCondition(Condition cond, StringBuilder sql, List<Object> params) {
         if (cond instanceof BinaryCondition) {
             BinaryCondition bc = (BinaryCondition) cond;
+            SqlOperator op = bc.getOperator();
+            Object[] values = bc.getValues();
+            Object firstVal = (values != null && values.length > 0) ? values[0] : null;
+
+            if ((op == SqlOperator.IN || op == SqlOperator.NOT_IN) && firstVal instanceof Collection && ((Collection<?>) firstVal).isEmpty()) {
+                if (op == SqlOperator.IN) {
+                    sql.append("1 = 0");
+                } else {
+                    sql.append("1 = 1");
+                }
+                return;
+            }
+
             if (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty()) {
                 sql.append(renderTablePrefix(bc.getTableAlias()));
             }
             sql.append(quote(bc.getColumnName())).append(" ");
-            SqlOperator op = bc.getOperator();
+
+            if (op == SqlOperator.EQ && (firstVal == null || (values != null && values.length == 0))) {
+                sql.append("IS NULL");
+                return;
+            }
+            if (op == SqlOperator.NE && (firstVal == null || (values != null && values.length == 0))) {
+                sql.append("IS NOT NULL");
+                return;
+            }
+
             sql.append(op.getSql());
             renderOperatorValues(op, bc.getValues(), sql, params);
         } else if (cond instanceof ExpressionCondition) {
@@ -297,9 +339,7 @@ public abstract class AbstractDialect implements Dialect {
             renderExpression((SqlExpression) val, sql, params);
         } else {
             sql.append(" ?");
-            if (val != null) {
-                params.add(val);
-            }
+            params.add(val);
         }
     }
 

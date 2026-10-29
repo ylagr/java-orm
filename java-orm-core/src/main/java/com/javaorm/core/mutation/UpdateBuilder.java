@@ -19,6 +19,7 @@ import com.javaorm.core.proxy.RecordingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.javaorm.core.connection.ConnectionUtils;
 import com.javaorm.core.query.Query;
 import com.javaorm.core.query.WhereBuilder;
 
@@ -54,7 +55,18 @@ public class UpdateBuilder<T> {
         // 自动注入逻辑删除保护（避免误更新已删除记录）
         if (metadata.hasLogicDelete()) {
             ColumnMetadata ld = metadata.getLogicDeleteColumn();
-            statement.addWhereCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+            statement.addSystemCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+        }
+
+        // 自动注入多租户隔离保护
+        if (metadata.hasTenant()) {
+            ColumnMetadata tc = metadata.getTenantColumn();
+            Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+            if (tenantId != null) {
+                statement.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
+            } else if (config != null && config.isTenantStrict()) {
+                throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
+            }
         }
     }
 
@@ -182,17 +194,21 @@ public class UpdateBuilder<T> {
             log.info("==> Parameters: {}", sqlAndParams.getParams());
         }
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-
-            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+        Connection conn = null;
+        boolean isTx = false;
+        try {
+            conn = ConnectionUtils.getConnection(dataSource, config);
+            isTx = ConnectionUtils.isTransactionConnection(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
+                for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
+                    ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+                }
+                return ps.executeUpdate();
             }
-
-            return ps.executeUpdate();
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute update statement", e);
         } finally {
+            if (!isTx) ConnectionUtils.closeConnection(conn);
             Query.resetAliasSeq();
         }
     }

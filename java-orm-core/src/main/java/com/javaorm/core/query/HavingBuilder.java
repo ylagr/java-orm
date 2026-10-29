@@ -42,6 +42,9 @@ public class HavingBuilder<T> {
         if (val instanceof SqlExpression) {
             return and((SqlExpression) val);
         }
+        if (val instanceof String) {
+            return and(new com.javaorm.core.ast.RawSqlExpression((String) val));
+        }
         PropertyPath path = RecordingContext.finish();
         SqlExpression expr = query.pathToColumnExpression(path);
         return and(expr);
@@ -59,6 +62,9 @@ public class HavingBuilder<T> {
     public <R> PropertyOperator<HavingBuilder<T>, R> or(R val) {
         if (val instanceof SqlExpression) {
             return or((SqlExpression) val);
+        }
+        if (val instanceof String) {
+            return or(new com.javaorm.core.ast.RawSqlExpression((String) val));
         }
         PropertyPath path = RecordingContext.finish();
         SqlExpression expr = query.pathToColumnExpression(path);

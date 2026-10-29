@@ -4,12 +4,6 @@ import java.util.List;
 
 public class PostgreSQLDialect extends AbstractDialect {
 
-    @Override
-    public String quote(String identifier) {
-        if (identifier == null) return null;
-        if (identifier.startsWith("\"") && identifier.endsWith("\"")) return identifier;
-        return "\"" + identifier + "\"";
-    }
 
     @Override
     protected boolean renderDialectSpecificFunction(String name, List<Object> args, StringBuilder sql, List<Object> params) {

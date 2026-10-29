@@ -11,6 +11,8 @@ import com.javaorm.core.metadata.EntityMetadataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.javaorm.core.connection.ConnectionUtils;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -69,6 +71,19 @@ public class InsertBuilder<T> {
                 }
             }
 
+            // 处理多租户字段默认填充
+            if (col.isTenant()) {
+                Object val = col.getValue(entity);
+                if (val == null) {
+                    Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+                    if (tenantId != null) {
+                        col.setValue(entity, tenantId);
+                    } else if (config != null && config.isTenantStrict()) {
+                        throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
+                    }
+                }
+            }
+
             // 自动填充日期/时间
             Object val = col.getValue(entity);
             if (val == null) {
@@ -90,28 +105,35 @@ public class InsertBuilder<T> {
             log.info("==> Parameters: {}", sqlAndParams.getParams());
         }
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql(), Statement.RETURN_GENERATED_KEYS)) {
+        Connection conn = null;
+        boolean isTx = false;
+        try {
+            conn = ConnectionUtils.getConnection(dataSource, config);
+            isTx = ConnectionUtils.isTransactionConnection(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql(), Statement.RETURN_GENERATED_KEYS)) {
 
-            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
-            }
+                for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
+                    ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+                }
 
-            int affected = ps.executeUpdate();
+                int affected = ps.executeUpdate();
 
-            // 主键自增值回填
-            if (metadata.getIdColumn() != null) {
-                try (ResultSet rs = ps.getGeneratedKeys()) {
-                    if (rs != null && rs.next()) {
-                        Object key = rs.getObject(1);
-                        metadata.getIdColumn().setValue(entity, key);
+                // 主键自增值回填
+                if (metadata.getIdColumn() != null) {
+                    try (ResultSet rs = ps.getGeneratedKeys()) {
+                        if (rs != null && rs.next()) {
+                            Object key = rs.getObject(1);
+                            metadata.getIdColumn().setValue(entity, key);
+                        }
                     }
                 }
-            }
 
-            return affected;
+                return affected;
+            }
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute insert statement", e);
+        } finally {
+            if (!isTx) ConnectionUtils.closeConnection(conn);
         }
     }
 }

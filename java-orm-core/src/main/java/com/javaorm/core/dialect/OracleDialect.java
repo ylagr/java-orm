@@ -25,12 +25,6 @@ public class OracleDialect extends AbstractDialect {
         return oracle11;
     }
 
-    @Override
-    public String quote(String identifier) {
-        if (identifier == null) return null;
-        if (identifier.startsWith("\"") && identifier.endsWith("\"")) return identifier;
-        return "\"" + identifier + "\"";
-    }
 
     @Override
     public SqlAndParams buildSelect(SelectStatement stmt) {

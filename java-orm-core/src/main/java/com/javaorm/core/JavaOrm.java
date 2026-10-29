@@ -41,6 +41,53 @@ public class JavaOrm {
     }
 
     /**
+     * 开启编程式事务执行（无返回值）
+     */
+    public void transaction(java.util.function.Consumer<JavaOrm> action) {
+        transactionResult(orm -> {
+            action.accept(orm);
+            return null;
+        });
+    }
+
+    /**
+     * 开启编程式事务执行（带返回值）
+     */
+    public <R> R transactionResult(java.util.function.Function<JavaOrm, R> action) {
+        java.sql.Connection existing = com.javaorm.core.connection.TransactionContext.getConnection();
+        if (existing != null) {
+            return action.apply(this);
+        }
+        try (java.sql.Connection conn = dataSource.getConnection()) {
+            boolean autoCommit = conn.getAutoCommit();
+            conn.setAutoCommit(false);
+            com.javaorm.core.connection.TransactionContext.setConnection(conn);
+            try {
+                R result = action.apply(this);
+                conn.commit();
+                return result;
+            } catch (Throwable t) {
+                try {
+                    conn.rollback();
+                } catch (Exception ignored) {}
+                if (t instanceof RuntimeException) {
+                    throw (RuntimeException) t;
+                }
+                throw new RuntimeException("Transaction rolled back due to error", t);
+            } finally {
+                com.javaorm.core.connection.TransactionContext.clear();
+                try {
+                    conn.setAutoCommit(autoCommit);
+                } catch (Exception ignored) {}
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Transaction execution failed", e);
+        }
+    }
+
+    /**
      * 获取指定实体的录制代理单例对象
      */
     public <T> T proxy(Class<T> entityClass) {

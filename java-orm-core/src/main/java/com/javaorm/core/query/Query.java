@@ -14,6 +14,8 @@ import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.ProxyFactory;
 import com.javaorm.core.proxy.RecordingContext;
 
+import com.javaorm.core.connection.ConnectionUtils;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.util.*;
@@ -81,10 +83,21 @@ public class Query<T> {
         this.statement = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), rootAlias);
         RecordingContext.registerAlias(rootEntityClass, rootAlias);
 
-        // 默认自动注入逻辑删除过滤条件
+        // 默认自动注入逻辑删除系统过滤条件
         if (rootMetadata.hasLogicDelete()) {
             ColumnMetadata ld = rootMetadata.getLogicDeleteColumn();
-            statement.addWhereCondition(new BinaryCondition(rootAlias, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+            statement.addSystemCondition(new BinaryCondition(rootAlias, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+        }
+
+        // 默认自动注入多租户隔离系统过滤条件
+        if (rootMetadata.hasTenant()) {
+            ColumnMetadata tc = rootMetadata.getTenantColumn();
+            Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+            if (tenantId != null) {
+                statement.addSystemCondition(new BinaryCondition(rootAlias, tc.getColumnName(), SqlOperator.EQ, tenantId));
+            } else if (config != null && config.isTenantStrict()) {
+                throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + rootEntityClass.getName());
+            }
         }
     }
 
@@ -110,10 +123,21 @@ public class Query<T> {
         this.statement = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), rootAlias);
         RecordingContext.registerAlias(rootEntityClass, rootAlias);
 
-        // 默认自动注入逻辑删除过滤条件
+        // 默认自动注入逻辑删除系统过滤条件
         if (rootMetadata.hasLogicDelete()) {
             ColumnMetadata ld = rootMetadata.getLogicDeleteColumn();
-            statement.addWhereCondition(new BinaryCondition(rootAlias, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+            statement.addSystemCondition(new BinaryCondition(rootAlias, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+        }
+
+        // 默认自动注入多租户隔离系统过滤条件
+        if (rootMetadata.hasTenant()) {
+            ColumnMetadata tc = rootMetadata.getTenantColumn();
+            Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+            if (tenantId != null) {
+                statement.addSystemCondition(new BinaryCondition(rootAlias, tc.getColumnName(), SqlOperator.EQ, tenantId));
+            } else if (config != null && config.isTenantStrict()) {
+                throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + rootEntityClass.getName());
+            }
         }
     }
 
@@ -499,6 +523,7 @@ public class Query<T> {
         for (SqlExpression expr : statement.getProjectExpressions()) {
             updateExpressionTableAlias(expr, oldAlias, newAlias);
         }
+        updateConditionsTableAlias(statement.getSystemConditions(), oldAlias, newAlias);
         updateConditionsTableAlias(statement.getWhereConditions(), oldAlias, newAlias);
         for (TableJoin join : statement.getJoins()) {
             updateConditionsTableAlias(join.getOnConditions(), oldAlias, newAlias);
@@ -590,10 +615,16 @@ public class Query<T> {
 
     // 执行方法
     public List<T> list() {
-        try (Connection conn = dataSource.getConnection()) {
+        Connection conn = null;
+        boolean isTx = false;
+        try {
+            conn = ConnectionUtils.getConnection(dataSource, config);
+            isTx = ConnectionUtils.isTransactionConnection(conn);
             return list(conn);
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute query list", e);
+        } finally {
+            if (!isTx) ConnectionUtils.closeConnection(conn);
         }
     }
 
@@ -610,10 +641,16 @@ public class Query<T> {
     }
 
     public List<Map<String, Object>> listMaps() {
-        try (Connection conn = dataSource.getConnection()) {
+        Connection conn = null;
+        boolean isTx = false;
+        try {
+            conn = ConnectionUtils.getConnection(dataSource, config);
+            isTx = ConnectionUtils.isTransactionConnection(conn);
             return EntityHydrator.queryMaps(conn, statement, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute listMaps query", e);
+        } finally {
+            if (!isTx) ConnectionUtils.closeConnection(conn);
         }
     }
 
@@ -623,18 +660,30 @@ public class Query<T> {
 
     public <V> V fetchOne(Class<V> targetType) {
         statement.setLimit(1);
-        try (Connection conn = dataSource.getConnection()) {
+        Connection conn = null;
+        boolean isTx = false;
+        try {
+            conn = ConnectionUtils.getConnection(dataSource, config);
+            isTx = ConnectionUtils.isTransactionConnection(conn);
             return EntityHydrator.queryScalar(conn, statement, targetType, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to fetch one scalar", e);
+        } finally {
+            if (!isTx) ConnectionUtils.closeConnection(conn);
         }
     }
 
     public <V> List<V> fetchList(Class<V> targetType) {
-        try (Connection conn = dataSource.getConnection()) {
+        Connection conn = null;
+        boolean isTx = false;
+        try {
+            conn = ConnectionUtils.getConnection(dataSource, config);
+            isTx = ConnectionUtils.isTransactionConnection(conn);
             return EntityHydrator.queryScalarList(conn, statement, targetType, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to fetch scalar list", e);
+        } finally {
+            if (!isTx) ConnectionUtils.closeConnection(conn);
         }
     }
 
@@ -649,19 +698,74 @@ public class Query<T> {
     }
 
     public long count() {
-        SelectStatement countStmt = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), statement.getRootTableAlias());
-        countStmt.addSelectColumn("COUNT(1)");
-        for (TableJoin join : statement.getJoins()) {
-            countStmt.addJoin(join);
-        }
-        for (Condition cond : statement.getWhereConditions()) {
-            countStmt.addWhereCondition(cond);
-        }
+        boolean isComplex = statement.isDistinct()
+                || !statement.getGroupByExpressions().isEmpty()
+                || !statement.getHavingConditions().isEmpty()
+                || !statement.getUnions().isEmpty();
 
-        try (Connection conn = dataSource.getConnection()) {
-            return EntityHydrator.queryCount(conn, countStmt, dialect, getEffectiveConfig());
+        Connection conn = null;
+        boolean isTx = false;
+        try {
+            conn = ConnectionUtils.getConnection(dataSource, config);
+            isTx = ConnectionUtils.isTransactionConnection(conn);
+
+            if (!isComplex) {
+                SelectStatement countStmt = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), statement.getRootTableAlias());
+                countStmt.addSelectColumn("COUNT(1)");
+                for (TableJoin join : statement.getJoins()) {
+                    countStmt.addJoin(join);
+                }
+                for (Condition cond : statement.getSystemConditions()) {
+                    countStmt.addSystemCondition(cond);
+                }
+                for (Condition cond : statement.getWhereConditions()) {
+                    countStmt.addWhereCondition(cond);
+                }
+                return EntityHydrator.queryCount(conn, countStmt, dialect, getEffectiveConfig());
+            } else {
+                // 复杂查询保留 DISTINCT / GROUP BY / HAVING / UNION 语义，忽略分页并以外层子查询包装计数
+                SelectStatement innerStmt = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), statement.getRootTableAlias());
+                innerStmt.setDistinct(statement.isDistinct());
+                for (SqlExpression expr : statement.getProjectExpressions()) {
+                    innerStmt.addProjectExpression(expr);
+                }
+                for (String col : statement.getSelectColumns()) {
+                    innerStmt.addSelectColumn(col);
+                }
+                if (!statement.getGroupByExpressions().isEmpty() && innerStmt.getProjectExpressions().isEmpty() && innerStmt.getSelectColumns().isEmpty()) {
+                    for (SqlExpression expr : statement.getGroupByExpressions()) {
+                        innerStmt.addProjectExpression(expr);
+                    }
+                }
+                for (TableJoin join : statement.getJoins()) {
+                    innerStmt.addJoin(join);
+                }
+                for (Condition cond : statement.getSystemConditions()) {
+                    innerStmt.addSystemCondition(cond);
+                }
+                for (Condition cond : statement.getWhereConditions()) {
+                    innerStmt.addWhereCondition(cond);
+                }
+                for (SqlExpression expr : statement.getGroupByExpressions()) {
+                    innerStmt.addGroupByExpression(expr);
+                }
+                for (Condition cond : statement.getHavingConditions()) {
+                    innerStmt.addHavingCondition(cond);
+                }
+                for (UnionClause u : statement.getUnions()) {
+                    innerStmt.addUnion(u);
+                }
+                // 分页 limit / offset 不参与 count 统计
+
+                com.javaorm.core.dialect.SqlAndParams innerSql = dialect.buildSelect(innerStmt);
+                String countSql = "SELECT COUNT(1) FROM (" + innerSql.getSql() + ") count_sub";
+                com.javaorm.core.dialect.SqlAndParams countSqlAndParams = new com.javaorm.core.dialect.SqlAndParams(countSql, innerSql.getParams());
+                return EntityHydrator.queryCount(conn, countSqlAndParams, getEffectiveConfig());
+            }
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute count query", e);
+        } finally {
+            if (!isTx) ConnectionUtils.closeConnection(conn);
         }
     }
 
@@ -833,6 +937,7 @@ public class Query<T> {
         for (SqlExpression expr : statement.getProjectExpressions()) {
             updateExpressionTableAlias(expr, oldAlias, newAlias);
         }
+        updateConditionsTableAlias(statement.getSystemConditions(), oldAlias, newAlias);
         updateConditionsTableAlias(statement.getWhereConditions(), oldAlias, newAlias);
         for (TableJoin join : statement.getJoins()) {
             updateConditionsTableAlias(join.getOnConditions(), oldAlias, newAlias);
@@ -973,6 +1078,15 @@ public class Query<T> {
             if (targetMeta.hasLogicDelete()) {
                 ColumnMetadata ld = targetMeta.getLogicDeleteColumn();
                 join.addOnCondition(new BinaryCondition(nextAlias, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+            }
+
+            // 子表多租户自动过滤
+            if (targetMeta.hasTenant()) {
+                ColumnMetadata tc = targetMeta.getTenantColumn();
+                Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+                if (tenantId != null) {
+                    join.addOnCondition(new BinaryCondition(nextAlias, tc.getColumnName(), SqlOperator.EQ, tenantId));
+                }
             }
 
             statement.addJoin(join);

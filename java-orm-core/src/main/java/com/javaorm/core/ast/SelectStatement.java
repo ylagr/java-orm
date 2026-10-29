@@ -10,6 +10,7 @@ public class SelectStatement {
     private final List<String> selectColumns = new ArrayList<>();
     private final List<SqlExpression> projectExpressions = new ArrayList<>();
     private final List<TableJoin> joins = new ArrayList<>();
+    private final List<Condition> systemConditions = new ArrayList<>();
     private final List<Condition> whereConditions = new ArrayList<>();
     private final List<SqlExpression> groupByExpressions = new ArrayList<>();
     private final List<Condition> havingConditions = new ArrayList<>();
@@ -28,6 +29,7 @@ public class SelectStatement {
     public void addSelectColumn(String col) { selectColumns.add(col); }
     public void addProjectExpression(SqlExpression expr) { projectExpressions.add(expr); }
     public void addJoin(TableJoin join) { joins.add(join); }
+    public void addSystemCondition(Condition condition) { systemConditions.add(condition); }
     public void addWhereCondition(Condition condition) { whereConditions.add(condition); }
     public void addGroupByExpression(SqlExpression expr) { groupByExpressions.add(expr); }
     public void addHavingCondition(Condition condition) { havingConditions.add(condition); }
@@ -44,6 +46,7 @@ public class SelectStatement {
     public List<String> getSelectColumns() { return selectColumns; }
     public List<SqlExpression> getProjectExpressions() { return projectExpressions; }
     public List<TableJoin> getJoins() { return joins; }
+    public List<Condition> getSystemConditions() { return systemConditions; }
     public List<Condition> getWhereConditions() { return whereConditions; }
     public List<SqlExpression> getGroupByExpressions() { return groupByExpressions; }
     public List<Condition> getHavingConditions() { return havingConditions; }

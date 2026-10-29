@@ -63,7 +63,11 @@ public class OrmJmhBenchmark {
 
     @Benchmark
     public Object javaOrm_01_ProxyPropertyCall() {
-        return javaOrmProxy.getAge();
+        try {
+            return javaOrmProxy.getAge();
+        } finally {
+            com.javaorm.core.proxy.RecordingContext.clearRecording();
+        }
     }
 
     @Benchmark
@@ -79,7 +83,8 @@ public class OrmJmhBenchmark {
                 .where()
                     .and(s -> s.getAge()).ge(18)
                     .and(s -> s.getStudentName()).like("王%")
-                .orderBy(s -> s.getAge()).desc();
+                .orderBy(s -> s.getAge()).desc()
+                .toSql();
     }
 
     @Benchmark

@@ -1,5 +1,11 @@
 package com.javaorm.core.config;
 
+import com.javaorm.core.connection.ConnectionProvider;
+import com.javaorm.core.tenant.TenantContext;
+
+import java.util.Objects;
+import java.util.function.Supplier;
+
 /**
  * 全局 ORM 配置
  */
@@ -10,6 +16,9 @@ public class OrmConfig {
     private String defaultLogicDeleteProperty = null; // 全局逻辑删除字段名（若实体无注解时生效）
     private Object defaultLogicDeleteNormalValue = 0;
     private Object defaultLogicDeleteDeletedValue = 1;
+    private ConnectionProvider connectionProvider = null;
+    private Supplier<Object> tenantIdProvider = TenantContext::getTenantId;
+    private boolean tenantStrict = false;
 
     public NameConversion getNameConversion() {
         return nameConversion;
@@ -56,5 +65,36 @@ public class OrmConfig {
     public OrmConfig setDefaultLogicDeleteDeletedValue(Object defaultLogicDeleteDeletedValue) {
         this.defaultLogicDeleteDeletedValue = defaultLogicDeleteDeletedValue;
         return this;
+    }
+
+    public ConnectionProvider getConnectionProvider() {
+        return connectionProvider;
+    }
+
+    public OrmConfig setConnectionProvider(ConnectionProvider connectionProvider) {
+        this.connectionProvider = connectionProvider;
+        return this;
+    }
+
+    public Supplier<Object> getTenantIdProvider() {
+        return tenantIdProvider;
+    }
+
+    public OrmConfig setTenantIdProvider(Supplier<Object> tenantIdProvider) {
+        this.tenantIdProvider = tenantIdProvider;
+        return this;
+    }
+
+    public boolean isTenantStrict() {
+        return tenantStrict;
+    }
+
+    public OrmConfig setTenantStrict(boolean tenantStrict) {
+        this.tenantStrict = tenantStrict;
+        return this;
+    }
+
+    public Object getCurrentTenantId() {
+        return tenantIdProvider != null ? tenantIdProvider.get() : TenantContext.getTenantId();
     }
 }

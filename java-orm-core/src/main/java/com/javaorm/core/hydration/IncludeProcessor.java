@@ -78,6 +78,8 @@ public class IncludeProcessor {
         }
     }
 
+    private static final int CHUNK_SIZE = 500;
+
     private static <T> void processManyToOne(Connection conn,
                                              List<T> rootEntities,
                                              EntityMetadata rootMetadata,
@@ -103,19 +105,26 @@ public class IncludeProcessor {
         ColumnMetadata targetPkCol = targetMeta.getColumnByProperty(relation.getTargetProperty());
         String targetColName = targetPkCol != null ? targetPkCol.getColumnName() : config.getNameConversion().convert(relation.getTargetProperty());
 
-        // 使用 Query 构建目标查询，支持子查询、筛选、排序与递归包含
-        @SuppressWarnings({"rawtypes", "unchecked"})
-        Query<?> targetQuery = new Query(relation.getTargetEntityClass(), dataSource, dialect, config);
-        if (includeSpec != null) {
-            includeSpec.applyConfig(targetQuery);
+        // 分批切片查询（防止 Oracle 11g 1000 参数上限或 SQLite 参数限制）
+        List<Object> allTargets = new ArrayList<>();
+        List<Object> keyList = new ArrayList<>(fkValues);
+        for (int i = 0; i < keyList.size(); i += CHUNK_SIZE) {
+            List<Object> chunk = keyList.subList(i, Math.min(i + CHUNK_SIZE, keyList.size()));
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            Query<?> targetQuery = new Query(relation.getTargetEntityClass(), dataSource, dialect, config);
+            if (includeSpec != null) {
+                includeSpec.applyConfig(targetQuery);
+            }
+
+            targetQuery.getStatement().addWhereCondition(
+                    new BinaryCondition(targetQuery.getStatement().getRootTableAlias(), targetColName, SqlOperator.IN, chunk));
+
+            List<?> targets = targetQuery.list(conn);
+            allTargets.addAll(targets);
         }
 
-        targetQuery.getStatement().addWhereCondition(
-                new BinaryCondition(targetQuery.getStatement().getRootTableAlias(), targetColName, SqlOperator.IN, fkValues));
-
-        List<?> targets = targetQuery.list(conn);
         Map<Object, Object> targetMap = new HashMap<>();
-        for (Object target : targets) {
+        for (Object target : allTargets) {
             Object pkVal = targetPkCol != null ? targetPkCol.getValue(target) : null;
             if (pkVal != null) {
                 targetMap.put(pkVal, target);
@@ -157,19 +166,26 @@ public class IncludeProcessor {
         ColumnMetadata childFkCol = targetMeta.getColumnByProperty(relation.getTargetProperty());
         String childFkColName = childFkCol != null ? childFkCol.getColumnName() : config.getNameConversion().convert(relation.getTargetProperty());
 
-        // 使用 Query 构建目标查询，支持下级筛选、排序与下级递归 include
-        @SuppressWarnings({"rawtypes", "unchecked"})
-        Query<?> targetQuery = new Query(relation.getTargetEntityClass(), dataSource, dialect, config);
-        if (includeSpec != null) {
-            includeSpec.applyConfig(targetQuery);
+        // 分批切片查询（防止 Oracle 11g 1000 参数上限或 SQLite 参数限制）
+        List<Object> allChildren = new ArrayList<>();
+        List<Object> idList = new ArrayList<>(parentIds);
+        for (int i = 0; i < idList.size(); i += CHUNK_SIZE) {
+            List<Object> chunk = idList.subList(i, Math.min(i + CHUNK_SIZE, idList.size()));
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            Query<?> targetQuery = new Query(relation.getTargetEntityClass(), dataSource, dialect, config);
+            if (includeSpec != null) {
+                includeSpec.applyConfig(targetQuery);
+            }
+
+            targetQuery.getStatement().addWhereCondition(
+                    new BinaryCondition(targetQuery.getStatement().getRootTableAlias(), childFkColName, SqlOperator.IN, chunk));
+
+            List<?> children = targetQuery.list(conn);
+            allChildren.addAll(children);
         }
 
-        targetQuery.getStatement().addWhereCondition(
-                new BinaryCondition(targetQuery.getStatement().getRootTableAlias(), childFkColName, SqlOperator.IN, parentIds));
-
-        List<?> children = targetQuery.list(conn);
         Map<Object, List<Object>> groupedChildren = new HashMap<>();
-        for (Object child : children) {
+        for (Object child : allChildren) {
             Object fkVal = childFkCol != null ? childFkCol.getValue(child) : null;
             if (fkVal != null) {
                 groupedChildren.computeIfAbsent(fkVal, k -> new ArrayList<>()).add(child);

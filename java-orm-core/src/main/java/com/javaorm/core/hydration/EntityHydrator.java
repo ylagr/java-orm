@@ -244,7 +244,10 @@ public class EntityHydrator {
     }
 
     public static long queryCount(Connection conn, SelectStatement stmt, Dialect dialect, OrmConfig config) throws Exception {
-        SqlAndParams sqlAndParams = dialect.buildSelect(stmt);
+        return queryCount(conn, dialect.buildSelect(stmt), config);
+    }
+
+    public static long queryCount(Connection conn, SqlAndParams sqlAndParams, OrmConfig config) throws Exception {
         if (config.isPrintSql()) {
             log.info("==> [Count] Preparing: {}", sqlAndParams.getSql());
             log.info("==> [Count] Parameters: {}", sqlAndParams.getParams());

@@ -24,32 +24,56 @@ public class PropertyOperator<TQuery, R> {
     }
 
     public TQuery eq(Object value) {
-        appender.append(SqlOperator.EQ, resolveOperand(value));
+        Object operand = resolveOperand(value);
+        if (operand == null) {
+            return isNull();
+        }
+        appender.append(SqlOperator.EQ, operand);
         return query;
     }
 
     public TQuery ne(Object value) {
-        appender.append(SqlOperator.NE, resolveOperand(value));
+        Object operand = resolveOperand(value);
+        if (operand == null) {
+            return isNotNull();
+        }
+        appender.append(SqlOperator.NE, operand);
         return query;
     }
 
     public TQuery gt(Object value) {
-        appender.append(SqlOperator.GT, resolveOperand(value));
+        Object operand = resolveOperand(value);
+        if (operand == null) {
+            throw new IllegalArgumentException("Comparison operator > does not support null value");
+        }
+        appender.append(SqlOperator.GT, operand);
         return query;
     }
 
     public TQuery ge(Object value) {
-        appender.append(SqlOperator.GE, resolveOperand(value));
+        Object operand = resolveOperand(value);
+        if (operand == null) {
+            throw new IllegalArgumentException("Comparison operator >= does not support null value");
+        }
+        appender.append(SqlOperator.GE, operand);
         return query;
     }
 
     public TQuery lt(Object value) {
-        appender.append(SqlOperator.LT, resolveOperand(value));
+        Object operand = resolveOperand(value);
+        if (operand == null) {
+            throw new IllegalArgumentException("Comparison operator < does not support null value");
+        }
+        appender.append(SqlOperator.LT, operand);
         return query;
     }
 
     public TQuery le(Object value) {
-        appender.append(SqlOperator.LE, resolveOperand(value));
+        Object operand = resolveOperand(value);
+        if (operand == null) {
+            throw new IllegalArgumentException("Comparison operator <= does not support null value");
+        }
+        appender.append(SqlOperator.LE, operand);
         return query;
     }
 

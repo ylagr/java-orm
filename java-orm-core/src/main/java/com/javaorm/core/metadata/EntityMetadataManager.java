@@ -15,14 +15,94 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class EntityMetadataManager {
 
-    private static final Map<Class<?>, EntityMetadata> METADATA_CACHE = new ConcurrentHashMap<>();
+    private static final Map<MetadataCacheKey, EntityMetadata> METADATA_CACHE = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, Map<String, RelationMetadata>> RELATIONS_CACHE = new ConcurrentHashMap<>();
+
+    public static final class MetadataCacheKey {
+        private final Class<?> entityClass;
+        private final Class<?> nameConversionClass;
+        private final String defaultLogicDeleteProperty;
+        private final Object defaultLogicDeleteNormalValue;
+        private final Object defaultLogicDeleteDeletedValue;
+
+        public MetadataCacheKey(Class<?> entityClass, OrmConfig config) {
+            this.entityClass = entityClass;
+            if (config != null) {
+                this.nameConversionClass = config.getNameConversion() != null ? config.getNameConversion().getClass() : null;
+                this.defaultLogicDeleteProperty = config.getDefaultLogicDeleteProperty();
+                this.defaultLogicDeleteNormalValue = config.getDefaultLogicDeleteNormalValue();
+                this.defaultLogicDeleteDeletedValue = config.getDefaultLogicDeleteDeletedValue();
+            } else {
+                this.nameConversionClass = null;
+                this.defaultLogicDeleteProperty = null;
+                this.defaultLogicDeleteNormalValue = null;
+                this.defaultLogicDeleteDeletedValue = null;
+            }
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            MetadataCacheKey that = (MetadataCacheKey) o;
+            return Objects.equals(entityClass, that.entityClass) &&
+                    Objects.equals(nameConversionClass, that.nameConversionClass) &&
+                    Objects.equals(defaultLogicDeleteProperty, that.defaultLogicDeleteProperty) &&
+                    Objects.equals(defaultLogicDeleteNormalValue, that.defaultLogicDeleteNormalValue) &&
+                    Objects.equals(defaultLogicDeleteDeletedValue, that.defaultLogicDeleteDeletedValue);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(entityClass, nameConversionClass, defaultLogicDeleteProperty,
+                    defaultLogicDeleteNormalValue, defaultLogicDeleteDeletedValue);
+        }
+    }
 
     public static EntityMetadata get(Class<?> entityClass, OrmConfig config) {
-        return METADATA_CACHE.computeIfAbsent(entityClass, clazz -> parseMetadata(clazz, config));
+        if (config == null) {
+            config = new OrmConfig();
+        }
+        MetadataCacheKey key = new MetadataCacheKey(entityClass, config);
+        final OrmConfig cfg = config;
+        return METADATA_CACHE.computeIfAbsent(key, k -> parseMetadata(entityClass, cfg));
     }
 
     public static EntityMetadata get(Class<?> entityClass) {
         return get(entityClass, new OrmConfig());
+    }
+
+    public static RelationMetadata getRelation(Class<?> entityClass, String propertyName) {
+        if (entityClass == null || propertyName == null) return null;
+        Map<String, RelationMetadata> map = RELATIONS_CACHE.computeIfAbsent(entityClass, EntityMetadataManager::parseClassRelations);
+        return map.get(propertyName);
+    }
+
+    public static Map<String, RelationMetadata> parseClassRelations(Class<?> clazz) {
+        Map<String, RelationMetadata> relations = new LinkedHashMap<>();
+        Map<String, Field> fields = getAllFields(clazz);
+        for (Map.Entry<String, Field> entry : fields.entrySet()) {
+            String propName = entry.getKey();
+            Field field = entry.getValue();
+            int modifiers = field.getModifiers();
+            if (Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers)) {
+                continue;
+            }
+            Method getter = findGetter(clazz, propName, field.getType());
+            RelationMetadata rel = parseRelation(field, getter, clazz);
+            if (rel != null) {
+                Method setter = findSetter(clazz, propName, field.getType());
+                rel.setGetter(getter);
+                rel.setSetter(setter);
+                relations.put(propName, rel);
+            }
+        }
+        return Collections.unmodifiableMap(relations);
+    }
+
+    public static void clearCache() {
+        METADATA_CACHE.clear();
+        RELATIONS_CACHE.clear();
     }
 
     private static EntityMetadata parseMetadata(Class<?> clazz, OrmConfig config) {
@@ -49,29 +129,26 @@ public class EntityMetadataManager {
         metadata.setTableName(tableName);
         metadata.setSchema(schema);
 
-        // 2. 遍历字段与 Getter/Setter
+        // 2. 填充关联关系（独立静态解析）
+        Map<String, RelationMetadata> classRelations = parseClassRelations(clazz);
+        for (RelationMetadata rel : classRelations.values()) {
+            metadata.addRelation(rel);
+        }
+
+        // 3. 遍历字段与 Getter/Setter 解析列
         Map<String, Field> fields = getAllFields(clazz);
         for (Map.Entry<String, Field> entry : fields.entrySet()) {
             String propName = entry.getKey();
             Field field = entry.getValue();
 
-            // 过滤静态与 transient 字段
+            // 过滤静态与 transient 字段以及关联属性
             int modifiers = field.getModifiers();
-            if (Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers)) {
+            if (Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) || classRelations.containsKey(propName)) {
                 continue;
             }
 
             Method getter = findGetter(clazz, propName, field.getType());
             Method setter = findSetter(clazz, propName, field.getType());
-
-            // 检查是否为关联属性（@Navigate 或 JPA @ManyToOne / @OneToMany / @OneToOne）
-            RelationMetadata relationMeta = parseRelation(field, getter, clazz);
-            if (relationMeta != null) {
-                relationMeta.setGetter(getter);
-                relationMeta.setSetter(setter);
-                metadata.addRelation(relationMeta);
-                continue;
-            }
 
             // 解析普通列
             ColumnMetadata colMeta = parseColumn(field, getter, setter, nameConversion, config);

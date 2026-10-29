@@ -40,15 +40,13 @@ public class RecorderInterceptor {
         }
 
         Class<?> entityClass = proxy.getClass().getSuperclass();
-        EntityMetadata metadata = EntityMetadataManager.get(entityClass);
-
         RecordingContext.ensureStarted(entityClass);
 
-        // 检查该属性名是否为关联关系
-        RelationMetadata relation = metadata.getRelation(propName);
+        // 检查该属性名是否为关联关系（纯静态反射结构，无需加载全量 ORM 映射元数据）
+        RelationMetadata relation = EntityMetadataManager.getRelation(entityClass, propName);
         if (relation == null && methodName.startsWith("is")) {
             // 特殊容错：字段名直接是 isDeleted 的情况
-            relation = metadata.getRelation(methodName);
+            relation = EntityMetadataManager.getRelation(entityClass, methodName);
             if (relation != null) {
                 propName = methodName;
             }

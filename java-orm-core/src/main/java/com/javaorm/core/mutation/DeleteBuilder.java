@@ -18,6 +18,7 @@ import com.javaorm.core.proxy.RecordingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.javaorm.core.connection.ConnectionUtils;
 import com.javaorm.core.query.Query;
 import com.javaorm.core.query.WhereBuilder;
 
@@ -67,6 +68,12 @@ public class DeleteBuilder<T> {
     }
 
     public SqlAndParams toSqlAndParams() {
+        ColumnMetadata tc = metadata.hasTenant() ? metadata.getTenantColumn() : null;
+        Object tenantId = (tc != null && config != null) ? config.getCurrentTenantId() : (tc != null ? com.javaorm.core.tenant.TenantContext.getTenantId() : null);
+        if (tc != null && tenantId == null && config != null && config.isTenantStrict()) {
+            throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
+        }
+
         if (metadata.hasLogicDelete()) {
             ColumnMetadata ld = metadata.getLogicDeleteColumn();
             com.javaorm.core.ast.UpdateStatement updateStmt = new com.javaorm.core.ast.UpdateStatement(entityClass, metadata.getTableName());
@@ -74,12 +81,18 @@ public class DeleteBuilder<T> {
             for (Condition c : whereConditions) {
                 updateStmt.addWhereCondition(c);
             }
-            updateStmt.addWhereCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+            updateStmt.addSystemCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+            if (tc != null && tenantId != null) {
+                updateStmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
+            }
             return dialect.buildUpdate(updateStmt);
         }
         DeleteStatement stmt = new DeleteStatement(entityClass, metadata.getTableName());
         for (Condition c : whereConditions) {
             stmt.addWhereCondition(c);
+        }
+        if (tc != null && tenantId != null) {
+            stmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
         }
         return dialect.buildDelete(stmt);
     }
@@ -124,6 +137,15 @@ public class DeleteBuilder<T> {
             for (Condition c : whereConditions) {
                 stmt.addWhereCondition(c);
             }
+            if (metadata.hasTenant()) {
+                ColumnMetadata tc = metadata.getTenantColumn();
+                Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+                if (tenantId != null) {
+                    stmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
+                } else if (config != null && config.isTenantStrict()) {
+                    throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
+                }
+            }
 
             SqlAndParams sqlAndParams = dialect.buildDelete(stmt);
             boolean shouldPrint = (printSqlOverride != null) ? printSqlOverride : config.isPrintSql();
@@ -132,16 +154,21 @@ public class DeleteBuilder<T> {
                 log.info("==> Parameters: {}", sqlAndParams.getParams());
             }
 
-            try (Connection conn = dataSource.getConnection();
-                 PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-
-                for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                    ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+            Connection conn = null;
+            boolean isTx = false;
+            try {
+                conn = ConnectionUtils.getConnection(dataSource, config);
+                isTx = ConnectionUtils.isTransactionConnection(conn);
+                try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
+                    for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
+                        ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+                    }
+                    return ps.executeUpdate();
                 }
-
-                return ps.executeUpdate();
             } catch (Exception e) {
                 throw new RuntimeException("Failed to execute delete statement", e);
+            } finally {
+                if (!isTx) ConnectionUtils.closeConnection(conn);
             }
         } finally {
             Query.resetAliasSeq();
@@ -160,8 +187,17 @@ public class DeleteBuilder<T> {
         for (Condition c : whereConditions) {
             updateStmt.addWhereCondition(c);
         }
-        // 且仅删除未删除状态的数据
-        updateStmt.addWhereCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+        // 系统条件：且仅删除未删除状态的数据，并注入租户隔离
+        updateStmt.addSystemCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+        if (metadata.hasTenant()) {
+            ColumnMetadata tc = metadata.getTenantColumn();
+            Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+            if (tenantId != null) {
+                updateStmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
+            } else if (config != null && config.isTenantStrict()) {
+                throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
+            }
+        }
 
         SqlAndParams sqlAndParams = dialect.buildUpdate(updateStmt);
         boolean shouldPrint = (printSqlOverride != null) ? printSqlOverride : config.isPrintSql();
@@ -170,16 +206,21 @@ public class DeleteBuilder<T> {
             log.info("==> [LogicDelete] Parameters: {}", sqlAndParams.getParams());
         }
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-
-            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+        Connection conn = null;
+        boolean isTx = false;
+        try {
+            conn = ConnectionUtils.getConnection(dataSource, config);
+            isTx = ConnectionUtils.isTransactionConnection(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
+                for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
+                    ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+                }
+                return ps.executeUpdate();
             }
-
-            return ps.executeUpdate();
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute logic delete statement", e);
+        } finally {
+            if (!isTx) ConnectionUtils.closeConnection(conn);
         }
     }
 

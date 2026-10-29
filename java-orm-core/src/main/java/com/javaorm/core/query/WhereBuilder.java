@@ -326,6 +326,14 @@ public class WhereBuilder<T> {
         conditionReceiver.accept(cond);
     }
 
+    private static final java.util.regex.Pattern SAFE_IDENTIFIER =
+            java.util.regex.Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)*$");
+
+    public static boolean isValidIdentifier(String name) {
+        if (name == null || name.trim().isEmpty()) return false;
+        return SAFE_IDENTIFIER.matcher(name.trim()).matches();
+    }
+
     private void appendDynamicCondition(LogicalOperator logOp, String propertyOrColumn, SqlOperator op, Object... vals) {
         if (vals != null && rootQuery != null) {
             for (Object v : vals) {
@@ -359,19 +367,36 @@ public class WhereBuilder<T> {
             alias = scopeAlias;
             colName = str;
         }
+
+        boolean matchedInMetadata = false;
         if (entityClass != null && rootQuery != null) {
             com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(entityClass, rootQuery.getConfig());
             com.javaorm.core.metadata.ColumnMetadata cm = meta.getColumnByProperty(colName);
             if (cm != null) {
                 colName = cm.getColumnName();
+                matchedInMetadata = true;
             } else {
                 com.javaorm.core.metadata.ColumnMetadata dbCol = meta.getColumnByDbName(colName);
                 if (dbCol != null) {
                     colName = dbCol.getColumnName();
+                    matchedInMetadata = true;
                 } else if (rootQuery.getConfig() != null && rootQuery.getConfig().getNameConversion() != null) {
-                    colName = rootQuery.getConfig().getNameConversion().convert(colName);
+                    String converted = rootQuery.getConfig().getNameConversion().convert(colName);
+                    com.javaorm.core.metadata.ColumnMetadata convCol = meta.getColumnByDbName(converted);
+                    if (convCol != null) {
+                        colName = convCol.getColumnName();
+                        matchedInMetadata = true;
+                    }
                 }
             }
+        }
+
+        if (!matchedInMetadata && !isValidIdentifier(colName)) {
+            throw new IllegalArgumentException("Invalid dynamic property or column name '" + propertyOrColumn +
+                    "'. Must be a mapped entity property or a valid SQL identifier. For raw SQL conditions, use andRaw(...) or orRaw(...).");
+        }
+        if (alias != null && !isValidIdentifier(alias)) {
+            throw new IllegalArgumentException("Invalid table alias '" + alias + "'. Must be a valid SQL identifier.");
         }
 
         BinaryCondition cond = new BinaryCondition(alias, colName, op, vals);

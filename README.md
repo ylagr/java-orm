@@ -19,7 +19,7 @@
 - 🔗 **智能导航与多表自动 JOIN**：在条件或排序列中点号调用外键关联实体属性，框架自动基于 JPA / 外键约定生成对应表的 `LEFT JOIN`。
 - 📦 **高性能 Split/Batch IN 装配（Include）**：一对一/多对一/一对多关系通过 `.include()` 显式批量加载（IN 查询），从根源杜绝 SQL 笛卡尔积膨胀与分页失效问题。
 - 🏷️ **极低侵入性（@Column 完全可选）**：预设全局 `NameConversion` 策略（默认驼峰转下划线），标准 POJO 无需任何额外标记即可映射数据表。
-- 🛡️ **无感逻辑删除与多租户**：标记 `@LogicDelete` 或全局配置后，所有查询自动追加未删除过滤，删除操作自动重写为 `UPDATE`。
+- 🛡️ **无感逻辑删除与多租户隔离**：标记 `@LogicDelete` 或 `@TenantId`，系统过滤与用户过滤分开建 AST，所有查询、JOIN、Include 及更新/删除操作自动受逻辑删除与租户隔离保护，即使顶层使用 `OR` 条件也无法绕过系统边界。
 - ☕ **向下兼容 Java 8**：基线面向 Java 8，无缝向上兼容运行于 Java 11 / 17 / 21 / 25。
 
 ---
@@ -357,12 +357,15 @@ orm.delete(Student.class)
     .execute();
 ```
 
-### 8. 完全动态字符串格式 (Dynamic String Syntax)
+### 8. 动态列名与安全边界 (Dynamic Syntax & Security Boundary)
 
-除了强类型代理方式外，框架全面支持纯字符串传参（动态列名、表别名、复杂表达式），适用于高度动态的报表配置与前端条件直通：
+除了强类型代理方式外，框架支持纯字符串传参（动态列名、表别名），适用于动态报表与前端条件映射：
+
+- **白名单与标识符安全校验**：动态列名通过实体元数据白名单与 SQL 标识符格式校验（`[a-zA-Z_][a-zA-Z0-9_]*`），严密阻断 SQL 注入；方言层对标识符内的引号定界符进行严格转义（如 MySQL 双写反引号、ANSI 双写双引号）。
+- **信任边界分明**：动态字段 API 与 Raw SQL API 严格区分。对于任意复杂 SQL 片段或自定义表达式，使用 `andRaw(...)` / `orRaw(...)`。
 
 ```java
-// 1. 动态条件与原生 Raw SQL
+// 1. 动态安全列名与原生 Raw SQL
 orm.select(Student.class)
     .where()
         .and("age").ge(18)
@@ -423,6 +426,48 @@ List<Student> students = orm.select(Student.class)
     .list();
 ```
 
+### 10. 事务管理与多租户隔离 (Transactions & Multi-Tenancy)
+
+#### 编程式事务
+支持 `orm.transaction(...)` 闭包，自动管理物理连接复用与 commit/rollback，异常时自动回滚：
+
+```java
+orm.transaction(tx -> {
+    Student s = new Student();
+    s.setStudentName("新学生");
+    tx.insert(s);
+
+    tx.update(Teacher.class)
+      .set(Teacher::getTitle, "资深教授")
+      .where().and(Teacher::getId).eq(1L)
+      .execute();
+});
+```
+
+#### Spring 事务集成
+配置 `OrmConfig.setConnectionProvider(...)` 可无缝接入 Spring `@Transactional` 或外部连接池：
+
+```java
+OrmConfig config = new OrmConfig();
+config.setConnectionProvider(ds -> org.springframework.jdbc.datasource.DataSourceUtils.getConnection(ds));
+JavaOrm orm = JavaOrm.create(dataSource, dialect, config);
+```
+
+#### 完整多租户隔离 (`@TenantId`)
+在实体字段上标注 `@TenantId`，并在请求入口设置 `TenantContext.setTenantId(...)`：
+- **SELECT / JOIN / Include**：自动在根表和关联子表注入系统级 `tenant_id = ?` 过滤。
+- **UPDATE / DELETE**：自动注入系统级租户隔离，无法跨租户更新或删除。
+- **INSERT**：未设置租户属性时自动填充当前租户 ID。
+
+```java
+TenantContext.setTenantId(1001L);
+try {
+    List<Student> list = orm.select(Student.class).where().and(s -> s.getAge()).gt(18).list();
+} finally {
+    TenantContext.clear();
+}
+```
+
 ---
 
 ## 运行录制原理解析
@@ -440,7 +485,7 @@ List<Student> students = orm.select(Student.class)
    |-- .gt(30) ----------------------------------> 构建 SQL: t1.age > 30               |
 ```
 
-1. **单例代理池**：每个实体的代理子类仅在首次使用时生成一次，且实例在内存中单例复用，执行查询录制时**零额外 GC 分配**。
+1. **单例代理池**：每个实体的代理子类仅在首次使用时生成一次，且实例在内存中单例复用，录制属性与全局配置彻底解耦。
 2. **纳秒级开销**：录制调用仅执行空方法拦截与 ThreadLocal 字符串记录，每次条件构建仅需数十纳秒，性能无限逼近手写 SQL。
 
 ---
