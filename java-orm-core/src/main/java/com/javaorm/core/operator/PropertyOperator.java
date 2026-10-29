@@ -60,10 +60,6 @@ public class PropertyOperator<TQuery, R> {
         return eq(value);
     }
 
-    public TQuery eqIf(boolean condition, R value) {
-        return eq(condition, value);
-    }
-
     public TQuery eq(R value) {
         Object operand = resolveOperand(value);
         if (operand == null) {
@@ -78,10 +74,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return eq(value, dummy);
-    }
-
-    public TQuery eqIf(boolean condition, Number value, Object... dummy) {
-        return eq(condition, value, dummy);
     }
 
     public TQuery eq(Number value, Object... dummy) {
@@ -100,10 +92,6 @@ public class PropertyOperator<TQuery, R> {
         return eq(expr, dummy);
     }
 
-    public TQuery eqIf(boolean condition, SqlExpression<? extends R> expr, Object... dummy) {
-        return eq(condition, expr, dummy);
-    }
-
     public TQuery eq(SqlExpression<? extends R> expr, Object... dummy) {
         appender.append(SqlOperator.EQ, expr);
         return query;
@@ -114,10 +102,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return eq(subQuery, dummy);
-    }
-
-    public TQuery eqIf(boolean condition, Query<?> subQuery, Object... dummy) {
-        return eq(condition, subQuery, dummy);
     }
 
     public TQuery eq(Query<?> subQuery, Object... dummy) {
@@ -132,10 +116,6 @@ public class PropertyOperator<TQuery, R> {
         return eq(subQuery, dummy);
     }
 
-    public TQuery eqIf(boolean condition, WhereBuilder<?> subQuery, Object... dummy) {
-        return eq(condition, subQuery, dummy);
-    }
-
     public TQuery eq(WhereBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.EQ, subQuery);
         return query;
@@ -146,10 +126,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return ne(value);
-    }
-
-    public TQuery neIf(boolean condition, R value) {
-        return ne(condition, value);
     }
 
     public TQuery ne(R value) {
@@ -168,10 +144,6 @@ public class PropertyOperator<TQuery, R> {
         return ne(value, dummy);
     }
 
-    public TQuery neIf(boolean condition, Number value, Object... dummy) {
-        return ne(condition, value, dummy);
-    }
-
     public TQuery ne(Number value, Object... dummy) {
         Object operand = resolveOperand(value);
         if (operand == null) {
@@ -188,10 +160,6 @@ public class PropertyOperator<TQuery, R> {
         return ne(expr, dummy);
     }
 
-    public TQuery neIf(boolean condition, SqlExpression<? extends R> expr, Object... dummy) {
-        return ne(condition, expr, dummy);
-    }
-
     public TQuery ne(SqlExpression<? extends R> expr, Object... dummy) {
         appender.append(SqlOperator.NE, expr);
         return query;
@@ -202,10 +170,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return ne(subQuery, dummy);
-    }
-
-    public TQuery neIf(boolean condition, Query<?> subQuery, Object... dummy) {
-        return ne(condition, subQuery, dummy);
     }
 
     public TQuery ne(Query<?> subQuery, Object... dummy) {
@@ -220,10 +184,6 @@ public class PropertyOperator<TQuery, R> {
         return ne(subQuery, dummy);
     }
 
-    public TQuery neIf(boolean condition, WhereBuilder<?> subQuery, Object... dummy) {
-        return ne(condition, subQuery, dummy);
-    }
-
     public TQuery ne(WhereBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.NE, subQuery);
         return query;
@@ -234,10 +194,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return gt(value);
-    }
-
-    public TQuery gtIf(boolean condition, R value) {
-        return gt(condition, value);
     }
 
     public TQuery gt(R value) {
@@ -256,10 +212,6 @@ public class PropertyOperator<TQuery, R> {
         return gt(value, dummy);
     }
 
-    public TQuery gtIf(boolean condition, Number value, Object... dummy) {
-        return gt(condition, value, dummy);
-    }
-
     public TQuery gt(Number value, Object... dummy) {
         Object operand = resolveOperand(value);
         if (operand == null) {
@@ -276,10 +228,6 @@ public class PropertyOperator<TQuery, R> {
         return gt(expr, dummy);
     }
 
-    public TQuery gtIf(boolean condition, SqlExpression<? extends R> expr, Object... dummy) {
-        return gt(condition, expr, dummy);
-    }
-
     public TQuery gt(SqlExpression<? extends R> expr, Object... dummy) {
         appender.append(SqlOperator.GT, expr);
         return query;
@@ -290,10 +238,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return gt(subQuery, dummy);
-    }
-
-    public TQuery gtIf(boolean condition, Query<?> subQuery, Object... dummy) {
-        return gt(condition, subQuery, dummy);
     }
 
     public TQuery gt(Query<?> subQuery, Object... dummy) {
@@ -308,10 +252,6 @@ public class PropertyOperator<TQuery, R> {
         return gt(subQuery, dummy);
     }
 
-    public TQuery gtIf(boolean condition, WhereBuilder<?> subQuery, Object... dummy) {
-        return gt(condition, subQuery, dummy);
-    }
-
     public TQuery gt(WhereBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.GT, subQuery);
         return query;
@@ -322,10 +262,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return ge(value);
-    }
-
-    public TQuery geIf(boolean condition, R value) {
-        return ge(condition, value);
     }
 
     public TQuery ge(R value) {
@@ -344,10 +280,6 @@ public class PropertyOperator<TQuery, R> {
         return ge(value, dummy);
     }
 
-    public TQuery geIf(boolean condition, Number value, Object... dummy) {
-        return ge(condition, value, dummy);
-    }
-
     public TQuery ge(Number value, Object... dummy) {
         Object operand = resolveOperand(value);
         if (operand == null) {
@@ -364,10 +296,6 @@ public class PropertyOperator<TQuery, R> {
         return ge(expr, dummy);
     }
 
-    public TQuery geIf(boolean condition, SqlExpression<? extends R> expr, Object... dummy) {
-        return ge(condition, expr, dummy);
-    }
-
     public TQuery ge(SqlExpression<? extends R> expr, Object... dummy) {
         appender.append(SqlOperator.GE, expr);
         return query;
@@ -378,10 +306,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return ge(subQuery, dummy);
-    }
-
-    public TQuery geIf(boolean condition, Query<?> subQuery, Object... dummy) {
-        return ge(condition, subQuery, dummy);
     }
 
     public TQuery ge(Query<?> subQuery, Object... dummy) {
@@ -396,10 +320,6 @@ public class PropertyOperator<TQuery, R> {
         return ge(subQuery, dummy);
     }
 
-    public TQuery geIf(boolean condition, WhereBuilder<?> subQuery, Object... dummy) {
-        return ge(condition, subQuery, dummy);
-    }
-
     public TQuery ge(WhereBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.GE, subQuery);
         return query;
@@ -410,10 +330,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return lt(value);
-    }
-
-    public TQuery ltIf(boolean condition, R value) {
-        return lt(condition, value);
     }
 
     public TQuery lt(R value) {
@@ -432,10 +348,6 @@ public class PropertyOperator<TQuery, R> {
         return lt(value, dummy);
     }
 
-    public TQuery ltIf(boolean condition, Number value, Object... dummy) {
-        return lt(condition, value, dummy);
-    }
-
     public TQuery lt(Number value, Object... dummy) {
         Object operand = resolveOperand(value);
         if (operand == null) {
@@ -452,10 +364,6 @@ public class PropertyOperator<TQuery, R> {
         return lt(expr, dummy);
     }
 
-    public TQuery ltIf(boolean condition, SqlExpression<? extends R> expr, Object... dummy) {
-        return lt(condition, expr, dummy);
-    }
-
     public TQuery lt(SqlExpression<? extends R> expr, Object... dummy) {
         appender.append(SqlOperator.LT, expr);
         return query;
@@ -466,10 +374,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return lt(subQuery, dummy);
-    }
-
-    public TQuery ltIf(boolean condition, Query<?> subQuery, Object... dummy) {
-        return lt(condition, subQuery, dummy);
     }
 
     public TQuery lt(Query<?> subQuery, Object... dummy) {
@@ -484,10 +388,6 @@ public class PropertyOperator<TQuery, R> {
         return lt(subQuery, dummy);
     }
 
-    public TQuery ltIf(boolean condition, WhereBuilder<?> subQuery, Object... dummy) {
-        return lt(condition, subQuery, dummy);
-    }
-
     public TQuery lt(WhereBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.LT, subQuery);
         return query;
@@ -498,10 +398,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return le(value);
-    }
-
-    public TQuery leIf(boolean condition, R value) {
-        return le(condition, value);
     }
 
     public TQuery le(R value) {
@@ -520,10 +416,6 @@ public class PropertyOperator<TQuery, R> {
         return le(value, dummy);
     }
 
-    public TQuery leIf(boolean condition, Number value, Object... dummy) {
-        return le(condition, value, dummy);
-    }
-
     public TQuery le(Number value, Object... dummy) {
         Object operand = resolveOperand(value);
         if (operand == null) {
@@ -540,10 +432,6 @@ public class PropertyOperator<TQuery, R> {
         return le(expr, dummy);
     }
 
-    public TQuery leIf(boolean condition, SqlExpression<? extends R> expr, Object... dummy) {
-        return le(condition, expr, dummy);
-    }
-
     public TQuery le(SqlExpression<? extends R> expr, Object... dummy) {
         appender.append(SqlOperator.LE, expr);
         return query;
@@ -556,10 +444,6 @@ public class PropertyOperator<TQuery, R> {
         return le(subQuery, dummy);
     }
 
-    public TQuery leIf(boolean condition, Query<?> subQuery, Object... dummy) {
-        return le(condition, subQuery, dummy);
-    }
-
     public TQuery le(Query<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.LE, subQuery);
         return query;
@@ -570,10 +454,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return le(subQuery, dummy);
-    }
-
-    public TQuery leIf(boolean condition, WhereBuilder<?> subQuery, Object... dummy) {
-        return le(condition, subQuery, dummy);
     }
 
     public TQuery le(WhereBuilder<?> subQuery, Object... dummy) {
@@ -597,10 +477,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return like(pattern);
-    }
-
-    public TQuery likeIf(boolean condition, String pattern) {
-        return like(condition, pattern);
     }
 
     public TQuery like(String pattern) {
@@ -648,10 +524,6 @@ public class PropertyOperator<TQuery, R> {
         return notLike(pattern);
     }
 
-    public TQuery notLikeIf(boolean condition, String pattern) {
-        return notLike(condition, pattern);
-    }
-
     public TQuery notLike(String pattern) {
         appender.append(SqlOperator.NOT_LIKE, pattern);
         return query;
@@ -662,10 +534,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return isNull();
-    }
-
-    public TQuery isNullIf(boolean condition) {
-        return isNull(condition);
     }
 
     public TQuery isNull() {
@@ -680,10 +548,6 @@ public class PropertyOperator<TQuery, R> {
         return isNotNull();
     }
 
-    public TQuery isNotNullIf(boolean condition) {
-        return isNotNull(condition);
-    }
-
     public TQuery isNotNull() {
         appender.append(SqlOperator.IS_NOT_NULL);
         return query;
@@ -694,10 +558,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return in(values);
-    }
-
-    public TQuery inIf(boolean condition, Collection<? extends R> values) {
-        return in(condition, values);
     }
 
     public TQuery in(Collection<? extends R> values) {
@@ -711,11 +571,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return in(values);
-    }
-
-    @SafeVarargs
-    public final TQuery inIf(boolean condition, R... values) {
-        return in(condition, values);
     }
 
     @SafeVarargs
@@ -734,10 +589,6 @@ public class PropertyOperator<TQuery, R> {
         return in(subQuery);
     }
 
-    public TQuery inIf(boolean condition, Query<?> subQuery) {
-        return in(condition, subQuery);
-    }
-
     public TQuery in(Query<?> subQuery) {
         appender.append(SqlOperator.IN, subQuery);
         return query;
@@ -748,10 +599,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return in(subQuery);
-    }
-
-    public TQuery inIf(boolean condition, WhereBuilder<?> subQuery) {
-        return in(condition, subQuery);
     }
 
     public TQuery in(WhereBuilder<?> subQuery) {
@@ -766,10 +613,6 @@ public class PropertyOperator<TQuery, R> {
         return in(subQuery, dummy);
     }
 
-    public TQuery inIf(boolean condition, SqlExpression<?> subQuery, Object... dummy) {
-        return in(condition, subQuery, dummy);
-    }
-
     public TQuery in(SqlExpression<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.IN, subQuery);
         return query;
@@ -780,10 +623,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return notIn(values);
-    }
-
-    public TQuery notInIf(boolean condition, Collection<? extends R> values) {
-        return notIn(condition, values);
     }
 
     public TQuery notIn(Collection<? extends R> values) {
@@ -797,11 +636,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return notIn(values);
-    }
-
-    @SafeVarargs
-    public final TQuery notInIf(boolean condition, R... values) {
-        return notIn(condition, values);
     }
 
     @SafeVarargs
@@ -820,10 +654,6 @@ public class PropertyOperator<TQuery, R> {
         return notIn(subQuery);
     }
 
-    public TQuery notInIf(boolean condition, Query<?> subQuery) {
-        return notIn(condition, subQuery);
-    }
-
     public TQuery notIn(Query<?> subQuery) {
         appender.append(SqlOperator.NOT_IN, subQuery);
         return query;
@@ -834,10 +664,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return notIn(subQuery);
-    }
-
-    public TQuery notInIf(boolean condition, WhereBuilder<?> subQuery) {
-        return notIn(condition, subQuery);
     }
 
     public TQuery notIn(WhereBuilder<?> subQuery) {
@@ -852,10 +678,6 @@ public class PropertyOperator<TQuery, R> {
         return notIn(subQuery, dummy);
     }
 
-    public TQuery notInIf(boolean condition, SqlExpression<?> subQuery, Object... dummy) {
-        return notIn(condition, subQuery, dummy);
-    }
-
     public TQuery notIn(SqlExpression<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.NOT_IN, subQuery);
         return query;
@@ -866,10 +688,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return between(min, max);
-    }
-
-    public TQuery betweenIf(boolean condition, R min, R max) {
-        return between(condition, min, max);
     }
 
     public TQuery between(R min, R max) {
@@ -884,10 +702,6 @@ public class PropertyOperator<TQuery, R> {
         return between(min, max);
     }
 
-    public TQuery betweenIf(boolean condition, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
-        return between(condition, min, max);
-    }
-
     public TQuery between(SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
         appender.append(SqlOperator.BETWEEN, min, max);
         return query;
@@ -900,10 +714,6 @@ public class PropertyOperator<TQuery, R> {
         return between(min, max);
     }
 
-    public TQuery betweenIf(boolean condition, SqlExpression<? extends R> min, R max) {
-        return between(condition, min, max);
-    }
-
     public TQuery between(SqlExpression<? extends R> min, R max) {
         appender.append(SqlOperator.BETWEEN, min, max);
         return query;
@@ -914,10 +724,6 @@ public class PropertyOperator<TQuery, R> {
             return query;
         }
         return between(min, max);
-    }
-
-    public TQuery betweenIf(boolean condition, R min, SqlExpression<? extends R> max) {
-        return between(condition, min, max);
     }
 
     public TQuery between(R min, SqlExpression<? extends R> max) {

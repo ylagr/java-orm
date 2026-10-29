@@ -135,14 +135,14 @@ public class WhereConditionAndFlatApiTest {
         assertEquals(2, sp1.getParams().size());
         assertNull("ThreadLocal must be clean after sp1", RecordingContext.finish());
 
-        // 3.2 eq(false, ...) 和 eqIf(false, ...) 阻断
+        // 3.2 验证 condition 为 false 阻断，为 true 正常生效
         SqlAndParams sp2 = orm.select(Student.class)
                 .where()
                     .and(s.getAge()).eq(false, 18)
-                    .and(s.getAge()).eqIf(false, 19)
+                    .and(s.getAge()).eq(false, 19)
                     .and(s.getAge()).gt(false, 20)
-                    .and(s.getAge()).gtIf(false, 21)
-                    .and(s.getAge()).eqIf(true, 35)
+                    .and(s.getAge()).gt(false, 21)
+                    .and(s.getAge()).eq(true, 35)
                 .toSqlAndParams();
 
         String sql2 = sp2.getSql();
