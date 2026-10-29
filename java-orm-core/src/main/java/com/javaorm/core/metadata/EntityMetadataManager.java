@@ -113,7 +113,7 @@ public class EntityMetadataManager {
         EntityMetadata metadata = new EntityMetadata(clazz);
         NameConversion nameConversion = config.getNameConversion();
 
-        // 1. 解析表名（检查 @JoTable / @Table 或兼容 JPA 的 @Table）
+        // 1. 解析表名（优先 @JoTable，亦兼容 JPA 的 @Table）
         String tableName = null;
         String schema = null;
         for (Annotation ann : clazz.getAnnotations()) {
@@ -122,10 +122,6 @@ public class EntityMetadataManager {
                 JoTable t = (JoTable) ann;
                 if (!t.value().isEmpty()) tableName = t.value();
                 else if (!t.name().isEmpty()) tableName = t.name();
-                if (!t.schema().isEmpty()) schema = t.schema();
-            } else if (ann instanceof Table) {
-                Table t = (Table) ann;
-                if (!t.name().isEmpty()) tableName = t.name();
                 if (!t.schema().isEmpty()) schema = t.schema();
             } else if (annName.endsWith(".JoTable") || annName.endsWith(".Table")) {
                 tableName = getAnnotationString(ann, "value");
@@ -184,12 +180,6 @@ public class EntityMetadataManager {
             String name = ann.annotationType().getName();
             if (ann instanceof JoNavigate) {
                 JoNavigate nav = (JoNavigate) ann;
-                isRelation = true;
-                relType = nav.value();
-                selfProp = nav.selfProperty();
-                targetProp = nav.targetProperty();
-            } else if (ann instanceof Navigate) {
-                Navigate nav = (Navigate) ann;
                 isRelation = true;
                 relType = nav.value();
                 selfProp = nav.selfProperty();
@@ -279,24 +269,19 @@ public class EntityMetadataManager {
                 else if (!c.name().isEmpty()) colName = c.name();
                 if (c.primaryKey()) isPk = true;
                 if (c.ignore()) col.setIgnored(true);
-            } else if (ann instanceof Column) {
-                Column c = (Column) ann;
-                if (!c.name().isEmpty()) colName = c.name();
-                if (c.primaryKey()) isPk = true;
-                if (c.ignore()) col.setIgnored(true);
             } else if (name.endsWith(".JoColumn") || name.endsWith(".Column")) {
                 String n = getAnnotationString(ann, "value");
                 if (n == null || n.isEmpty()) {
                     n = getAnnotationString(ann, "name");
                 }
                 if (n != null && !n.isEmpty()) colName = n;
-            } else if (ann instanceof JoId || ann instanceof Id || name.endsWith(".JoId") || name.endsWith(".Id")) {
+            } else if (ann instanceof JoId || name.endsWith(".JoId") || name.endsWith(".Id")) {
                 isPk = true;
             } else if (ann instanceof JoGeneratedValue) {
                 JoGeneratedValue gv = (JoGeneratedValue) ann;
                 col.setGenerated(true);
                 col.setGenerationType(gv.strategy());
-            } else if (ann instanceof GeneratedValue || name.endsWith(".JoGeneratedValue") || name.endsWith(".GeneratedValue")) {
+            } else if (name.endsWith(".JoGeneratedValue") || name.endsWith(".GeneratedValue")) {
                 col.setGenerated(true);
             } else if (ann instanceof JoLogicDelete) {
                 JoLogicDelete ld = (JoLogicDelete) ann;
@@ -305,21 +290,13 @@ public class EntityMetadataManager {
                 String del = !ld.delval().isEmpty() ? ld.delval() : ld.deletedValue();
                 col.setLogicDeleteNormalValue(norm);
                 col.setLogicDeleteDeletedValue(del);
-            } else if (ann instanceof LogicDelete) {
-                LogicDelete ld = (LogicDelete) ann;
-                col.setLogicDelete(true);
-                col.setLogicDeleteNormalValue(ld.normalValue());
-                col.setLogicDeleteDeletedValue(ld.deletedValue());
-            } else if (ann instanceof JoTenantId || ann instanceof TenantId) {
+            } else if (ann instanceof JoTenantId) {
                 col.setTenant(true);
             } else if (ann instanceof JoAutoFill) {
                 JoAutoFill af = (JoAutoFill) ann;
                 col.setAutoFill(true);
                 AutoFillType fillType = af.fillType() != AutoFillType.INSERT ? af.fillType() : af.value();
                 col.setAutoFillType(fillType);
-            } else if (ann instanceof AutoFill) {
-                col.setAutoFill(true);
-                col.setAutoFillType(((AutoFill) ann).value());
             }
         }
 
@@ -352,7 +329,7 @@ public class EntityMetadataManager {
         if (clazz == null || clazz.isPrimitive() || clazz.getName().startsWith("java.")) return false;
         for (Annotation ann : clazz.getAnnotations()) {
             String name = ann.annotationType().getName();
-            if (name.endsWith(".Entity") || name.endsWith(".Table") || name.endsWith(".JoTable") || ann instanceof Table || ann instanceof JoTable) {
+            if (name.endsWith(".Entity") || name.endsWith(".Table") || name.endsWith(".JoTable") || ann instanceof JoTable) {
                 return true;
             }
         }

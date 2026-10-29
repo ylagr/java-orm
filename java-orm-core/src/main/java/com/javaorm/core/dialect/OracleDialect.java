@@ -316,6 +316,123 @@ public class OracleDialect extends AbstractDialect {
             sql.append(")");
             return true;
         }
+        if ("CEILING".equals(name) && !args.isEmpty()) {
+            sql.append("CEIL(");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("REPEAT".equals(name) && args.size() >= 2) {
+            sql.append("RPAD(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", (LENGTH(");
+            renderArg(args.get(0), sql, params);
+            sql.append(") * ");
+            renderArg(args.get(1), sql, params);
+            sql.append("), ");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("DATE_SUB".equals(name) && args.size() >= 2) {
+            String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
+            Object amount = args.get(1);
+            if ("MONTH".equals(unit)) {
+                sql.append("ADD_MONTHS(");
+                renderArg(args.get(0), sql, params);
+                sql.append(", -(");
+                if (amount instanceof Number) {
+                    sql.append(amount);
+                } else {
+                    renderArg(amount, sql, params);
+                }
+                sql.append("))");
+            } else if ("YEAR".equals(unit)) {
+                sql.append("ADD_MONTHS(");
+                renderArg(args.get(0), sql, params);
+                sql.append(", -(");
+                if (amount instanceof Number) {
+                    sql.append(amount);
+                } else {
+                    renderArg(amount, sql, params);
+                }
+                sql.append(" * 12))");
+            } else if ("HOUR".equals(unit)) {
+                sql.append("(");
+                renderArg(args.get(0), sql, params);
+                sql.append(" - (");
+                if (amount instanceof Number) {
+                    sql.append(amount);
+                } else {
+                    renderArg(amount, sql, params);
+                }
+                sql.append(" / 24))");
+            } else if ("MINUTE".equals(unit)) {
+                sql.append("(");
+                renderArg(args.get(0), sql, params);
+                sql.append(" - (");
+                if (amount instanceof Number) {
+                    sql.append(amount);
+                } else {
+                    renderArg(amount, sql, params);
+                }
+                sql.append(" / 1440))");
+            } else if ("SECOND".equals(unit)) {
+                sql.append("(");
+                renderArg(args.get(0), sql, params);
+                sql.append(" - (");
+                if (amount instanceof Number) {
+                    sql.append(amount);
+                } else {
+                    renderArg(amount, sql, params);
+                }
+                sql.append(" / 86400))");
+            } else {
+                sql.append("(");
+                renderArg(args.get(0), sql, params);
+                sql.append(" - ");
+                if (amount instanceof Number) {
+                    sql.append(amount);
+                } else {
+                    renderArg(amount, sql, params);
+                }
+                sql.append(")");
+            }
+            return true;
+        }
+        if ("LAST_DAY".equals(name) && !args.isEmpty()) {
+            sql.append("LAST_DAY(");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("LOCATE".equals(name) && args.size() >= 2) {
+            sql.append("INSTR(");
+            renderArg(args.get(1), sql, params);
+            sql.append(", ");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if (("IIF".equals(name) || "IF".equals(name)) && args.size() >= 3) {
+            sql.append("(CASE WHEN ");
+            renderArg(args.get(0), sql, params);
+            sql.append(" THEN ");
+            renderArg(args.get(1), sql, params);
+            sql.append(" ELSE ");
+            renderArg(args.get(2), sql, params);
+            sql.append(" END)");
+            return true;
+        }
+        if ("CAST".equals(name) && args.size() >= 2) {
+            String type = String.valueOf(args.get(1)).toUpperCase();
+            if ("CHAR".equals(type) || "VARCHAR".equals(type) || "TEXT".equals(type) || "STRING".equals(type)) type = "VARCHAR2(4000)";
+            else if ("SIGNED".equals(type) || "INT".equals(type) || "INTEGER".equals(type) || "BIGINT".equals(type)) type = "NUMBER";
+            sql.append("CAST(");
+            renderArg(args.get(0), sql, params);
+            sql.append(" AS ").append(type).append(")");
+            return true;
+        }
         return super.renderDialectSpecificFunction(name, args, sql, params);
     }
 }

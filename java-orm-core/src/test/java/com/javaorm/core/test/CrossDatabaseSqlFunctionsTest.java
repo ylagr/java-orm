@@ -347,6 +347,128 @@ public class CrossDatabaseSqlFunctionsTest {
     }
 
     @Test
+    public void testDateSubAndLastDayCrossDatabase() {
+        CrossRecord s = proxy(CrossRecord.class);
+        Query<CrossRecord> query = orm.select(CrossRecord.class)
+                .select(
+                        dateSub(s.getCreateTime(), 3, DateUnit.DAY).as("sub_days"),
+                        lastDay(s.getCreateTime()).as("month_end")
+                );
+
+        // MySQL
+        query.setDialect(new MySQLDialect());
+        String mySql = query.toSql();
+        assertTrue(mySql.contains("DATE_SUB(t0.`create_time`, INTERVAL 3 DAY) AS `sub_days`"));
+        assertTrue(mySql.contains("LAST_DAY(t0.`create_time`) AS `month_end`"));
+
+        // PostgreSQL
+        query.setDialect(new PostgreSQLDialect());
+        String pgSql = query.toSql();
+        assertTrue(pgSql.contains("(t0.\"create_time\" - (3 * INTERVAL '1 DAY')) AS \"sub_days\""));
+        assertTrue(pgSql.contains("CAST(DATE_TRUNC('month', t0.\"create_time\") + INTERVAL '1 month - 1 day' AS DATE) AS \"month_end\""));
+
+        // Oracle
+        query.setDialect(new OracleDialect());
+        String oraSql = query.toSql();
+        assertTrue(oraSql.contains("(t0.\"create_time\" - 3) AS \"sub_days\""));
+        assertTrue(oraSql.contains("LAST_DAY(t0.\"create_time\") AS \"month_end\""));
+
+        // SQLite
+        query.setDialect(new SQLiteDialect());
+        String sqSql = query.toSql();
+        assertTrue(sqSql.contains("datetime(t0.\"create_time\", ('-' || 3 || ' days')) AS \"sub_days\""));
+        assertTrue(sqSql.contains("date(t0.\"create_time\", 'start of month', '+1 month', '-1 day') AS \"month_end\""));
+    }
+
+    @Test
+    public void testGreatestLeastRepeatCeilingCrossDatabase() {
+        CrossRecord s = proxy(CrossRecord.class);
+        Query<CrossRecord> query = orm.select(CrossRecord.class)
+                .select(
+                        greatest(s.getAge(), 18, 25).as("max_val"),
+                        least(s.getAge(), 18, 25).as("min_val"),
+                        repeat(s.getName(), 2).as("rep_name"),
+                        ceiling(s.getScore()).as("ceil_score")
+                );
+
+        // MySQL
+        query.setDialect(new MySQLDialect());
+        String mySql = query.toSql();
+        assertTrue(mySql.contains("GREATEST(t0.`age`, ?, ?) AS `max_val`"));
+        assertTrue(mySql.contains("REPEAT(t0.`name`, ?) AS `rep_name`"));
+        assertTrue(mySql.contains("CEIL"));
+
+        // PostgreSQL
+        query.setDialect(new PostgreSQLDialect());
+        String pgSql = query.toSql();
+        assertTrue(pgSql.contains("GREATEST(t0.\"age\", ?, ?) AS \"max_val\""));
+        assertTrue(pgSql.contains("REPEAT(t0.\"name\", ?) AS \"rep_name\""));
+
+        // Oracle
+        query.setDialect(new OracleDialect());
+        String oraSql = query.toSql();
+        assertTrue(oraSql.contains("GREATEST(t0.\"age\", ?, ?) AS \"max_val\""));
+        // Oracle maps REPEAT to RPAD
+        assertTrue(oraSql.contains("RPAD(t0.\"name\", (LENGTH(t0.\"name\") * ?), t0.\"name\") AS \"rep_name\""));
+        // Oracle maps CEILING to CEIL
+        assertTrue(oraSql.contains("CEIL(t0.\"score\") AS \"ceil_score\""));
+
+        // SQLite
+        query.setDialect(new SQLiteDialect());
+        String sqSql = query.toSql();
+        // SQLite maps GREATEST -> max, LEAST -> min
+        assertTrue(sqSql.contains("max(t0.\"age\", ?, ?) AS \"max_val\""));
+        assertTrue(sqSql.contains("min(t0.\"age\", ?, ?) AS \"min_val\""));
+        assertTrue(sqSql.contains("replace(hex(zeroblob(?)), '00', t0.\"name\") AS \"rep_name\""));
+        assertTrue(sqSql.toUpperCase().contains("CEIL(T0.\"SCORE\") AS \"CEIL_SCORE\""));
+    }
+
+    @Test
+    public void testLocateIifAndCastCrossDatabase() {
+        CrossRecord s = proxy(CrossRecord.class);
+        Query<CrossRecord> query = orm.select(CrossRecord.class)
+                .select(
+                        locate("lic", s.getName()).as("loc_idx"),
+                        iif(s.getAge(), s.getScore(), 0.0).as("cond_val"),
+                        castAsChar(s.getId()).as("id_str"),
+                        castAsInt(s.getScore()).as("score_int")
+                );
+
+        // MySQL
+        query.setDialect(new MySQLDialect());
+        String mySql = query.toSql();
+        assertTrue(mySql.contains("LOCATE(?, t0.`name`) AS `loc_idx`"));
+        assertTrue(mySql.contains("IF(t0.`age`, t0.`score`, ?) AS `cond_val`"));
+        assertTrue(mySql.contains("CAST(t0.`id` AS CHAR) AS `id_str`"));
+        assertTrue(mySql.contains("CAST(t0.`score` AS SIGNED) AS `score_int`"));
+
+        // PostgreSQL
+        query.setDialect(new PostgreSQLDialect());
+        String pgSql = query.toSql();
+        // STRPOS(str, substr)
+        assertTrue(pgSql.contains("STRPOS(t0.\"name\", ?) AS \"loc_idx\""));
+        assertTrue(pgSql.contains("CASE WHEN t0.\"age\" THEN t0.\"score\" ELSE ? END"));
+        assertTrue(pgSql.contains("CAST(t0.\"id\" AS TEXT) AS \"id_str\""));
+        assertTrue(pgSql.contains("CAST(t0.\"score\" AS INTEGER) AS \"score_int\""));
+
+        // Oracle
+        query.setDialect(new OracleDialect());
+        String oraSql = query.toSql();
+        assertTrue(oraSql.contains("INSTR(t0.\"name\", ?) AS \"loc_idx\""));
+        assertTrue(oraSql.contains("CASE WHEN t0.\"age\" THEN t0.\"score\" ELSE ? END"));
+        assertTrue(oraSql.contains("CAST(t0.\"id\" AS VARCHAR2(4000)) AS \"id_str\""));
+        assertTrue(oraSql.contains("CAST(t0.\"score\" AS NUMBER) AS \"score_int\""));
+
+        // SQLite
+        query.setDialect(new SQLiteDialect());
+        String sqSql = query.toSql();
+        assertTrue(sqSql.contains("instr(t0.\"name\", ?) AS \"loc_idx\""));
+        assertTrue(sqSql.contains("iif(t0.\"age\", t0.\"score\", ?) AS \"cond_val\""));
+        assertTrue(sqSql.contains("CAST(t0.\"id\" AS TEXT) AS \"id_str\""));
+        assertTrue(sqSql.contains("CAST(t0.\"score\" AS INT) AS \"score_int\""));
+    }
+
+    @Test
     public void testH2RuntimeExecutionOfCrossDatabaseFunctions() {
         CrossRecord s = proxy(CrossRecord.class);
 
@@ -359,7 +481,11 @@ public class CrossDatabaseSqlFunctionsTest {
                         round(s.getScore(), 1).as("r_score"),
                         trunc(s.getScore(), 0).as("t_score"),
                         dayOfWeek(s.getCreateTime()).as("dow"),
-                        dayOfYear(s.getCreateTime()).as("doy")
+                        dayOfYear(s.getCreateTime()).as("doy"),
+                        greatest(s.getAge(), 10, 15).as("gt_age"),
+                        least(s.getAge(), 10, 15).as("lt_age"),
+                        iif(s.getAge(), "Adult", "Minor").as("age_group"),
+                        castAsChar(s.getId()).as("id_str")
                 )
                 .where(s.getId(), SqlOperator.EQ, 1L)
                 .queryMaps();
@@ -370,6 +496,10 @@ public class CrossDatabaseSqlFunctionsTest {
         assertEquals(5, ((Number) row.get("name_len")).intValue()); // "Alice" -> 5
         assertEquals(88.6, ((Number) row.get("r_score")).doubleValue(), 0.01);
         assertEquals(88.0, ((Number) row.get("t_score")).doubleValue(), 0.01);
+        assertEquals(20, ((Number) row.get("gt_age")).intValue()); // max(20, 10, 15) -> 20
+        assertEquals(10, ((Number) row.get("lt_age")).intValue()); // min(20, 10, 15) -> 10
+        assertEquals("Adult", row.get("age_group"));
+        assertEquals("1", String.valueOf(row.get("id_str")));
 
         // 验证聚合函数 DISTINCT
         List<Map<String, Object>> aggMaps = orm.select(CrossRecord.class)

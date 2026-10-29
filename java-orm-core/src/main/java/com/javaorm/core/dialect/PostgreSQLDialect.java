@@ -7,7 +7,7 @@ public class PostgreSQLDialect extends AbstractDialect {
 
     @Override
     protected boolean renderDialectSpecificFunction(String name, List<Object> args, StringBuilder sql, List<Object> params) {
-        if ("IFNULL".equals(name) && args.size() >= 2) {
+        if (("IFNULL".equals(name) || "NVL".equals(name)) && args.size() >= 2) {
             sql.append("COALESCE(");
             renderArg(args.get(0), sql, params);
             sql.append(", ");
@@ -123,6 +123,53 @@ public class PostgreSQLDialect extends AbstractDialect {
                 renderArg(args.get(1), sql, params);
             }
             sql.append(")");
+            return true;
+        }
+        if ("DATE_SUB".equals(name) && args.size() >= 2) {
+            String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
+            Object amount = args.get(1);
+            sql.append("(");
+            renderArg(args.get(0), sql, params);
+            sql.append(" - (");
+            if (amount instanceof Number) {
+                sql.append(amount);
+            } else {
+                renderArg(amount, sql, params);
+            }
+            sql.append(" * INTERVAL '1 ").append(unit).append("'))");
+            return true;
+        }
+        if ("LAST_DAY".equals(name) && !args.isEmpty()) {
+            sql.append("CAST(DATE_TRUNC('month', ");
+            renderArg(args.get(0), sql, params);
+            sql.append(") + INTERVAL '1 month - 1 day' AS DATE)");
+            return true;
+        }
+        if ("LOCATE".equals(name) && args.size() >= 2) {
+            sql.append("STRPOS(");
+            renderArg(args.get(1), sql, params);
+            sql.append(", ");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if (("IIF".equals(name) || "IF".equals(name)) && args.size() >= 3) {
+            sql.append("(CASE WHEN ");
+            renderArg(args.get(0), sql, params);
+            sql.append(" THEN ");
+            renderArg(args.get(1), sql, params);
+            sql.append(" ELSE ");
+            renderArg(args.get(2), sql, params);
+            sql.append(" END)");
+            return true;
+        }
+        if ("CAST".equals(name) && args.size() >= 2) {
+            String type = String.valueOf(args.get(1)).toUpperCase();
+            if ("CHAR".equals(type) || "STRING".equals(type)) type = "TEXT";
+            else if ("SIGNED".equals(type) || "INT".equals(type)) type = "INTEGER";
+            sql.append("CAST(");
+            renderArg(args.get(0), sql, params);
+            sql.append(" AS ").append(type).append(")");
             return true;
         }
         return super.renderDialectSpecificFunction(name, args, sql, params);

@@ -92,6 +92,70 @@ public class MySQLDialect extends AbstractDialect {
             sql.append(")");
             return true;
         }
+        if ("DATE_SUB".equals(name) && args.size() >= 2) {
+            String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
+            Object amount = args.get(1);
+            sql.append("DATE_SUB(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", INTERVAL ");
+            if (amount instanceof Number) {
+                sql.append(amount);
+            } else {
+                renderArg(amount, sql, params);
+            }
+            sql.append(" ").append(unit).append(")");
+            return true;
+        }
+        if ("LAST_DAY".equals(name) && !args.isEmpty()) {
+            sql.append("LAST_DAY(");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("NVL".equals(name) && args.size() >= 2) {
+            sql.append("IFNULL(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            renderArg(args.get(1), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("STRPOS".equals(name) && args.size() >= 2) {
+            sql.append("INSTR(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            renderArg(args.get(1), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("LOCATE".equals(name) && args.size() >= 2) {
+            sql.append("LOCATE(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            renderArg(args.get(1), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if (("IIF".equals(name) || "IF".equals(name)) && args.size() >= 3) {
+            sql.append("IF(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            renderArg(args.get(1), sql, params);
+            sql.append(", ");
+            renderArg(args.get(2), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("CAST".equals(name) && args.size() >= 2) {
+            String type = String.valueOf(args.get(1)).toUpperCase();
+            if ("VARCHAR".equals(type) || "TEXT".equals(type) || "STRING".equals(type)) type = "CHAR";
+            else if ("INT".equals(type) || "INTEGER".equals(type) || "BIGINT".equals(type)) type = "SIGNED";
+            else if ("FLOAT".equals(type) || "DOUBLE".equals(type)) type = "DECIMAL(18,4)";
+            sql.append("CAST(");
+            renderArg(args.get(0), sql, params);
+            sql.append(" AS ").append(type).append(")");
+            return true;
+        }
         return super.renderDialectSpecificFunction(name, args, sql, params);
     }
 }

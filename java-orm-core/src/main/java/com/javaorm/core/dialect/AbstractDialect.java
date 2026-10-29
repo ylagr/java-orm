@@ -535,6 +535,56 @@ public abstract class AbstractDialect implements Dialect {
             sql.append(")");
             return true;
         }
+        if ("DATE_SUB".equals(name) && args.size() >= 2) {
+            String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
+            Object amount = args.get(1);
+            sql.append("DATEADD('").append(unit).append("', -(");
+            if (amount instanceof Number) {
+                sql.append(amount);
+            } else {
+                renderArg(amount, sql, params);
+            }
+            sql.append("), ");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("LAST_DAY".equals(name) && !args.isEmpty()) {
+            sql.append("DATEADD('DAY', -1, DATEADD('MONTH', 1, DATEADD('DAY', -(DAYOFMONTH(");
+            renderArg(args.get(0), sql, params);
+            sql.append(") - 1), ");
+            renderArg(args.get(0), sql, params);
+            sql.append(")))");
+            return true;
+        }
+        if ("NVL".equals(name) && args.size() >= 2) {
+            sql.append("IFNULL(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            renderArg(args.get(1), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if (("IIF".equals(name) || "IF".equals(name)) && args.size() >= 3) {
+            sql.append("CASE WHEN ");
+            renderArg(args.get(0), sql, params);
+            sql.append(" THEN ");
+            renderArg(args.get(1), sql, params);
+            sql.append(" ELSE ");
+            renderArg(args.get(2), sql, params);
+            sql.append(" END");
+            return true;
+        }
+        if ("PI".equals(name)) {
+            sql.append("PI()");
+            return true;
+        }
+        if ("CAST".equals(name) && args.size() >= 2) {
+            sql.append("CAST(");
+            renderArg(args.get(0), sql, params);
+            sql.append(" AS ").append(String.valueOf(args.get(1)).replace("'", "")).append(")");
+            return true;
+        }
         return false;
     }
 

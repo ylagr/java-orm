@@ -270,6 +270,46 @@ public class SQL {
         return dateAdd(prop, seconds, DateUnit.SECOND);
     }
 
+    public static FunctionExpression dateSub(Object prop, Object amount, DateUnit unit) {
+        return new FunctionExpression("DATE_SUB", toExpression(prop), amount, unit.name());
+    }
+
+    public static FunctionExpression dateSub(Object prop, Object amount, String unit) {
+        return new FunctionExpression("DATE_SUB", toExpression(prop), amount, unit);
+    }
+
+    public static FunctionExpression dateSub(Object prop, Object amount) {
+        return dateSub(prop, amount, DateUnit.DAY);
+    }
+
+    public static FunctionExpression dateSubDays(Object prop, Object days) {
+        return dateSub(prop, days, DateUnit.DAY);
+    }
+
+    public static FunctionExpression dateSubMonths(Object prop, Object months) {
+        return dateSub(prop, months, DateUnit.MONTH);
+    }
+
+    public static FunctionExpression dateSubYears(Object prop, Object years) {
+        return dateSub(prop, years, DateUnit.YEAR);
+    }
+
+    public static FunctionExpression dateSubHours(Object prop, Object hours) {
+        return dateSub(prop, hours, DateUnit.HOUR);
+    }
+
+    public static FunctionExpression dateSubMinutes(Object prop, Object minutes) {
+        return dateSub(prop, minutes, DateUnit.MINUTE);
+    }
+
+    public static FunctionExpression dateSubSeconds(Object prop, Object seconds) {
+        return dateSub(prop, seconds, DateUnit.SECOND);
+    }
+
+    public static FunctionExpression lastDay(Object prop) {
+        return new FunctionExpression("LAST_DAY", toExpression(prop));
+    }
+
     public static FunctionExpression dateDiff(Object d1, Object d2) {
         return new FunctionExpression("DATEDIFF", toExpressions(d1, d2));
     }
@@ -410,6 +450,14 @@ public class SQL {
         return new FunctionExpression("INSTR", toExpressions(str, substr));
     }
 
+    public static FunctionExpression locate(Object substr, Object str) {
+        return new FunctionExpression("LOCATE", toExpressions(substr, str));
+    }
+
+    public static FunctionExpression md5(Object prop) {
+        return new FunctionExpression("MD5", toExpression(prop));
+    }
+
     public static FunctionExpression lpad(Object prop, int len, Object pad) {
         return new FunctionExpression("LPAD", toExpressions(prop, len, pad));
     }
@@ -499,6 +547,42 @@ public class SQL {
         return new FunctionExpression("LOG", toExpressions(base, prop));
     }
 
+    public static FunctionExpression pi() {
+        return new FunctionExpression("PI");
+    }
+
+    public static FunctionExpression sin(Object prop) {
+        return new FunctionExpression("SIN", toExpression(prop));
+    }
+
+    public static FunctionExpression cos(Object prop) {
+        return new FunctionExpression("COS", toExpression(prop));
+    }
+
+    public static FunctionExpression tan(Object prop) {
+        return new FunctionExpression("TAN", toExpression(prop));
+    }
+
+    public static FunctionExpression asin(Object prop) {
+        return new FunctionExpression("ASIN", toExpression(prop));
+    }
+
+    public static FunctionExpression acos(Object prop) {
+        return new FunctionExpression("ACOS", toExpression(prop));
+    }
+
+    public static FunctionExpression atan(Object prop) {
+        return new FunctionExpression("ATAN", toExpression(prop));
+    }
+
+    public static FunctionExpression degrees(Object prop) {
+        return new FunctionExpression("DEGREES", toExpression(prop));
+    }
+
+    public static FunctionExpression radians(Object prop) {
+        return new FunctionExpression("RADIANS", toExpression(prop));
+    }
+
     // ==================== 空值控制与条件分支 ====================
     public static FunctionExpression ifNull(Object prop, Object def) {
         return new FunctionExpression("IFNULL", toExpression(prop), def);
@@ -534,6 +618,34 @@ public class SQL {
 
     public static CaseWhenBuilder caseWhen(Object prop, com.javaorm.core.operator.SqlOperator op, Object val, Object thenVal) {
         return new CaseWhenBuilder(prop, op, val, thenVal);
+    }
+
+    public static FunctionExpression iif(Object condition, Object trueVal, Object falseVal) {
+        return new FunctionExpression("IIF", toExpressions(condition, trueVal, falseVal));
+    }
+
+    public static FunctionExpression ifExpr(Object condition, Object trueVal, Object falseVal) {
+        return iif(condition, trueVal, falseVal);
+    }
+
+    public static FunctionExpression cast(Object prop, String targetType) {
+        return new FunctionExpression("CAST", toExpression(prop), targetType);
+    }
+
+    public static FunctionExpression castAsChar(Object prop) {
+        return cast(prop, "CHAR");
+    }
+
+    public static FunctionExpression castAsInt(Object prop) {
+        return cast(prop, "SIGNED");
+    }
+
+    public static FunctionExpression castAsDecimal(Object prop, int precision, int scale) {
+        return cast(prop, "DECIMAL(" + precision + "," + scale + ")");
+    }
+
+    public static FunctionExpression castAsDate(Object prop) {
+        return cast(prop, "DATE");
     }
 
     // ==================== 子查询与原生片段 ====================

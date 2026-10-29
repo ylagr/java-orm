@@ -193,6 +193,101 @@ public class SQLiteDialect extends AbstractDialect {
             sql.append(")");
             return true;
         }
+        if ("GREATEST".equals(name) && !args.isEmpty()) {
+            sql.append("max(");
+            for (int i = 0; i < args.size(); i++) {
+                if (i > 0) sql.append(", ");
+                renderArg(args.get(i), sql, params);
+            }
+            sql.append(")");
+            return true;
+        }
+        if ("LEAST".equals(name) && !args.isEmpty()) {
+            sql.append("min(");
+            for (int i = 0; i < args.size(); i++) {
+                if (i > 0) sql.append(", ");
+                renderArg(args.get(i), sql, params);
+            }
+            sql.append(")");
+            return true;
+        }
+        if ("NVL".equals(name) && args.size() >= 2) {
+            sql.append("ifnull(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            renderArg(args.get(1), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("CEILING".equals(name) && !args.isEmpty()) {
+            sql.append("ceil(");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("REPEAT".equals(name) && args.size() >= 2) {
+            sql.append("replace(hex(zeroblob(");
+            renderArg(args.get(1), sql, params);
+            sql.append(")), '00', ");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("DATE_SUB".equals(name) && args.size() >= 2) {
+            String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
+            String unitSuffix;
+            if ("MONTH".equals(unit)) unitSuffix = " months";
+            else if ("YEAR".equals(unit)) unitSuffix = " years";
+            else if ("HOUR".equals(unit)) unitSuffix = " hours";
+            else if ("MINUTE".equals(unit)) unitSuffix = " minutes";
+            else if ("SECOND".equals(unit)) unitSuffix = " seconds";
+            else unitSuffix = " days";
+
+            sql.append("datetime(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", ('-' || ");
+            if (args.get(1) instanceof Number) {
+                sql.append(args.get(1));
+            } else {
+                renderArg(args.get(1), sql, params);
+            }
+            sql.append(" || '").append(unitSuffix).append("'))");
+            return true;
+        }
+        if ("LAST_DAY".equals(name) && !args.isEmpty()) {
+            sql.append("date(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", 'start of month', '+1 month', '-1 day')");
+            return true;
+        }
+        if ("LOCATE".equals(name) && args.size() >= 2) {
+            sql.append("instr(");
+            renderArg(args.get(1), sql, params);
+            sql.append(", ");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if (("IIF".equals(name) || "IF".equals(name)) && args.size() >= 3) {
+            sql.append("iif(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            renderArg(args.get(1), sql, params);
+            sql.append(", ");
+            renderArg(args.get(2), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("CAST".equals(name) && args.size() >= 2) {
+            String type = String.valueOf(args.get(1)).toUpperCase();
+            if ("CHAR".equals(type) || "VARCHAR".equals(type) || "STRING".equals(type)) type = "TEXT";
+            else if ("SIGNED".equals(type) || "INTEGER".equals(type)) type = "INT";
+            else if ("DECIMAL".equals(type) || "DOUBLE".equals(type) || "FLOAT".equals(type)) type = "REAL";
+            sql.append("CAST(");
+            renderArg(args.get(0), sql, params);
+            sql.append(" AS ").append(type).append(")");
+            return true;
+        }
         return super.renderDialectSpecificFunction(name, args, sql, params);
     }
 }
