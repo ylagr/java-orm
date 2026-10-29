@@ -1,6 +1,8 @@
 package com.javaorm.core;
 
 import com.javaorm.core.ast.*;
+import com.javaorm.core.function.BuiltinSqlFunction;
+import com.javaorm.core.function.SqlFunction;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.ProxyFactory;
 import com.javaorm.core.proxy.RecordingContext;
@@ -85,125 +87,140 @@ public class SQL {
         return expr.as(alias);
     }
 
+    // ==================== 通用/自定义函数调用入口 ====================
+    /**
+     * 自定义或内置 SQL 函数调用（支持传入 SqlFunction 接口实现或内置 BuiltinSqlFunction 枚举）。
+     */
+    public static FunctionExpression func(SqlFunction function, Object... args) {
+        return new FunctionExpression(function, toExpressions(args));
+    }
+
+    /**
+     * 自定义 SQL 函数调用（根据字符串函数名称自动解析或创建）。
+     */
+    public static FunctionExpression func(String functionName, Object... args) {
+        return new FunctionExpression(functionName, toExpressions(args));
+    }
+
     // ==================== 聚合函数 ====================
     public static FunctionExpression count() {
-        return new FunctionExpression("COUNT", new RawSqlExpression("1"));
+        return new FunctionExpression(BuiltinSqlFunction.COUNT, new RawSqlExpression("1"));
     }
 
     public static FunctionExpression count(Object prop) {
-        return new FunctionExpression("COUNT", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.COUNT, toExpression(prop));
     }
 
     public static FunctionExpression countDistinct(Object prop) {
-        return new FunctionExpression("COUNT", toExpression(prop)).distinct();
+        return new FunctionExpression(BuiltinSqlFunction.COUNT, toExpression(prop)).distinct();
     }
 
     public static FunctionExpression sum(Object prop) {
-        return new FunctionExpression("SUM", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.SUM, toExpression(prop));
     }
 
     public static FunctionExpression sumDistinct(Object prop) {
-        return new FunctionExpression("SUM", toExpression(prop)).distinct();
+        return new FunctionExpression(BuiltinSqlFunction.SUM, toExpression(prop)).distinct();
     }
 
     public static FunctionExpression avg(Object prop) {
-        return new FunctionExpression("AVG", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.AVG, toExpression(prop));
     }
 
     public static FunctionExpression avgDistinct(Object prop) {
-        return new FunctionExpression("AVG", toExpression(prop)).distinct();
+        return new FunctionExpression(BuiltinSqlFunction.AVG, toExpression(prop)).distinct();
     }
 
     public static FunctionExpression max(Object prop) {
-        return new FunctionExpression("MAX", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.MAX, toExpression(prop));
     }
 
     public static FunctionExpression min(Object prop) {
-        return new FunctionExpression("MIN", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.MIN, toExpression(prop));
     }
 
     public static FunctionExpression groupConcat(Object prop) {
-        return new FunctionExpression("GROUP_CONCAT", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.GROUP_CONCAT, toExpression(prop));
     }
 
     public static FunctionExpression groupConcat(Object prop, String separator) {
-        return new FunctionExpression("GROUP_CONCAT", toExpression(prop), separator);
+        return new FunctionExpression(BuiltinSqlFunction.GROUP_CONCAT, toExpression(prop), separator);
     }
 
     public static FunctionExpression stddev(Object prop) {
-        return new FunctionExpression("STDDEV", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.STDDEV, toExpression(prop));
     }
 
     public static FunctionExpression variance(Object prop) {
-        return new FunctionExpression("VARIANCE", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.VARIANCE, toExpression(prop));
     }
 
     // ==================== 开窗函数 (Window Functions) ====================
     // 排名函数
     public static WindowFunctionExpression rowNumber() {
-        return new WindowFunctionExpression(new FunctionExpression("ROW_NUMBER"));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.ROW_NUMBER));
     }
 
     public static WindowFunctionExpression rank() {
-        return new WindowFunctionExpression(new FunctionExpression("RANK"));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.RANK));
     }
 
     public static WindowFunctionExpression denseRank() {
-        return new WindowFunctionExpression(new FunctionExpression("DENSE_RANK"));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.DENSE_RANK));
     }
 
     public static WindowFunctionExpression percentRank() {
-        return new WindowFunctionExpression(new FunctionExpression("PERCENT_RANK"));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.PERCENT_RANK));
     }
 
     public static WindowFunctionExpression cumeDist() {
-        return new WindowFunctionExpression(new FunctionExpression("CUME_DIST"));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.CUME_DIST));
     }
 
     public static WindowFunctionExpression ntile(int n) {
-        return new WindowFunctionExpression(new FunctionExpression("NTILE", new RawSqlExpression(String.valueOf(n))));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.NTILE, new RawSqlExpression(String.valueOf(n))));
     }
 
     // 导航/取值函数
     public static WindowFunctionExpression lead(Object prop) {
-        return new WindowFunctionExpression(new FunctionExpression("LEAD", toExpression(prop)));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.LEAD, toExpression(prop)));
     }
 
     public static WindowFunctionExpression lead(Object prop, int offset) {
-        return new WindowFunctionExpression(new FunctionExpression("LEAD", toExpression(prop), new RawSqlExpression(String.valueOf(offset))));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.LEAD, toExpression(prop), new RawSqlExpression(String.valueOf(offset))));
     }
 
     public static WindowFunctionExpression lead(Object prop, int offset, Object def) {
-        return new WindowFunctionExpression(new FunctionExpression("LEAD", toExpression(prop), new RawSqlExpression(String.valueOf(offset)), toExpression(def)));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.LEAD, toExpression(prop), new RawSqlExpression(String.valueOf(offset)), toExpression(def)));
     }
 
     public static WindowFunctionExpression lag(Object prop) {
-        return new WindowFunctionExpression(new FunctionExpression("LAG", toExpression(prop)));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.LAG, toExpression(prop)));
     }
 
     public static WindowFunctionExpression lag(Object prop, int offset) {
-        return new WindowFunctionExpression(new FunctionExpression("LAG", toExpression(prop), new RawSqlExpression(String.valueOf(offset))));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.LAG, toExpression(prop), new RawSqlExpression(String.valueOf(offset))));
     }
 
     public static WindowFunctionExpression lag(Object prop, int offset, Object def) {
-        return new WindowFunctionExpression(new FunctionExpression("LAG", toExpression(prop), new RawSqlExpression(String.valueOf(offset)), toExpression(def)));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.LAG, toExpression(prop), new RawSqlExpression(String.valueOf(offset)), toExpression(def)));
     }
 
     public static WindowFunctionExpression firstValue(Object prop) {
-        return new WindowFunctionExpression(new FunctionExpression("FIRST_VALUE", toExpression(prop)));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.FIRST_VALUE, toExpression(prop)));
     }
 
     public static WindowFunctionExpression lastValue(Object prop) {
-        return new WindowFunctionExpression(new FunctionExpression("LAST_VALUE", toExpression(prop)));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.LAST_VALUE, toExpression(prop)));
     }
 
     public static WindowFunctionExpression nthValue(Object prop, int n) {
-        return new WindowFunctionExpression(new FunctionExpression("NTH_VALUE", toExpression(prop), new RawSqlExpression(String.valueOf(n))));
+        return new WindowFunctionExpression(new FunctionExpression(BuiltinSqlFunction.NTH_VALUE, toExpression(prop), new RawSqlExpression(String.valueOf(n))));
     }
 
     // ==================== 日期时间函数 ====================
     public static FunctionExpression dateFormat(Object prop, String pattern) {
-        return new FunctionExpression("DATE_FORMAT", toExpression(prop), pattern);
+        return new FunctionExpression(BuiltinSqlFunction.DATE_FORMAT, toExpression(prop), pattern);
     }
 
     public static FunctionExpression dateFormat(Object prop) {
@@ -219,7 +236,7 @@ public class SQL {
     }
 
     public static FunctionExpression strToDate(Object prop, String pattern) {
-        return new FunctionExpression("STR_TO_DATE", toExpression(prop), pattern);
+        return new FunctionExpression(BuiltinSqlFunction.STR_TO_DATE, toExpression(prop), pattern);
     }
 
     public static FunctionExpression stringToDate(Object prop, String pattern) {
@@ -235,11 +252,11 @@ public class SQL {
     }
 
     public static FunctionExpression dateAdd(Object prop, Object amount, DateUnit unit) {
-        return new FunctionExpression("DATE_ADD", toExpression(prop), amount, unit.name());
+        return new FunctionExpression(BuiltinSqlFunction.DATE_ADD, toExpression(prop), amount, unit.name());
     }
 
     public static FunctionExpression dateAdd(Object prop, Object amount, String unit) {
-        return new FunctionExpression("DATE_ADD", toExpression(prop), amount, unit);
+        return new FunctionExpression(BuiltinSqlFunction.DATE_ADD, toExpression(prop), amount, unit);
     }
 
     public static FunctionExpression dateAdd(Object prop, Object amount) {
@@ -271,11 +288,11 @@ public class SQL {
     }
 
     public static FunctionExpression dateSub(Object prop, Object amount, DateUnit unit) {
-        return new FunctionExpression("DATE_SUB", toExpression(prop), amount, unit.name());
+        return new FunctionExpression(BuiltinSqlFunction.DATE_SUB, toExpression(prop), amount, unit.name());
     }
 
     public static FunctionExpression dateSub(Object prop, Object amount, String unit) {
-        return new FunctionExpression("DATE_SUB", toExpression(prop), amount, unit);
+        return new FunctionExpression(BuiltinSqlFunction.DATE_SUB, toExpression(prop), amount, unit);
     }
 
     public static FunctionExpression dateSub(Object prop, Object amount) {
@@ -307,47 +324,47 @@ public class SQL {
     }
 
     public static FunctionExpression lastDay(Object prop) {
-        return new FunctionExpression("LAST_DAY", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.LAST_DAY, toExpression(prop));
     }
 
     public static FunctionExpression dateDiff(Object d1, Object d2) {
-        return new FunctionExpression("DATEDIFF", toExpressions(d1, d2));
+        return new FunctionExpression(BuiltinSqlFunction.DATEDIFF, toExpressions(d1, d2));
     }
 
     public static FunctionExpression dayOfWeek(Object prop) {
-        return new FunctionExpression("DAYOFWEEK", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.DAYOFWEEK, toExpression(prop));
     }
 
     public static FunctionExpression dayOfYear(Object prop) {
-        return new FunctionExpression("DAYOFYEAR", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.DAYOFYEAR, toExpression(prop));
     }
 
     public static FunctionExpression year(Object prop) {
-        return new FunctionExpression("YEAR", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.YEAR, toExpression(prop));
     }
 
     public static FunctionExpression month(Object prop) {
-        return new FunctionExpression("MONTH", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.MONTH, toExpression(prop));
     }
 
     public static FunctionExpression day(Object prop) {
-        return new FunctionExpression("DAY", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.DAY, toExpression(prop));
     }
 
     public static FunctionExpression hour(Object prop) {
-        return new FunctionExpression("HOUR", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.HOUR, toExpression(prop));
     }
 
     public static FunctionExpression minute(Object prop) {
-        return new FunctionExpression("MINUTE", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.MINUTE, toExpression(prop));
     }
 
     public static FunctionExpression second(Object prop) {
-        return new FunctionExpression("SECOND", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.SECOND, toExpression(prop));
     }
 
     public static FunctionExpression now() {
-        return new FunctionExpression("NOW");
+        return new FunctionExpression(BuiltinSqlFunction.NOW);
     }
 
     public static FunctionExpression currentTimestamp() {
@@ -355,7 +372,7 @@ public class SQL {
     }
 
     public static FunctionExpression curDate() {
-        return new FunctionExpression("CURDATE");
+        return new FunctionExpression(BuiltinSqlFunction.CURDATE);
     }
 
     public static FunctionExpression currentDate() {
@@ -363,7 +380,7 @@ public class SQL {
     }
 
     public static FunctionExpression curTime() {
-        return new FunctionExpression("CURTIME");
+        return new FunctionExpression(BuiltinSqlFunction.CURTIME);
     }
 
     public static FunctionExpression currentTime() {
@@ -372,50 +389,50 @@ public class SQL {
 
     // ==================== 字符串函数 ====================
     public static FunctionExpression length(Object prop) {
-        return new FunctionExpression("LENGTH", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.LENGTH, toExpression(prop));
     }
 
     public static FunctionExpression charLength(Object prop) {
-        return new FunctionExpression("CHAR_LENGTH", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.CHAR_LENGTH, toExpression(prop));
     }
 
     public static FunctionExpression lower(Object prop) {
-        return new FunctionExpression("LOWER", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.LOWER, toExpression(prop));
     }
 
     public static FunctionExpression upper(Object prop) {
-        return new FunctionExpression("UPPER", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.UPPER, toExpression(prop));
     }
 
     public static FunctionExpression trim(Object prop) {
-        return new FunctionExpression("TRIM", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.TRIM, toExpression(prop));
     }
 
     public static FunctionExpression ltrim(Object prop) {
-        return new FunctionExpression("LTRIM", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.LTRIM, toExpression(prop));
     }
 
     public static FunctionExpression rtrim(Object prop) {
-        return new FunctionExpression("RTRIM", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.RTRIM, toExpression(prop));
     }
 
     public static FunctionExpression concat(Object... props) {
-        return new FunctionExpression("CONCAT", toExpressions(props));
+        return new FunctionExpression(BuiltinSqlFunction.CONCAT, toExpressions(props));
     }
 
     public static FunctionExpression concatWs(Object separator, Object... props) {
         Object[] all = new Object[props.length + 1];
         all[0] = separator;
         System.arraycopy(props, 0, all, 1, props.length);
-        return new FunctionExpression("CONCAT_WS", toExpressions(all));
+        return new FunctionExpression(BuiltinSqlFunction.CONCAT_WS, toExpressions(all));
     }
 
     public static FunctionExpression subString(Object prop, int start, int len) {
-        return new FunctionExpression("SUBSTRING", toExpression(prop), start, len);
+        return new FunctionExpression(BuiltinSqlFunction.SUBSTRING, toExpression(prop), start, len);
     }
 
     public static FunctionExpression subString(Object prop, int start) {
-        return new FunctionExpression("SUBSTRING", toExpression(prop), start);
+        return new FunctionExpression(BuiltinSqlFunction.SUBSTRING, toExpression(prop), start);
     }
 
     public static FunctionExpression substring(Object prop, int start, int len) {
@@ -435,56 +452,56 @@ public class SQL {
     }
 
     public static FunctionExpression replace(Object prop, Object target, Object replacement) {
-        return new FunctionExpression("REPLACE", toExpressions(prop, target, replacement));
+        return new FunctionExpression(BuiltinSqlFunction.REPLACE, toExpressions(prop, target, replacement));
     }
 
     public static FunctionExpression left(Object prop, int len) {
-        return new FunctionExpression("LEFT", toExpression(prop), len);
+        return new FunctionExpression(BuiltinSqlFunction.LEFT, toExpression(prop), len);
     }
 
     public static FunctionExpression right(Object prop, int len) {
-        return new FunctionExpression("RIGHT", toExpression(prop), len);
+        return new FunctionExpression(BuiltinSqlFunction.RIGHT, toExpression(prop), len);
     }
 
     public static FunctionExpression instr(Object str, Object substr) {
-        return new FunctionExpression("INSTR", toExpressions(str, substr));
+        return new FunctionExpression(BuiltinSqlFunction.INSTR, toExpressions(str, substr));
     }
 
     public static FunctionExpression locate(Object substr, Object str) {
-        return new FunctionExpression("LOCATE", toExpressions(substr, str));
+        return new FunctionExpression(BuiltinSqlFunction.LOCATE, toExpressions(substr, str));
     }
 
     public static FunctionExpression md5(Object prop) {
-        return new FunctionExpression("MD5", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.MD5, toExpression(prop));
     }
 
     public static FunctionExpression lpad(Object prop, int len, Object pad) {
-        return new FunctionExpression("LPAD", toExpressions(prop, len, pad));
+        return new FunctionExpression(BuiltinSqlFunction.LPAD, toExpressions(prop, len, pad));
     }
 
     public static FunctionExpression rpad(Object prop, int len, Object pad) {
-        return new FunctionExpression("RPAD", toExpressions(prop, len, pad));
+        return new FunctionExpression(BuiltinSqlFunction.RPAD, toExpressions(prop, len, pad));
     }
 
     public static FunctionExpression reverse(Object prop) {
-        return new FunctionExpression("REVERSE", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.REVERSE, toExpression(prop));
     }
 
     public static FunctionExpression repeat(Object prop, int count) {
-        return new FunctionExpression("REPEAT", toExpression(prop), count);
+        return new FunctionExpression(BuiltinSqlFunction.REPEAT, toExpression(prop), count);
     }
 
     public static FunctionExpression ascii(Object prop) {
-        return new FunctionExpression("ASCII", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.ASCII, toExpression(prop));
     }
 
     // ==================== 数值函数 ====================
     public static FunctionExpression abs(Object prop) {
-        return new FunctionExpression("ABS", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.ABS, toExpression(prop));
     }
 
     public static FunctionExpression round(Object prop, int scale) {
-        return new FunctionExpression("ROUND", toExpression(prop), scale);
+        return new FunctionExpression(BuiltinSqlFunction.ROUND, toExpression(prop), scale);
     }
 
     public static FunctionExpression round(Object prop) {
@@ -492,7 +509,7 @@ public class SQL {
     }
 
     public static FunctionExpression ceil(Object prop) {
-        return new FunctionExpression("CEIL", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.CEIL, toExpression(prop));
     }
 
     public static FunctionExpression ceiling(Object prop) {
@@ -500,27 +517,27 @@ public class SQL {
     }
 
     public static FunctionExpression floor(Object prop) {
-        return new FunctionExpression("FLOOR", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.FLOOR, toExpression(prop));
     }
 
     public static FunctionExpression mod(Object prop, Object divisor) {
-        return new FunctionExpression("MOD", toExpressions(prop, divisor));
+        return new FunctionExpression(BuiltinSqlFunction.MOD, toExpressions(prop, divisor));
     }
 
     public static FunctionExpression sqrt(Object prop) {
-        return new FunctionExpression("SQRT", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.SQRT, toExpression(prop));
     }
 
     public static FunctionExpression power(Object prop, Object exponent) {
-        return new FunctionExpression("POWER", toExpressions(prop, exponent));
+        return new FunctionExpression(BuiltinSqlFunction.POWER, toExpressions(prop, exponent));
     }
 
     public static FunctionExpression sign(Object prop) {
-        return new FunctionExpression("SIGN", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.SIGN, toExpression(prop));
     }
 
     public static FunctionExpression truncate(Object prop, int scale) {
-        return new FunctionExpression("TRUNCATE", toExpression(prop), scale);
+        return new FunctionExpression(BuiltinSqlFunction.TRUNCATE, toExpression(prop), scale);
     }
 
     public static FunctionExpression trunc(Object prop, int scale) {
@@ -532,11 +549,11 @@ public class SQL {
     }
 
     public static FunctionExpression exp(Object prop) {
-        return new FunctionExpression("EXP", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.EXP, toExpression(prop));
     }
 
     public static FunctionExpression ln(Object prop) {
-        return new FunctionExpression("LN", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.LN, toExpression(prop));
     }
 
     public static FunctionExpression log(Object prop) {
@@ -544,48 +561,48 @@ public class SQL {
     }
 
     public static FunctionExpression log(Object base, Object prop) {
-        return new FunctionExpression("LOG", toExpressions(base, prop));
+        return new FunctionExpression(BuiltinSqlFunction.LOG, toExpressions(base, prop));
     }
 
     public static FunctionExpression pi() {
-        return new FunctionExpression("PI");
+        return new FunctionExpression(BuiltinSqlFunction.PI);
     }
 
     public static FunctionExpression sin(Object prop) {
-        return new FunctionExpression("SIN", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.SIN, toExpression(prop));
     }
 
     public static FunctionExpression cos(Object prop) {
-        return new FunctionExpression("COS", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.COS, toExpression(prop));
     }
 
     public static FunctionExpression tan(Object prop) {
-        return new FunctionExpression("TAN", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.TAN, toExpression(prop));
     }
 
     public static FunctionExpression asin(Object prop) {
-        return new FunctionExpression("ASIN", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.ASIN, toExpression(prop));
     }
 
     public static FunctionExpression acos(Object prop) {
-        return new FunctionExpression("ACOS", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.ACOS, toExpression(prop));
     }
 
     public static FunctionExpression atan(Object prop) {
-        return new FunctionExpression("ATAN", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.ATAN, toExpression(prop));
     }
 
     public static FunctionExpression degrees(Object prop) {
-        return new FunctionExpression("DEGREES", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.DEGREES, toExpression(prop));
     }
 
     public static FunctionExpression radians(Object prop) {
-        return new FunctionExpression("RADIANS", toExpression(prop));
+        return new FunctionExpression(BuiltinSqlFunction.RADIANS, toExpression(prop));
     }
 
     // ==================== 空值控制与条件分支 ====================
     public static FunctionExpression ifNull(Object prop, Object def) {
-        return new FunctionExpression("IFNULL", toExpression(prop), def);
+        return new FunctionExpression(BuiltinSqlFunction.IFNULL, toExpression(prop), def);
     }
 
     public static FunctionExpression nvl(Object prop, Object def) {
@@ -593,19 +610,19 @@ public class SQL {
     }
 
     public static FunctionExpression coalesce(Object... props) {
-        return new FunctionExpression("COALESCE", toExpressions(props));
+        return new FunctionExpression(BuiltinSqlFunction.COALESCE, toExpressions(props));
     }
 
     public static FunctionExpression nullIf(Object expr1, Object expr2) {
-        return new FunctionExpression("NULLIF", toExpressions(expr1, expr2));
+        return new FunctionExpression(BuiltinSqlFunction.NULLIF, toExpressions(expr1, expr2));
     }
 
     public static FunctionExpression greatest(Object... props) {
-        return new FunctionExpression("GREATEST", toExpressions(props));
+        return new FunctionExpression(BuiltinSqlFunction.GREATEST, toExpressions(props));
     }
 
     public static FunctionExpression least(Object... props) {
-        return new FunctionExpression("LEAST", toExpressions(props));
+        return new FunctionExpression(BuiltinSqlFunction.LEAST, toExpressions(props));
     }
 
     public static CaseWhenBuilder caseWhen() {
@@ -621,7 +638,7 @@ public class SQL {
     }
 
     public static FunctionExpression iif(Object condition, Object trueVal, Object falseVal) {
-        return new FunctionExpression("IIF", toExpressions(condition, trueVal, falseVal));
+        return new FunctionExpression(BuiltinSqlFunction.IIF, toExpressions(condition, trueVal, falseVal));
     }
 
     public static FunctionExpression ifExpr(Object condition, Object trueVal, Object falseVal) {
@@ -629,7 +646,7 @@ public class SQL {
     }
 
     public static FunctionExpression cast(Object prop, String targetType) {
-        return new FunctionExpression("CAST", toExpression(prop), targetType);
+        return new FunctionExpression(BuiltinSqlFunction.CAST, toExpression(prop), targetType);
     }
 
     public static FunctionExpression castAsChar(Object prop) {

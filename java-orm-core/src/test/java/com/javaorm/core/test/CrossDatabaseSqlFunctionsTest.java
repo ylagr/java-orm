@@ -7,6 +7,11 @@ import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.*;
 import com.javaorm.core.metadata.EntityMetadata;
 import com.javaorm.core.metadata.EntityMetadataManager;
+import com.javaorm.core.function.BuiltinSqlFunction;
+import com.javaorm.core.function.SimpleSqlFunction;
+import com.javaorm.core.function.SqlFunction;
+import com.javaorm.core.operator.BuiltinSqlOperator;
+import com.javaorm.core.operator.SimpleSqlOperator;
 import com.javaorm.core.operator.SqlOperator;
 import com.javaorm.core.query.Query;
 import org.h2.jdbcx.JdbcDataSource;
@@ -517,5 +522,134 @@ public class CrossDatabaseSqlFunctionsTest {
         assertEquals(3L, ((Number) aggRow.get("distinct_names")).longValue());
         // ages: 20, 22, 20, 25 -> distinct ages are 20, 22, 25 -> sum is 67
         assertEquals(67L, ((Number) aggRow.get("distinct_age_sum")).longValue());
+    }
+
+    public enum CustomGeoFunction implements SqlFunction {
+        ST_DISTANCE;
+
+        @Override
+        public String getName() {
+            return name();
+        }
+    }
+
+    public enum CustomOperator implements SqlOperator {
+        REGEX("~");
+
+        private final String sql;
+        CustomOperator(String sql) { this.sql = sql; }
+        @Override
+        public String getSql() { return sql; }
+    }
+
+    @Test
+    public void testCustomSqlFunctionAndDialectReplacement() {
+        MySQLDialect mysql = new MySQLDialect();
+        PostgreSQLDialect pg = new PostgreSQLDialect();
+        SQLiteDialect sqlite = new SQLiteDialect();
+
+        // 注册自定义函数 ST_DISTANCE
+        mysql.registerFunction(CustomGeoFunction.ST_DISTANCE, (fn, args, sql, params, d) -> {
+            sql.append("ST_Distance_Sphere(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            d.renderArg(args.get(1), sql, params);
+            sql.append(")");
+        });
+
+        pg.registerFunction(CustomGeoFunction.ST_DISTANCE, (fn, args, sql, params, d) -> {
+            sql.append("ST_Distance(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append("::geography, ");
+            d.renderArg(args.get(1), sql, params);
+            sql.append("::geography)");
+        });
+
+        sqlite.registerFunction(CustomGeoFunction.ST_DISTANCE, (fn, args, sql, params, d) -> {
+            sql.append("CUSTOM_GEO_DIST(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            d.renderArg(args.get(1), sql, params);
+            sql.append(")");
+        });
+
+        CrossRecord s = $(CrossRecord.class);
+        Query<CrossRecord> query = orm.select(CrossRecord.class)
+                .select(func(CustomGeoFunction.ST_DISTANCE, s.getScore(), 100.0).as("dist"));
+
+        SqlAndParams mySqlAndParams = mysql.buildSelect(query.getStatement());
+        assertTrue(mySqlAndParams.getSql().startsWith("SELECT ST_Distance_Sphere(t0.`score`, ?) AS `dist` FROM `t_cross_record` t0"));
+
+        SqlAndParams pgSqlAndParams = pg.buildSelect(query.getStatement());
+        assertTrue(pgSqlAndParams.getSql().startsWith("SELECT ST_Distance(t0.\"score\"::geography, ?::geography) AS \"dist\" FROM \"t_cross_record\" t0"));
+
+        SqlAndParams sqSqlAndParams = sqlite.buildSelect(query.getStatement());
+        assertTrue(sqSqlAndParams.getSql().startsWith("SELECT CUSTOM_GEO_DIST(t0.\"score\", ?) AS \"dist\" FROM \"t_cross_record\" t0"));
+    }
+
+    @Test
+    public void testDynamicFunctionOverride() {
+        MySQLDialect mysql = new MySQLDialect();
+        // 动态覆盖内置 DATE_FORMAT
+        mysql.registerFunction(BuiltinSqlFunction.DATE_FORMAT, (fn, args, sql, params, d) -> {
+            sql.append("MY_SPECIAL_DATE_FORMAT(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(")");
+        });
+
+        CrossRecord s = $(CrossRecord.class);
+        Query<CrossRecord> query = orm.select(CrossRecord.class)
+                .select(dateFormat(s.getCreateTime()).as("formatted_time"));
+
+        SqlAndParams res = mysql.buildSelect(query.getStatement());
+        assertTrue(res.getSql().startsWith("SELECT MY_SPECIAL_DATE_FORMAT(t0.`create_time`) AS `formatted_time` FROM `t_cross_record` t0"));
+    }
+
+    @Test
+    public void testCustomOperatorAndDialectReplacement() {
+        MySQLDialect mysql = new MySQLDialect();
+        PostgreSQLDialect pg = new PostgreSQLDialect();
+
+        // MySQL 对应正则操作符 REGEXP
+        mysql.registerOperator(CustomOperator.REGEX, (op, d) -> "REGEXP");
+        // PG 原生支持 ~
+        pg.registerOperator(CustomOperator.REGEX, (op, d) -> "~");
+
+        CrossRecord s = $(CrossRecord.class);
+        Query<CrossRecord> query = orm.select(CrossRecord.class)
+                .where(s.getName(), CustomOperator.REGEX, "^Ali.*");
+
+        SqlAndParams mySqlAndParams = mysql.buildSelect(query.getStatement());
+        assertTrue(mySqlAndParams.getSql().contains("t0.`name` REGEXP ?"));
+
+        SqlAndParams pgSqlAndParams = pg.buildSelect(query.getStatement());
+        assertTrue(pgSqlAndParams.getSql().contains("t0.\"name\" ~ ?"));
+    }
+
+    @Test
+    public void testCustomThirdPartyDialect() {
+        // 自定义达梦 (DM) 或金仓 (Kingbase) 数据库方言示例
+        class DamengDialect extends AbstractDialect {
+            public DamengDialect() {
+                super();
+                // 达梦将 IFNULL / NVL 统一映射为 NVL
+                registerFunction(BuiltinSqlFunction.IFNULL, (fn, args, sql, params, d) -> {
+                    sql.append("NVL(");
+                    d.renderArg(args.get(0), sql, params);
+                    sql.append(", ");
+                    d.renderArg(args.get(1), sql, params);
+                    sql.append(")");
+                });
+                registerFunction(BuiltinSqlFunction.NVL, getFunctionRenderer(BuiltinSqlFunction.IFNULL));
+            }
+        }
+
+        DamengDialect dm = new DamengDialect();
+        CrossRecord s = $(CrossRecord.class);
+        Query<CrossRecord> query = orm.select(CrossRecord.class)
+                .select(ifNull(s.getName(), "Anonymous").as("safe_name"));
+
+        SqlAndParams dmSql = dm.buildSelect(query.getStatement());
+        assertTrue(dmSql.getSql().startsWith("SELECT NVL(t0.\"name\", ?) AS \"safe_name\" FROM \"t_cross_record\" t0"));
     }
 }

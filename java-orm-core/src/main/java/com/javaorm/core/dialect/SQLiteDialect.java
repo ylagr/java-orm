@@ -1,40 +1,50 @@
 package com.javaorm.core.dialect;
 
-import java.util.List;
+import com.javaorm.core.function.BuiltinSqlFunction;
 
+/**
+ * SQLite 数据库方言实现。
+ * 通过内置注册机制支持 SQLite 专属语法、时间函数、字符串运算与类型转换。
+ */
 public class SQLiteDialect extends AbstractDialect {
 
+    public SQLiteDialect() {
+        super();
+        registerSQLiteFunctions();
+    }
 
-    @Override
-    protected boolean renderDialectSpecificFunction(String name, List<Object> args, StringBuilder sql, List<Object> params) {
-        if ("NOW".equals(name) || "CURRENT_TIMESTAMP".equals(name)) {
-            sql.append("datetime('now', 'localtime')");
-            return true;
-        }
-        if ("CURDATE".equals(name) || "CURRENT_DATE".equals(name)) {
-            sql.append("date('now', 'localtime')");
-            return true;
-        }
-        if ("CURTIME".equals(name) || "CURRENT_TIME".equals(name)) {
-            sql.append("time('now', 'localtime')");
-            return true;
-        }
-        if (("DATE_FORMAT".equals(name) || "DATE_TO_STRING".equals(name)) && !args.isEmpty()) {
+    protected void registerSQLiteFunctions() {
+        registerFunction(BuiltinSqlFunction.NOW, (fn, args, sql, params, d) -> sql.append("datetime('now', 'localtime')"));
+        registerFunction("CURRENT_TIMESTAMP", getFunctionRenderer(BuiltinSqlFunction.NOW));
+
+        registerFunction(BuiltinSqlFunction.CURDATE, (fn, args, sql, params, d) -> sql.append("date('now', 'localtime')"));
+        registerFunction("CURRENT_DATE", getFunctionRenderer(BuiltinSqlFunction.CURDATE));
+
+        registerFunction(BuiltinSqlFunction.CURTIME, (fn, args, sql, params, d) -> sql.append("time('now', 'localtime')"));
+        registerFunction("CURRENT_TIME", getFunctionRenderer(BuiltinSqlFunction.CURTIME));
+
+        registerFunction(BuiltinSqlFunction.DATE_FORMAT, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
             sql.append("strftime('");
             String fmt = args.size() > 1 ? String.valueOf(args.get(1)) : "yyyy-MM-dd HH:mm:ss";
             String sqFmt = DateFormatPatternConverter.toSQLite(fmt);
             sql.append(sqFmt).append("', ");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(")");
-            return true;
-        }
-        if (("STR_TO_DATE".equals(name) || "TO_DATE".equals(name) || "STRING_TO_DATE".equals(name)) && !args.isEmpty()) {
+        });
+        registerFunction("DATE_TO_STRING", getFunctionRenderer(BuiltinSqlFunction.DATE_FORMAT));
+
+        registerFunction(BuiltinSqlFunction.STR_TO_DATE, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
             sql.append("datetime(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(")");
-            return true;
-        }
-        if ("DATE_ADD".equals(name) && args.size() >= 2) {
+        });
+        registerFunction("TO_DATE", getFunctionRenderer(BuiltinSqlFunction.STR_TO_DATE));
+        registerFunction("STRING_TO_DATE", getFunctionRenderer(BuiltinSqlFunction.STR_TO_DATE));
+
+        registerFunction(BuiltinSqlFunction.DATE_ADD, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
             String unitSuffix;
             if ("MONTH".equals(unit)) unitSuffix = " months";
@@ -45,195 +55,18 @@ public class SQLiteDialect extends AbstractDialect {
             else unitSuffix = " days";
 
             sql.append("datetime(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", (");
             if (args.get(1) instanceof Number) {
                 sql.append(args.get(1));
             } else {
-                renderArg(args.get(1), sql, params);
+                d.renderArg(args.get(1), sql, params);
             }
             sql.append(" || '").append(unitSuffix).append("'))");
-            return true;
-        }
-        if ("DATEDIFF".equals(name) && args.size() >= 2) {
-            sql.append("CAST(julianday(");
-            renderArg(args.get(0), sql, params);
-            sql.append(") - julianday(");
-            renderArg(args.get(1), sql, params);
-            sql.append(") AS INT)");
-            return true;
-        }
-        if ("DAYOFWEEK".equals(name) && !args.isEmpty()) {
-            sql.append("(CAST(strftime('%w', ");
-            renderArg(args.get(0), sql, params);
-            sql.append(") AS INT) + 1)");
-            return true;
-        }
-        if ("DAYOFYEAR".equals(name) && !args.isEmpty()) {
-            sql.append("CAST(strftime('%j', ");
-            renderArg(args.get(0), sql, params);
-            sql.append(") AS INT)");
-            return true;
-        }
-        if ("CHAR_LENGTH".equals(name) && !args.isEmpty()) {
-            sql.append("length(");
-            renderArg(args.get(0), sql, params);
-            sql.append(")");
-            return true;
-        }
-        if ("CONCAT_WS".equals(name) && args.size() >= 2) {
-            Object sep = args.get(0);
-            for (int i = 1; i < args.size(); i++) {
-                if (i > 1) {
-                    sql.append(" || ");
-                    renderArg(sep, sql, params);
-                    sql.append(" || ");
-                }
-                renderArg(args.get(i), sql, params);
-            }
-            return true;
-        }
-        if ("GROUP_CONCAT".equals(name) && !args.isEmpty()) {
-            sql.append("group_concat(");
-            renderArg(args.get(0), sql, params);
-            if (args.size() > 1) {
-                sql.append(", ");
-                renderArg(args.get(1), sql, params);
-            }
-            sql.append(")");
-            return true;
-        }
-        if (("TRUNCATE".equals(name) || "TRUNC".equals(name)) && !args.isEmpty()) {
-            if (args.size() > 1) {
-                sql.append("ROUND(");
-                renderArg(args.get(0), sql, params);
-                sql.append(", ");
-                renderArg(args.get(1), sql, params);
-                sql.append(")");
-            } else {
-                sql.append("CAST(");
-                renderArg(args.get(0), sql, params);
-                sql.append(" AS INT)");
-            }
-            return true;
-        }
-        if ("YEAR".equals(name) && !args.isEmpty()) {
-            sql.append("CAST(strftime('%Y', ");
-            renderArg(args.get(0), sql, params);
-            sql.append(") AS INT)");
-            return true;
-        }
-        if ("MONTH".equals(name) && !args.isEmpty()) {
-            sql.append("CAST(strftime('%m', ");
-            renderArg(args.get(0), sql, params);
-            sql.append(") AS INT)");
-            return true;
-        }
-        if ("DAY".equals(name) && !args.isEmpty()) {
-            sql.append("CAST(strftime('%d', ");
-            renderArg(args.get(0), sql, params);
-            sql.append(") AS INT)");
-            return true;
-        }
-        if ("HOUR".equals(name) && !args.isEmpty()) {
-            sql.append("CAST(strftime('%H', ");
-            renderArg(args.get(0), sql, params);
-            sql.append(") AS INT)");
-            return true;
-        }
-        if ("MINUTE".equals(name) && !args.isEmpty()) {
-            sql.append("CAST(strftime('%M', ");
-            renderArg(args.get(0), sql, params);
-            sql.append(") AS INT)");
-            return true;
-        }
-        if ("SECOND".equals(name) && !args.isEmpty()) {
-            sql.append("CAST(strftime('%S', ");
-            renderArg(args.get(0), sql, params);
-            sql.append(") AS INT)");
-            return true;
-        }
-        if ("CONCAT".equals(name) && !args.isEmpty()) {
-            for (int i = 0; i < args.size(); i++) {
-                if (i > 0) sql.append(" || ");
-                renderArg(args.get(i), sql, params);
-            }
-            return true;
-        }
-        if ("SUBSTRING".equals(name) && args.size() >= 2) {
-            sql.append("substr(");
-            for (int i = 0; i < args.size(); i++) {
-                if (i > 0) sql.append(", ");
-                renderArg(args.get(i), sql, params);
-            }
-            sql.append(")");
-            return true;
-        }
-        if ("LEFT".equals(name) && args.size() >= 2) {
-            sql.append("substr(");
-            renderArg(args.get(0), sql, params);
-            sql.append(", 1, ");
-            renderArg(args.get(1), sql, params);
-            sql.append(")");
-            return true;
-        }
-        if ("RIGHT".equals(name) && args.size() >= 2) {
-            sql.append("substr(");
-            renderArg(args.get(0), sql, params);
-            sql.append(", -(");
-            renderArg(args.get(1), sql, params);
-            sql.append("))");
-            return true;
-        }
-        if ("MOD".equals(name) && args.size() >= 2) {
-            sql.append("(");
-            renderArg(args.get(0), sql, params);
-            sql.append(" % ");
-            renderArg(args.get(1), sql, params);
-            sql.append(")");
-            return true;
-        }
-        if ("GREATEST".equals(name) && !args.isEmpty()) {
-            sql.append("max(");
-            for (int i = 0; i < args.size(); i++) {
-                if (i > 0) sql.append(", ");
-                renderArg(args.get(i), sql, params);
-            }
-            sql.append(")");
-            return true;
-        }
-        if ("LEAST".equals(name) && !args.isEmpty()) {
-            sql.append("min(");
-            for (int i = 0; i < args.size(); i++) {
-                if (i > 0) sql.append(", ");
-                renderArg(args.get(i), sql, params);
-            }
-            sql.append(")");
-            return true;
-        }
-        if ("NVL".equals(name) && args.size() >= 2) {
-            sql.append("ifnull(");
-            renderArg(args.get(0), sql, params);
-            sql.append(", ");
-            renderArg(args.get(1), sql, params);
-            sql.append(")");
-            return true;
-        }
-        if ("CEILING".equals(name) && !args.isEmpty()) {
-            sql.append("ceil(");
-            renderArg(args.get(0), sql, params);
-            sql.append(")");
-            return true;
-        }
-        if ("REPEAT".equals(name) && args.size() >= 2) {
-            sql.append("replace(hex(zeroblob(");
-            renderArg(args.get(1), sql, params);
-            sql.append(")), '00', ");
-            renderArg(args.get(0), sql, params);
-            sql.append(")");
-            return true;
-        }
-        if ("DATE_SUB".equals(name) && args.size() >= 2) {
+        });
+
+        registerFunction(BuiltinSqlFunction.DATE_SUB, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
             String unitSuffix;
             if ("MONTH".equals(unit)) unitSuffix = " months";
@@ -244,50 +77,258 @@ public class SQLiteDialect extends AbstractDialect {
             else unitSuffix = " days";
 
             sql.append("datetime(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", ('-' || ");
             if (args.get(1) instanceof Number) {
                 sql.append(args.get(1));
             } else {
-                renderArg(args.get(1), sql, params);
+                d.renderArg(args.get(1), sql, params);
             }
             sql.append(" || '").append(unitSuffix).append("'))");
-            return true;
-        }
-        if ("LAST_DAY".equals(name) && !args.isEmpty()) {
+        });
+
+        registerFunction(BuiltinSqlFunction.DATEDIFF, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
+            sql.append("CAST(julianday(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(") - julianday(");
+            d.renderArg(args.get(1), sql, params);
+            sql.append(") AS INT)");
+        });
+
+        registerFunction(BuiltinSqlFunction.DAYOFWEEK, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("(CAST(strftime('%w', ");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(") AS INT) + 1)");
+        });
+
+        registerFunction(BuiltinSqlFunction.DAYOFYEAR, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("CAST(strftime('%j', ");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(") AS INT)");
+        });
+
+        registerFunction(BuiltinSqlFunction.CHAR_LENGTH, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("length(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(")");
+        });
+
+        registerFunction(BuiltinSqlFunction.CONCAT, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            for (int i = 0; i < args.size(); i++) {
+                if (i > 0) sql.append(" || ");
+                d.renderArg(args.get(i), sql, params);
+            }
+        });
+
+        registerFunction(BuiltinSqlFunction.CONCAT_WS, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
+            Object sep = args.get(0);
+            for (int i = 1; i < args.size(); i++) {
+                if (i > 1) {
+                    sql.append(" || ");
+                    d.renderArg(sep, sql, params);
+                    sql.append(" || ");
+                }
+                d.renderArg(args.get(i), sql, params);
+            }
+        });
+
+        registerFunction(BuiltinSqlFunction.GROUP_CONCAT, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("group_concat(");
+            d.renderArg(args.get(0), sql, params);
+            if (args.size() > 1) {
+                sql.append(", ");
+                d.renderArg(args.get(1), sql, params);
+            }
+            sql.append(")");
+        });
+
+        registerFunction(BuiltinSqlFunction.TRUNCATE, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            if (args.size() > 1) {
+                sql.append("ROUND(");
+                d.renderArg(args.get(0), sql, params);
+                sql.append(", ");
+                d.renderArg(args.get(1), sql, params);
+                sql.append(")");
+            } else {
+                sql.append("CAST(");
+                d.renderArg(args.get(0), sql, params);
+                sql.append(" AS INT)");
+            }
+        });
+        registerFunction(BuiltinSqlFunction.TRUNC, getFunctionRenderer(BuiltinSqlFunction.TRUNCATE));
+
+        registerFunction(BuiltinSqlFunction.YEAR, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("CAST(strftime('%Y', ");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(") AS INT)");
+        });
+
+        registerFunction(BuiltinSqlFunction.MONTH, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("CAST(strftime('%m', ");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(") AS INT)");
+        });
+
+        registerFunction(BuiltinSqlFunction.DAY, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("CAST(strftime('%d', ");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(") AS INT)");
+        });
+
+        registerFunction(BuiltinSqlFunction.HOUR, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("CAST(strftime('%H', ");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(") AS INT)");
+        });
+
+        registerFunction(BuiltinSqlFunction.MINUTE, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("CAST(strftime('%M', ");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(") AS INT)");
+        });
+
+        registerFunction(BuiltinSqlFunction.SECOND, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("CAST(strftime('%S', ");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(") AS INT)");
+        });
+
+        registerFunction(BuiltinSqlFunction.SUBSTRING, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
+            sql.append("substr(");
+            for (int i = 0; i < args.size(); i++) {
+                if (i > 0) sql.append(", ");
+                d.renderArg(args.get(i), sql, params);
+            }
+            sql.append(")");
+        });
+        registerFunction("SUBSTR", getFunctionRenderer(BuiltinSqlFunction.SUBSTRING));
+
+        registerFunction(BuiltinSqlFunction.LEFT, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
+            sql.append("substr(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(", 1, ");
+            d.renderArg(args.get(1), sql, params);
+            sql.append(")");
+        });
+
+        registerFunction(BuiltinSqlFunction.RIGHT, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
+            sql.append("substr(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(", -(");
+            d.renderArg(args.get(1), sql, params);
+            sql.append("))");
+        });
+
+        registerFunction(BuiltinSqlFunction.MOD, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
+            sql.append("(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(" % ");
+            d.renderArg(args.get(1), sql, params);
+            sql.append(")");
+        });
+
+        registerFunction(BuiltinSqlFunction.GREATEST, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("max(");
+            for (int i = 0; i < args.size(); i++) {
+                if (i > 0) sql.append(", ");
+                d.renderArg(args.get(i), sql, params);
+            }
+            sql.append(")");
+        });
+
+        registerFunction(BuiltinSqlFunction.LEAST, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("min(");
+            for (int i = 0; i < args.size(); i++) {
+                if (i > 0) sql.append(", ");
+                d.renderArg(args.get(i), sql, params);
+            }
+            sql.append(")");
+        });
+
+        registerFunction(BuiltinSqlFunction.IFNULL, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
+            sql.append("ifnull(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            d.renderArg(args.get(1), sql, params);
+            sql.append(")");
+        });
+        registerFunction(BuiltinSqlFunction.NVL, getFunctionRenderer(BuiltinSqlFunction.IFNULL));
+
+        registerFunction(BuiltinSqlFunction.CEILING, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("ceil(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(")");
+        });
+        registerFunction(BuiltinSqlFunction.CEIL, getFunctionRenderer(BuiltinSqlFunction.CEILING));
+
+        registerFunction(BuiltinSqlFunction.REPEAT, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
+            sql.append("replace(hex(zeroblob(");
+            d.renderArg(args.get(1), sql, params);
+            sql.append(")), '00', ");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(")");
+        });
+
+        registerFunction(BuiltinSqlFunction.LAST_DAY, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
             sql.append("date(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", 'start of month', '+1 month', '-1 day')");
-            return true;
-        }
-        if ("LOCATE".equals(name) && args.size() >= 2) {
+        });
+
+        registerFunction(BuiltinSqlFunction.LOCATE, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             sql.append("instr(");
-            renderArg(args.get(1), sql, params);
+            d.renderArg(args.get(1), sql, params);
             sql.append(", ");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(")");
-            return true;
-        }
-        if (("IIF".equals(name) || "IF".equals(name)) && args.size() >= 3) {
+        });
+
+        registerFunction(BuiltinSqlFunction.IIF, (fn, args, sql, params, d) -> {
+            if (args.size() < 3) return;
             sql.append("iif(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", ");
-            renderArg(args.get(1), sql, params);
+            d.renderArg(args.get(1), sql, params);
             sql.append(", ");
-            renderArg(args.get(2), sql, params);
+            d.renderArg(args.get(2), sql, params);
             sql.append(")");
-            return true;
-        }
-        if ("CAST".equals(name) && args.size() >= 2) {
+        });
+        registerFunction(BuiltinSqlFunction.IF, getFunctionRenderer(BuiltinSqlFunction.IIF));
+
+        registerFunction(BuiltinSqlFunction.CAST, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             String type = String.valueOf(args.get(1)).toUpperCase();
             if ("CHAR".equals(type) || "VARCHAR".equals(type) || "STRING".equals(type)) type = "TEXT";
             else if ("SIGNED".equals(type) || "INTEGER".equals(type)) type = "INT";
             else if ("DECIMAL".equals(type) || "DOUBLE".equals(type) || "FLOAT".equals(type)) type = "REAL";
             sql.append("CAST(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(" AS ").append(type).append(")");
-            return true;
-        }
-        return super.renderDialectSpecificFunction(name, args, sql, params);
+        });
     }
 }

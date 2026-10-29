@@ -1,10 +1,17 @@
 package com.javaorm.core.dialect;
 
 import com.javaorm.core.ast.SqlExpression;
+import com.javaorm.core.function.BuiltinSqlFunction;
 
 import java.util.List;
 
 public class MySQLDialect extends AbstractDialect {
+
+    public MySQLDialect() {
+        super();
+        registerMySQLFunctions();
+    }
+
     @Override
     public String quote(String identifier) {
         if (identifier == null) return null;
@@ -15,147 +22,159 @@ public class MySQLDialect extends AbstractDialect {
         return "`" + clean.replace("`", "``") + "`";
     }
 
-    @Override
-    protected boolean renderDialectSpecificFunction(String name, List<Object> args, StringBuilder sql, List<Object> params) {
-        if (("DATE_FORMAT".equals(name) || "DATE_TO_STRING".equals(name)) && !args.isEmpty()) {
+    protected void registerMySQLFunctions() {
+        registerFunction(BuiltinSqlFunction.DATE_FORMAT, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
             sql.append("DATE_FORMAT(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", ");
             String fmt = args.size() > 1 ? String.valueOf(args.get(1)) : "yyyy-MM-dd HH:mm:ss";
             String myFmt = DateFormatPatternConverter.toMySQL(fmt);
             sql.append("'").append(myFmt).append("')");
-            return true;
-        }
-        if (("STR_TO_DATE".equals(name) || "TO_DATE".equals(name) || "STRING_TO_DATE".equals(name)) && !args.isEmpty()) {
+        });
+        registerFunction("DATE_TO_STRING", getFunctionRenderer(BuiltinSqlFunction.DATE_FORMAT));
+
+        registerFunction(BuiltinSqlFunction.STR_TO_DATE, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
             sql.append("STR_TO_DATE(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", ");
             String fmt = args.size() > 1 ? String.valueOf(args.get(1)) : "yyyy-MM-dd HH:mm:ss";
             String myFmt = DateFormatPatternConverter.toMySQL(fmt);
             sql.append("'").append(myFmt).append("')");
-            return true;
-        }
-        if ("DATE_ADD".equals(name) && args.size() >= 2) {
+        });
+        registerFunction("TO_DATE", getFunctionRenderer(BuiltinSqlFunction.STR_TO_DATE));
+        registerFunction("STRING_TO_DATE", getFunctionRenderer(BuiltinSqlFunction.STR_TO_DATE));
+
+        registerFunction(BuiltinSqlFunction.DATE_ADD, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
             Object amount = args.get(1);
             sql.append("DATE_ADD(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", INTERVAL ");
             if (amount instanceof Number) {
                 sql.append(amount);
             } else {
-                renderArg(amount, sql, params);
+                d.renderArg(amount, sql, params);
             }
             sql.append(" ").append(unit).append(")");
-            return true;
-        }
-        if ("DATEDIFF".equals(name) && args.size() >= 2) {
+        });
+
+        registerFunction(BuiltinSqlFunction.DATE_SUB, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
+            String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
+            Object amount = args.get(1);
+            sql.append("DATE_SUB(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(", INTERVAL ");
+            if (amount instanceof Number) {
+                sql.append(amount);
+            } else {
+                d.renderArg(amount, sql, params);
+            }
+            sql.append(" ").append(unit).append(")");
+        });
+
+        registerFunction(BuiltinSqlFunction.DATEDIFF, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             sql.append("DATEDIFF(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", ");
-            renderArg(args.get(1), sql, params);
+            d.renderArg(args.get(1), sql, params);
             sql.append(")");
-            return true;
-        }
-        if ("NOW".equals(name) || "CURRENT_TIMESTAMP".equals(name)) {
-            sql.append("NOW()");
-            return true;
-        }
-        if ("CURDATE".equals(name) || "CURRENT_DATE".equals(name)) {
-            sql.append("CURDATE()");
-            return true;
-        }
-        if ("CURTIME".equals(name) || "CURRENT_TIME".equals(name)) {
-            sql.append("CURTIME()");
-            return true;
-        }
-        if ("GROUP_CONCAT".equals(name) && !args.isEmpty()) {
+        });
+
+        registerFunction(BuiltinSqlFunction.NOW, (fn, args, sql, params, d) -> sql.append("NOW()"));
+        registerFunction("CURRENT_TIMESTAMP", getFunctionRenderer(BuiltinSqlFunction.NOW));
+
+        registerFunction(BuiltinSqlFunction.CURDATE, (fn, args, sql, params, d) -> sql.append("CURDATE()"));
+        registerFunction("CURRENT_DATE", getFunctionRenderer(BuiltinSqlFunction.CURDATE));
+
+        registerFunction(BuiltinSqlFunction.CURTIME, (fn, args, sql, params, d) -> sql.append("CURTIME()"));
+        registerFunction("CURRENT_TIME", getFunctionRenderer(BuiltinSqlFunction.CURTIME));
+
+        registerFunction(BuiltinSqlFunction.GROUP_CONCAT, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
             sql.append("GROUP_CONCAT(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             if (args.size() > 1) {
                 sql.append(" SEPARATOR ");
                 Object sep = args.get(1);
                 if (sep instanceof SqlExpression) {
-                    renderArg(sep, sql, params);
+                    d.renderArg(sep, sql, params);
                 } else {
                     sql.append("'").append(String.valueOf(sep).replace("'", "''")).append("'");
                 }
             }
             sql.append(")");
-            return true;
-        }
-        if (("TRUNCATE".equals(name) || "TRUNC".equals(name)) && !args.isEmpty()) {
+        });
+
+        registerFunction(BuiltinSqlFunction.TRUNCATE, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
             sql.append("TRUNCATE(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", ");
-            renderArg(args.size() > 1 ? args.get(1) : 0, sql, params);
+            d.renderArg(args.size() > 1 ? args.get(1) : 0, sql, params);
             sql.append(")");
-            return true;
-        }
-        if ("DATE_SUB".equals(name) && args.size() >= 2) {
-            String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
-            Object amount = args.get(1);
-            sql.append("DATE_SUB(");
-            renderArg(args.get(0), sql, params);
-            sql.append(", INTERVAL ");
-            if (amount instanceof Number) {
-                sql.append(amount);
-            } else {
-                renderArg(amount, sql, params);
-            }
-            sql.append(" ").append(unit).append(")");
-            return true;
-        }
-        if ("LAST_DAY".equals(name) && !args.isEmpty()) {
+        });
+        registerFunction(BuiltinSqlFunction.TRUNC, getFunctionRenderer(BuiltinSqlFunction.TRUNCATE));
+
+        registerFunction(BuiltinSqlFunction.LAST_DAY, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
             sql.append("LAST_DAY(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(")");
-            return true;
-        }
-        if ("NVL".equals(name) && args.size() >= 2) {
+        });
+
+        registerFunction(BuiltinSqlFunction.NVL, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             sql.append("IFNULL(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", ");
-            renderArg(args.get(1), sql, params);
+            d.renderArg(args.get(1), sql, params);
             sql.append(")");
-            return true;
-        }
-        if ("STRPOS".equals(name) && args.size() >= 2) {
+        });
+
+        registerFunction("STRPOS", (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             sql.append("INSTR(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", ");
-            renderArg(args.get(1), sql, params);
+            d.renderArg(args.get(1), sql, params);
             sql.append(")");
-            return true;
-        }
-        if ("LOCATE".equals(name) && args.size() >= 2) {
+        });
+
+        registerFunction(BuiltinSqlFunction.LOCATE, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             sql.append("LOCATE(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", ");
-            renderArg(args.get(1), sql, params);
+            d.renderArg(args.get(1), sql, params);
             sql.append(")");
-            return true;
-        }
-        if (("IIF".equals(name) || "IF".equals(name)) && args.size() >= 3) {
+        });
+
+        registerFunction(BuiltinSqlFunction.IIF, (fn, args, sql, params, d) -> {
+            if (args.size() < 3) return;
             sql.append("IF(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", ");
-            renderArg(args.get(1), sql, params);
+            d.renderArg(args.get(1), sql, params);
             sql.append(", ");
-            renderArg(args.get(2), sql, params);
+            d.renderArg(args.get(2), sql, params);
             sql.append(")");
-            return true;
-        }
-        if ("CAST".equals(name) && args.size() >= 2) {
+        });
+        registerFunction(BuiltinSqlFunction.IF, getFunctionRenderer(BuiltinSqlFunction.IIF));
+
+        registerFunction(BuiltinSqlFunction.CAST, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             String type = String.valueOf(args.get(1)).toUpperCase();
             if ("VARCHAR".equals(type) || "TEXT".equals(type) || "STRING".equals(type)) type = "CHAR";
             else if ("INT".equals(type) || "INTEGER".equals(type) || "BIGINT".equals(type)) type = "SIGNED";
             else if ("FLOAT".equals(type) || "DOUBLE".equals(type)) type = "DECIMAL(18,4)";
             sql.append("CAST(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(" AS ").append(type).append(")");
-            return true;
-        }
-        return super.renderDialectSpecificFunction(name, args, sql, params);
+        });
     }
 }

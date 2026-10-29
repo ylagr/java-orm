@@ -1,12 +1,89 @@
 package com.javaorm.core.dialect;
 
 import com.javaorm.core.ast.*;
+import com.javaorm.core.function.BuiltinSqlFunction;
+import com.javaorm.core.function.FunctionRenderer;
+import com.javaorm.core.function.SqlFunction;
 import com.javaorm.core.operator.SqlOperator;
 
 import java.lang.reflect.Method;
 import java.util.*;
 
 public abstract class AbstractDialect implements Dialect {
+
+    protected final Map<String, FunctionRenderer> functionRenderers = new HashMap<>();
+    protected final Map<String, com.javaorm.core.operator.OperatorRenderer> operatorRenderers = new HashMap<>();
+
+    public AbstractDialect() {
+        registerDefaultFunctions();
+    }
+
+    @Override
+    public void registerFunction(SqlFunction function, FunctionRenderer renderer) {
+        if (function != null && renderer != null) {
+            functionRenderers.put(function.getName().toUpperCase(), renderer);
+        }
+    }
+
+    @Override
+    public void registerFunction(String functionName, FunctionRenderer renderer) {
+        if (functionName != null && renderer != null) {
+            functionRenderers.put(functionName.trim().toUpperCase(), renderer);
+        }
+    }
+
+    @Override
+    public FunctionRenderer getFunctionRenderer(SqlFunction function) {
+        if (function == null) return null;
+        return functionRenderers.get(function.getName().toUpperCase());
+    }
+
+    @Override
+    public FunctionRenderer getFunctionRenderer(String functionName) {
+        if (functionName == null) return null;
+        return functionRenderers.get(functionName.trim().toUpperCase());
+    }
+
+    @Override
+    public void registerOperator(SqlOperator operator, com.javaorm.core.operator.OperatorRenderer renderer) {
+        if (operator != null && renderer != null) {
+            operatorRenderers.put(operator.getName().toUpperCase(), renderer);
+            operatorRenderers.put(operator.getSql().toUpperCase(), renderer);
+        }
+    }
+
+    @Override
+    public void registerOperator(String operatorName, com.javaorm.core.operator.OperatorRenderer renderer) {
+        if (operatorName != null && renderer != null) {
+            operatorRenderers.put(operatorName.trim().toUpperCase(), renderer);
+        }
+    }
+
+    @Override
+    public com.javaorm.core.operator.OperatorRenderer getOperatorRenderer(SqlOperator operator) {
+        if (operator == null) return null;
+        com.javaorm.core.operator.OperatorRenderer renderer = operatorRenderers.get(operator.getName().toUpperCase());
+        if (renderer == null) {
+            renderer = operatorRenderers.get(operator.getSql().toUpperCase());
+        }
+        return renderer;
+    }
+
+    @Override
+    public com.javaorm.core.operator.OperatorRenderer getOperatorRenderer(String operatorName) {
+        if (operatorName == null) return null;
+        return operatorRenderers.get(operatorName.trim().toUpperCase());
+    }
+
+    @Override
+    public String renderOperator(SqlOperator operator) {
+        if (operator == null) return "";
+        com.javaorm.core.operator.OperatorRenderer renderer = getOperatorRenderer(operator);
+        if (renderer != null) {
+            return renderer.render(operator, this);
+        }
+        return operator.getSql();
+    }
 
     @Override
     public SqlAndParams buildSelect(SelectStatement stmt) {
@@ -225,6 +302,17 @@ public abstract class AbstractDialect implements Dialect {
         return quote(alias) + ".";
     }
 
+    protected boolean isOp(SqlOperator op, SqlOperator... targets) {
+        if (op == null || targets == null) return false;
+        for (SqlOperator target : targets) {
+            if (op == target) return true;
+            if (target != null && (op.getSql().equalsIgnoreCase(target.getSql()) || op.getName().equalsIgnoreCase(target.getName()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     protected void renderSingleCondition(Condition cond, StringBuilder sql, List<Object> params) {
         if (cond instanceof BinaryCondition) {
             BinaryCondition bc = (BinaryCondition) cond;
@@ -232,8 +320,8 @@ public abstract class AbstractDialect implements Dialect {
             Object[] values = bc.getValues();
             Object firstVal = (values != null && values.length > 0) ? values[0] : null;
 
-            if ((op == SqlOperator.IN || op == SqlOperator.NOT_IN) && firstVal instanceof Collection && ((Collection<?>) firstVal).isEmpty()) {
-                if (op == SqlOperator.IN) {
+            if (isOp(op, SqlOperator.IN, SqlOperator.NOT_IN) && firstVal instanceof Collection && ((Collection<?>) firstVal).isEmpty()) {
+                if (isOp(op, SqlOperator.IN)) {
                     sql.append("1 = 0");
                 } else {
                     sql.append("1 = 1");
@@ -246,22 +334,22 @@ public abstract class AbstractDialect implements Dialect {
             }
             sql.append(quote(bc.getColumnName())).append(" ");
 
-            if (op == SqlOperator.EQ && (firstVal == null || (values != null && values.length == 0))) {
+            if (isOp(op, SqlOperator.EQ) && (firstVal == null || (values != null && values.length == 0))) {
                 sql.append("IS NULL");
                 return;
             }
-            if (op == SqlOperator.NE && (firstVal == null || (values != null && values.length == 0))) {
+            if (isOp(op, SqlOperator.NE) && (firstVal == null || (values != null && values.length == 0))) {
                 sql.append("IS NOT NULL");
                 return;
             }
 
-            sql.append(op.getSql());
+            sql.append(renderOperator(op));
             renderOperatorValues(op, bc.getValues(), sql, params);
         } else if (cond instanceof ExpressionCondition) {
             ExpressionCondition ec = (ExpressionCondition) cond;
             renderExpression(ec.getExpression(), sql, params);
             if (ec.getOperator() != null) {
-                sql.append(" ").append(ec.getOperator().getSql());
+                sql.append(" ").append(renderOperator(ec.getOperator()));
                 renderOperatorValues(ec.getOperator(), ec.getValues(), sql, params);
             }
         } else if (cond instanceof ColumnEqualityCondition) {
@@ -288,10 +376,10 @@ public abstract class AbstractDialect implements Dialect {
     }
 
     protected void renderOperatorValues(SqlOperator op, Object[] values, StringBuilder sql, List<Object> params) {
-        if (op == SqlOperator.IS_NULL || op == SqlOperator.IS_NOT_NULL) {
+        if (isOp(op, SqlOperator.IS_NULL, SqlOperator.IS_NOT_NULL)) {
             return;
         }
-        if (op == SqlOperator.BETWEEN) {
+        if (isOp(op, SqlOperator.BETWEEN)) {
             sql.append(" ? AND ?");
             if (values != null && values.length >= 2) {
                 params.add(values[0]);
@@ -299,7 +387,7 @@ public abstract class AbstractDialect implements Dialect {
             }
             return;
         }
-        if (op == SqlOperator.IN || op == SqlOperator.NOT_IN) {
+        if (isOp(op, SqlOperator.IN, SqlOperator.NOT_IN)) {
             sql.append(" (");
             Object val = (values != null && values.length > 0) ? values[0] : null;
             if (val instanceof Collection) {
@@ -417,8 +505,15 @@ public abstract class AbstractDialect implements Dialect {
     }
 
     public void renderFunction(FunctionExpression fn, StringBuilder sql, List<Object> params) {
-        String name = fn.getFunctionName().toUpperCase();
+        SqlFunction func = fn.getFunction();
+        String name = func != null ? func.getName().toUpperCase() : fn.getFunctionName().toUpperCase();
         List<Object> args = fn.getArguments();
+
+        FunctionRenderer renderer = getFunctionRenderer(name);
+        if (renderer != null) {
+            renderer.render(func != null ? func : SqlFunction.of(name), args, sql, params, this);
+            return;
+        }
 
         if (renderDialectSpecificFunction(name, args, sql, params)) {
             return;
@@ -436,7 +531,8 @@ public abstract class AbstractDialect implements Dialect {
         sql.append(")");
     }
 
-    protected void renderArg(Object arg, StringBuilder sql, List<Object> params) {
+    @Override
+    public void renderArg(Object arg, StringBuilder sql, List<Object> params) {
         if (arg instanceof SqlExpression) {
             renderExpression((SqlExpression) arg, sql, params);
         } else {
@@ -445,146 +541,161 @@ public abstract class AbstractDialect implements Dialect {
         }
     }
 
-    protected boolean renderDialectSpecificFunction(String name, List<Object> args, StringBuilder sql, List<Object> params) {
-        if (("DATE_FORMAT".equals(name) || "DATE_TO_STRING".equals(name)) && !args.isEmpty()) {
+    protected void registerDefaultFunctions() {
+        registerFunction(BuiltinSqlFunction.DATE_FORMAT, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
             sql.append("FORMATDATETIME(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", ");
             String fmt = args.size() > 1 ? String.valueOf(args.get(1)) : "yyyy-MM-dd HH:mm:ss";
             String h2Fmt = DateFormatPatternConverter.toH2(fmt);
             sql.append("'").append(h2Fmt).append("')");
-            return true;
-        }
-        if (("STR_TO_DATE".equals(name) || "TO_DATE".equals(name) || "STRING_TO_DATE".equals(name)) && !args.isEmpty()) {
+        });
+        registerFunction("DATE_TO_STRING", getFunctionRenderer(BuiltinSqlFunction.DATE_FORMAT));
+
+        registerFunction(BuiltinSqlFunction.STR_TO_DATE, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
             sql.append("PARSEDATETIME(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(", ");
             String fmt = args.size() > 1 ? String.valueOf(args.get(1)) : "yyyy-MM-dd HH:mm:ss";
             String h2Fmt = DateFormatPatternConverter.toH2(fmt);
             sql.append("'").append(h2Fmt).append("')");
-            return true;
-        }
-        if ("DATE_ADD".equals(name) && args.size() >= 2) {
+        });
+        registerFunction("TO_DATE", getFunctionRenderer(BuiltinSqlFunction.STR_TO_DATE));
+        registerFunction("STRING_TO_DATE", getFunctionRenderer(BuiltinSqlFunction.STR_TO_DATE));
+
+        registerFunction(BuiltinSqlFunction.DATE_ADD, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
             Object amount = args.get(1);
             sql.append("DATEADD('").append(unit).append("', ");
             if (amount instanceof Number) {
                 sql.append(amount);
             } else {
-                renderArg(amount, sql, params);
+                d.renderArg(amount, sql, params);
             }
             sql.append(", ");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(")");
-            return true;
-        }
-        if ("DATEDIFF".equals(name) && args.size() >= 2) {
-            sql.append("DATEDIFF('DAY', ");
-            renderArg(args.get(1), sql, params);
-            sql.append(", ");
-            renderArg(args.get(0), sql, params);
-            sql.append(")");
-            return true;
-        }
-        if ("NOW".equals(name) || "CURRENT_TIMESTAMP".equals(name)) {
-            sql.append("CURRENT_TIMESTAMP");
-            return true;
-        }
-        if ("CURDATE".equals(name) || "CURRENT_DATE".equals(name)) {
-            sql.append("CURRENT_DATE");
-            return true;
-        }
-        if ("CURTIME".equals(name) || "CURRENT_TIME".equals(name)) {
-            sql.append("CURRENT_TIME");
-            return true;
-        }
-        if ("DAYOFWEEK".equals(name) && !args.isEmpty()) {
-            sql.append("DAYOFWEEK(");
-            renderArg(args.get(0), sql, params);
-            sql.append(")");
-            return true;
-        }
-        if ("DAYOFYEAR".equals(name) && !args.isEmpty()) {
-            sql.append("DAYOFYEAR(");
-            renderArg(args.get(0), sql, params);
-            sql.append(")");
-            return true;
-        }
-        if ("GROUP_CONCAT".equals(name) && !args.isEmpty()) {
-            sql.append("GROUP_CONCAT(");
-            renderArg(args.get(0), sql, params);
-            if (args.size() > 1) {
-                sql.append(" SEPARATOR ");
-                Object sep = args.get(1);
-                if (sep instanceof SqlExpression) {
-                    renderArg(sep, sql, params);
-                } else {
-                    sql.append("'").append(String.valueOf(sep).replace("'", "''")).append("'");
-                }
-            }
-            sql.append(")");
-            return true;
-        }
-        if (("TRUNCATE".equals(name) || "TRUNC".equals(name)) && !args.isEmpty()) {
-            sql.append("TRUNC(");
-            renderArg(args.get(0), sql, params);
-            if (args.size() > 1) {
-                sql.append(", ");
-                renderArg(args.get(1), sql, params);
-            }
-            sql.append(")");
-            return true;
-        }
-        if ("DATE_SUB".equals(name) && args.size() >= 2) {
+        });
+
+        registerFunction(BuiltinSqlFunction.DATE_SUB, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
             Object amount = args.get(1);
             sql.append("DATEADD('").append(unit).append("', -(");
             if (amount instanceof Number) {
                 sql.append(amount);
             } else {
-                renderArg(amount, sql, params);
+                d.renderArg(amount, sql, params);
             }
             sql.append("), ");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(")");
-            return true;
-        }
-        if ("LAST_DAY".equals(name) && !args.isEmpty()) {
-            sql.append("DATEADD('DAY', -1, DATEADD('MONTH', 1, DATEADD('DAY', -(DAYOFMONTH(");
-            renderArg(args.get(0), sql, params);
-            sql.append(") - 1), ");
-            renderArg(args.get(0), sql, params);
-            sql.append(")))");
-            return true;
-        }
-        if ("NVL".equals(name) && args.size() >= 2) {
-            sql.append("IFNULL(");
-            renderArg(args.get(0), sql, params);
+        });
+
+        registerFunction(BuiltinSqlFunction.DATEDIFF, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
+            sql.append("DATEDIFF('DAY', ");
+            d.renderArg(args.get(1), sql, params);
             sql.append(", ");
-            renderArg(args.get(1), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(")");
-            return true;
-        }
-        if (("IIF".equals(name) || "IF".equals(name)) && args.size() >= 3) {
+        });
+
+        registerFunction(BuiltinSqlFunction.NOW, (fn, args, sql, params, d) -> sql.append("CURRENT_TIMESTAMP"));
+        registerFunction("CURRENT_TIMESTAMP", getFunctionRenderer(BuiltinSqlFunction.NOW));
+
+        registerFunction(BuiltinSqlFunction.CURDATE, (fn, args, sql, params, d) -> sql.append("CURRENT_DATE"));
+        registerFunction("CURRENT_DATE", getFunctionRenderer(BuiltinSqlFunction.CURDATE));
+
+        registerFunction(BuiltinSqlFunction.CURTIME, (fn, args, sql, params, d) -> sql.append("CURRENT_TIME"));
+        registerFunction("CURRENT_TIME", getFunctionRenderer(BuiltinSqlFunction.CURTIME));
+
+        registerFunction(BuiltinSqlFunction.DAYOFWEEK, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("DAYOFWEEK(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(")");
+        });
+
+        registerFunction(BuiltinSqlFunction.DAYOFYEAR, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("DAYOFYEAR(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(")");
+        });
+
+        registerFunction(BuiltinSqlFunction.GROUP_CONCAT, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("GROUP_CONCAT(");
+            d.renderArg(args.get(0), sql, params);
+            if (args.size() > 1) {
+                sql.append(" SEPARATOR ");
+                Object sep = args.get(1);
+                if (sep instanceof SqlExpression) {
+                    d.renderArg(sep, sql, params);
+                } else {
+                    sql.append("'").append(String.valueOf(sep).replace("'", "''")).append("'");
+                }
+            }
+            sql.append(")");
+        });
+
+        registerFunction(BuiltinSqlFunction.TRUNCATE, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("TRUNC(");
+            d.renderArg(args.get(0), sql, params);
+            if (args.size() > 1) {
+                sql.append(", ");
+                d.renderArg(args.get(1), sql, params);
+            }
+            sql.append(")");
+        });
+        registerFunction(BuiltinSqlFunction.TRUNC, getFunctionRenderer(BuiltinSqlFunction.TRUNCATE));
+
+        registerFunction(BuiltinSqlFunction.LAST_DAY, (fn, args, sql, params, d) -> {
+            if (args.isEmpty()) return;
+            sql.append("DATEADD('DAY', -1, DATEADD('MONTH', 1, DATEADD('DAY', -(DAYOFMONTH(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(") - 1), ");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(")))");
+        });
+
+        registerFunction(BuiltinSqlFunction.NVL, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
+            sql.append("IFNULL(");
+            d.renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            d.renderArg(args.get(1), sql, params);
+            sql.append(")");
+        });
+
+        registerFunction(BuiltinSqlFunction.IIF, (fn, args, sql, params, d) -> {
+            if (args.size() < 3) return;
             sql.append("CASE WHEN ");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(" THEN ");
-            renderArg(args.get(1), sql, params);
+            d.renderArg(args.get(1), sql, params);
             sql.append(" ELSE ");
-            renderArg(args.get(2), sql, params);
+            d.renderArg(args.get(2), sql, params);
             sql.append(" END");
-            return true;
-        }
-        if ("PI".equals(name)) {
-            sql.append("PI()");
-            return true;
-        }
-        if ("CAST".equals(name) && args.size() >= 2) {
+        });
+        registerFunction(BuiltinSqlFunction.IF, getFunctionRenderer(BuiltinSqlFunction.IIF));
+
+        registerFunction(BuiltinSqlFunction.PI, (fn, args, sql, params, d) -> sql.append("PI()"));
+
+        registerFunction(BuiltinSqlFunction.CAST, (fn, args, sql, params, d) -> {
+            if (args.size() < 2) return;
             sql.append("CAST(");
-            renderArg(args.get(0), sql, params);
+            d.renderArg(args.get(0), sql, params);
             sql.append(" AS ").append(String.valueOf(args.get(1)).replace("'", "")).append(")");
-            return true;
-        }
+        });
+    }
+
+    protected boolean renderDialectSpecificFunction(String name, List<Object> args, StringBuilder sql, List<Object> params) {
         return false;
     }
 
