@@ -117,14 +117,14 @@ public class WhereConditionAndFlatApiTest {
     public void testOldTwoStageApiConditionSupport() {
         Student s = orm.proxy(Student.class);
 
-        // 3.1 and(false, ...) 阻断
+        // 3.1 两阶段 API 在 eq(condition, ...) / gt(condition, ...) 上阻断
         SqlAndParams sp1 = orm.select(Student.class)
                 .where()
-                    .and(false, s.getAge()).eq(18)
-                    .and(false, "studentName").eq("Jack")
-                    .and(false, Student::getAge).gt(20)
-                    .and(false, min(s.getAge())).gt(10)
-                    .and(true, s.getAge()).eq(30)
+                    .and(s.getAge()).eq(false, 18)
+                    .and("studentName").eq(false, "Jack")
+                    .and(Student::getAge).gt(false, 20)
+                    .and(min(s.getAge())).gt(false, 10)
+                    .and(s.getAge()).eq(true, 30)
                 .toSqlAndParams();
 
         String sql1 = sp1.getSql();
@@ -153,6 +153,18 @@ public class WhereConditionAndFlatApiTest {
         assertTrue("Must contain 35: " + sql2, sql2.contains("t0.\"age\" = ?"));
         assertEquals(2, sp2.getParams().size());
         assertNull("ThreadLocal must be clean after sp2", RecordingContext.finish());
+
+        // 3.3 两阶段 API 字段与字段比较以及 condition 阻断
+        SqlAndParams sp3 = orm.select(Student.class)
+                .where()
+                    .and(s.getAge()).eq(false, s.getId())
+                    .and(s.getAge()).eq(true, s.getTeacherId())
+                .toSqlAndParams();
+
+        String sql3 = sp3.getSql();
+        assertFalse("Must not compare with id: " + sql3, sql3.contains("t0.\"id\""));
+        assertTrue("Must compare age with teacher_id: " + sql3, sql3.contains("t0.\"age\" = t0.\"teacher_id\""));
+        assertNull("ThreadLocal must be clean after sp3", RecordingContext.finish());
     }
 
     /**

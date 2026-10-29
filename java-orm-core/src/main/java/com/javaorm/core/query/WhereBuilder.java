@@ -40,7 +40,6 @@ public class WhereBuilder<T> {
 
     private LogicalOperator currentLogOp = LogicalOperator.AND;
     private Object currentLeftOperand = null;
-    private boolean currentCondition = true;
 
     @SuppressWarnings("rawtypes")
     private final PropertyOperator reusableOperator;
@@ -88,7 +87,7 @@ public class WhereBuilder<T> {
         this.sqlAndParamsSupplier = sqlAndParamsSupplier;
         this.printSqlConsumer = printSqlConsumer;
         this.reusableOperator = new PropertyOperator<>(this, (op, values) -> {
-            dispatchCurrentCondition(this.currentCondition, this.currentLogOp, this.currentLeftOperand, op, values);
+            dispatchCurrentCondition(this.currentLogOp, this.currentLeftOperand, op, values);
         });
     }
 
@@ -114,20 +113,14 @@ public class WhereBuilder<T> {
     }
 
     public void cancelCurrentCondition() {
-        this.currentCondition = true;
         this.currentLogOp = LogicalOperator.AND;
         this.currentLeftOperand = null;
         RecordingContext.clearRecording();
     }
 
-    void dispatchCurrentCondition(boolean condition, LogicalOperator logOp, Object leftOperand, SqlOperator op, Object... vals) {
-        this.currentCondition = true;
+    void dispatchCurrentCondition(LogicalOperator logOp, Object leftOperand, SqlOperator op, Object... vals) {
         this.currentLogOp = LogicalOperator.AND;
         this.currentLeftOperand = null;
-        if (!condition) {
-            RecordingContext.clearRecording();
-            return;
-        }
         addResolvedCondition(logOp, leftOperand, op, vals);
     }
 
@@ -225,12 +218,6 @@ public class WhereBuilder<T> {
 
     @SuppressWarnings("unchecked")
     public <R> PropertyOperator<WhereBuilder<T>, R> and(R val) {
-        return and(true, val);
-    }
-
-    @SuppressWarnings("unchecked")
-    public <R> PropertyOperator<WhereBuilder<T>, R> and(boolean condition, R val) {
-        this.currentCondition = condition;
         this.currentLogOp = LogicalOperator.AND;
         PropertyPath recorded = RecordingContext.finishCurrent();
         if (recorded != null) {
@@ -243,14 +230,8 @@ public class WhereBuilder<T> {
 
     @SuppressWarnings("unchecked")
     public <R> PropertyOperator<WhereBuilder<T>, R> and(Function<T, R> getter) {
-        return and(true, getter);
-    }
-
-    @SuppressWarnings("unchecked")
-    public <R> PropertyOperator<WhereBuilder<T>, R> and(boolean condition, Function<T, R> getter) {
-        this.currentCondition = condition;
         this.currentLogOp = LogicalOperator.AND;
-        if (condition && getter != null) {
+        if (getter != null) {
             this.currentLeftOperand = recordPath(getter);
         } else {
             this.currentLeftOperand = null;
@@ -260,12 +241,6 @@ public class WhereBuilder<T> {
 
     @SuppressWarnings("unchecked")
     public <R> PropertyOperator<WhereBuilder<T>, R> and(SqlExpression<R> expr) {
-        return and(true, expr);
-    }
-
-    @SuppressWarnings("unchecked")
-    public <R> PropertyOperator<WhereBuilder<T>, R> and(boolean condition, SqlExpression<R> expr) {
-        this.currentCondition = condition;
         this.currentLogOp = LogicalOperator.AND;
         if (expr != null && rootQuery != null) {
             rootQuery.resolveExpression(expr);
@@ -276,12 +251,6 @@ public class WhereBuilder<T> {
 
     @SuppressWarnings("unchecked")
     public <R> PropertyOperator<WhereBuilder<T>, R> and(String propertyOrColumn) {
-        return and(true, propertyOrColumn);
-    }
-
-    @SuppressWarnings("unchecked")
-    public <R> PropertyOperator<WhereBuilder<T>, R> and(boolean condition, String propertyOrColumn) {
-        this.currentCondition = condition;
         this.currentLogOp = LogicalOperator.AND;
         PropertyPath recorded = RecordingContext.finishCurrent();
         if (recorded != null) {
@@ -292,27 +261,8 @@ public class WhereBuilder<T> {
         return (PropertyOperator<WhereBuilder<T>, R>) this.reusableOperator;
     }
 
-    public <R> PropertyOperator<WhereBuilder<T>, R> andIf(boolean condition, R val) {
-        return and(condition, val);
-    }
-    public <R> PropertyOperator<WhereBuilder<T>, R> andIf(boolean condition, Function<T, R> getter) {
-        return and(condition, getter);
-    }
-    public <R> PropertyOperator<WhereBuilder<T>, R> andIf(boolean condition, SqlExpression<R> expr) {
-        return and(condition, expr);
-    }
-    public <R> PropertyOperator<WhereBuilder<T>, R> andIf(boolean condition, String propertyOrColumn) {
-        return and(condition, propertyOrColumn);
-    }
-
     @SuppressWarnings("unchecked")
     public <R> PropertyOperator<WhereBuilder<T>, R> or(R val) {
-        return or(true, val);
-    }
-
-    @SuppressWarnings("unchecked")
-    public <R> PropertyOperator<WhereBuilder<T>, R> or(boolean condition, R val) {
-        this.currentCondition = condition;
         this.currentLogOp = LogicalOperator.OR;
         PropertyPath recorded = RecordingContext.finishCurrent();
         if (recorded != null) {
@@ -325,14 +275,8 @@ public class WhereBuilder<T> {
 
     @SuppressWarnings("unchecked")
     public <R> PropertyOperator<WhereBuilder<T>, R> or(Function<T, R> getter) {
-        return or(true, getter);
-    }
-
-    @SuppressWarnings("unchecked")
-    public <R> PropertyOperator<WhereBuilder<T>, R> or(boolean condition, Function<T, R> getter) {
-        this.currentCondition = condition;
         this.currentLogOp = LogicalOperator.OR;
-        if (condition && getter != null) {
+        if (getter != null) {
             this.currentLeftOperand = recordPath(getter);
         } else {
             this.currentLeftOperand = null;
@@ -342,12 +286,6 @@ public class WhereBuilder<T> {
 
     @SuppressWarnings("unchecked")
     public <R> PropertyOperator<WhereBuilder<T>, R> or(SqlExpression<R> expr) {
-        return or(true, expr);
-    }
-
-    @SuppressWarnings("unchecked")
-    public <R> PropertyOperator<WhereBuilder<T>, R> or(boolean condition, SqlExpression<R> expr) {
-        this.currentCondition = condition;
         this.currentLogOp = LogicalOperator.OR;
         if (expr != null && rootQuery != null) {
             rootQuery.resolveExpression(expr);
@@ -358,12 +296,6 @@ public class WhereBuilder<T> {
 
     @SuppressWarnings("unchecked")
     public <R> PropertyOperator<WhereBuilder<T>, R> or(String propertyOrColumn) {
-        return or(true, propertyOrColumn);
-    }
-
-    @SuppressWarnings("unchecked")
-    public <R> PropertyOperator<WhereBuilder<T>, R> or(boolean condition, String propertyOrColumn) {
-        this.currentCondition = condition;
         this.currentLogOp = LogicalOperator.OR;
         PropertyPath recorded = RecordingContext.finishCurrent();
         if (recorded != null) {
@@ -372,19 +304,6 @@ public class WhereBuilder<T> {
             this.currentLeftOperand = propertyOrColumn;
         }
         return (PropertyOperator<WhereBuilder<T>, R>) this.reusableOperator;
-    }
-
-    public <R> PropertyOperator<WhereBuilder<T>, R> orIf(boolean condition, R val) {
-        return or(condition, val);
-    }
-    public <R> PropertyOperator<WhereBuilder<T>, R> orIf(boolean condition, Function<T, R> getter) {
-        return or(condition, getter);
-    }
-    public <R> PropertyOperator<WhereBuilder<T>, R> orIf(boolean condition, SqlExpression<R> expr) {
-        return or(condition, expr);
-    }
-    public <R> PropertyOperator<WhereBuilder<T>, R> orIf(boolean condition, String propertyOrColumn) {
-        return or(condition, propertyOrColumn);
     }
 
     public WhereBuilder<T> andRaw(String rawSql, Object... params) {
