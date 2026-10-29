@@ -7,8 +7,9 @@ import java.lang.annotation.Target;
 
 /**
  * 逻辑删除注解。
- * 标记该属性为逻辑删除标识，查询时框架自动过滤已删除记录，删除时自动执行 UPDATE。
+ * @deprecated 请使用 {@link JoLogicDelete}
  */
+@Deprecated
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface LogicDelete {

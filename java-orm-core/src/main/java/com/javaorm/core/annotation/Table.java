@@ -7,8 +7,9 @@ import java.lang.annotation.Target;
 
 /**
  * 标记实体对应的数据库表名（可选）。
- * 若省略，则默认按全局 NameConversion 规则将实体类名转为表名。
+ * @deprecated 请使用 {@link JoTable}
  */
+@Deprecated
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Table {

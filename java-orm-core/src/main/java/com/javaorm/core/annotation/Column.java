@@ -7,8 +7,9 @@ import java.lang.annotation.Target;
 
 /**
  * 标记实体属性对应的列名（可选）。
- * 若省略，则按全局 NameConversion 规则将字段驼峰命名转为下划线列名。
+ * @deprecated 请使用 {@link JoColumn}
  */
+@Deprecated
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Column {

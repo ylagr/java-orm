@@ -1,15 +1,15 @@
 package com.benchmark.entity.javaorm;
 
-import com.javaorm.core.annotation.Id;
-import com.javaorm.core.annotation.LogicDelete;
-import com.javaorm.core.annotation.Table;
+import com.javaorm.core.annotation.JoId;
+import com.javaorm.core.annotation.JoLogicDelete;
+import com.javaorm.core.annotation.JoTable;
 
 import java.time.LocalDateTime;
 
-@Table(name = "t_student")
+@JoTable(name = "t_student")
 public class Student {
 
-    @Id
+    @JoId
     private Long id;
 
     private String studentName;
@@ -20,7 +20,7 @@ public class Student {
 
     private Teacher teacher;
 
-    @LogicDelete(normalValue = "0", deletedValue = "1")
+    @JoLogicDelete(normalValue = "0", deletedValue = "1")
     private Integer isDeleted;
 
     private LocalDateTime createTime;

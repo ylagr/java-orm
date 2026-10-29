@@ -7,7 +7,9 @@ import java.lang.annotation.Target;
 
 /**
  * 标记主键生成策略
+ * @deprecated 请使用 {@link JoGeneratedValue}
  */
+@Deprecated
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface GeneratedValue {

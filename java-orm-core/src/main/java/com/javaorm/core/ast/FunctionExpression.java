@@ -9,12 +9,27 @@ public class FunctionExpression implements SqlExpression {
     private final String functionName;
     private final List<Object> arguments = new ArrayList<>();
     private String alias;
+    private boolean distinct;
 
     public FunctionExpression(String functionName, Object... args) {
         this.functionName = functionName;
         if (args != null && args.length > 0) {
             this.arguments.addAll(Arrays.asList(args));
         }
+    }
+
+    public FunctionExpression distinct() {
+        this.distinct = true;
+        return this;
+    }
+
+    public FunctionExpression distinct(boolean distinct) {
+        this.distinct = distinct;
+        return this;
+    }
+
+    public boolean isDistinct() {
+        return distinct;
     }
 
     @Override

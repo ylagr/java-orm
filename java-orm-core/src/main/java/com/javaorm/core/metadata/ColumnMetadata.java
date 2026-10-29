@@ -16,6 +16,8 @@ public class ColumnMetadata {
     private Object logicDeleteNormalValue;
     private Object logicDeleteDeletedValue;
     private boolean tenant;
+    private boolean autoFill;
+    private com.javaorm.core.annotation.AutoFillType autoFillType;
     private boolean ignored;
     private Field field;
     private Method getter;
@@ -175,6 +177,12 @@ public class ColumnMetadata {
 
     public boolean isTenant() { return tenant; }
     public void setTenant(boolean tenant) { this.tenant = tenant; }
+
+    public boolean isAutoFill() { return autoFill; }
+    public void setAutoFill(boolean autoFill) { this.autoFill = autoFill; }
+
+    public com.javaorm.core.annotation.AutoFillType getAutoFillType() { return autoFillType; }
+    public void setAutoFillType(com.javaorm.core.annotation.AutoFillType autoFillType) { this.autoFillType = autoFillType; }
 
     public boolean isIgnored() { return ignored; }
     public void setIgnored(boolean ignored) { this.ignored = ignored; }

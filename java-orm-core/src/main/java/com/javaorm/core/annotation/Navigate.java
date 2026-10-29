@@ -7,8 +7,9 @@ import java.lang.annotation.Target;
 
 /**
  * 实体导航属性注解（支持一对一、多对一、一对多等关联关系）。
- * 也可无缝使用标准 JPA @ManyToOne / @OneToMany / @JoinColumn 注解。
+ * @deprecated 请使用 {@link JoNavigate}
  */
+@Deprecated
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Navigate {

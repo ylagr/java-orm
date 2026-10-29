@@ -23,6 +23,16 @@ public class PropertyOperator<TQuery, R> {
         this.appender = (op, values) -> appender.append(path, op, values);
     }
 
+    public TQuery op(SqlOperator op, Object... values) {
+        if (values != null && values.length == 1) {
+            Object operand = resolveOperand(values[0]);
+            appender.append(op, operand);
+        } else {
+            appender.append(op, values);
+        }
+        return query;
+    }
+
     public TQuery eq(Object value) {
         Object operand = resolveOperand(value);
         if (operand == null) {

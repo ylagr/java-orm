@@ -1,14 +1,14 @@
 package com.javaorm.core.test.entity;
 
-import com.javaorm.core.annotation.Id;
-import com.javaorm.core.annotation.Table;
+import com.javaorm.core.annotation.JoId;
+import com.javaorm.core.annotation.JoTable;
 
 import java.util.List;
 
-@Table(name = "t_teacher")
+@JoTable(name = "t_teacher")
 public class Teacher {
 
-    @Id
+    @JoId
     private Long id;
 
     // 省略 @Column，自动根据 NameConversion 映射为 teacher_name

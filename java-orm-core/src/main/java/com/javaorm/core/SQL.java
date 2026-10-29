@@ -94,12 +94,24 @@ public class SQL {
         return new FunctionExpression("COUNT", toExpression(prop));
     }
 
+    public static FunctionExpression countDistinct(Object prop) {
+        return new FunctionExpression("COUNT", toExpression(prop)).distinct();
+    }
+
     public static FunctionExpression sum(Object prop) {
         return new FunctionExpression("SUM", toExpression(prop));
     }
 
+    public static FunctionExpression sumDistinct(Object prop) {
+        return new FunctionExpression("SUM", toExpression(prop)).distinct();
+    }
+
     public static FunctionExpression avg(Object prop) {
         return new FunctionExpression("AVG", toExpression(prop));
+    }
+
+    public static FunctionExpression avgDistinct(Object prop) {
+        return new FunctionExpression("AVG", toExpression(prop)).distinct();
     }
 
     public static FunctionExpression max(Object prop) {
@@ -108,6 +120,14 @@ public class SQL {
 
     public static FunctionExpression min(Object prop) {
         return new FunctionExpression("MIN", toExpression(prop));
+    }
+
+    public static FunctionExpression groupConcat(Object prop) {
+        return new FunctionExpression("GROUP_CONCAT", toExpression(prop));
+    }
+
+    public static FunctionExpression groupConcat(Object prop, String separator) {
+        return new FunctionExpression("GROUP_CONCAT", toExpression(prop), separator);
     }
 
     public static FunctionExpression stddev(Object prop) {
@@ -182,6 +202,86 @@ public class SQL {
     }
 
     // ==================== 日期时间函数 ====================
+    public static FunctionExpression dateFormat(Object prop, String pattern) {
+        return new FunctionExpression("DATE_FORMAT", toExpression(prop), pattern);
+    }
+
+    public static FunctionExpression dateFormat(Object prop) {
+        return dateFormat(prop, "yyyy-MM-dd HH:mm:ss");
+    }
+
+    public static FunctionExpression dateToString(Object prop, String pattern) {
+        return dateFormat(prop, pattern);
+    }
+
+    public static FunctionExpression dateToString(Object prop) {
+        return dateFormat(prop);
+    }
+
+    public static FunctionExpression strToDate(Object prop, String pattern) {
+        return new FunctionExpression("STR_TO_DATE", toExpression(prop), pattern);
+    }
+
+    public static FunctionExpression stringToDate(Object prop, String pattern) {
+        return strToDate(prop, pattern);
+    }
+
+    public static FunctionExpression toDate(Object prop, String pattern) {
+        return strToDate(prop, pattern);
+    }
+
+    public static FunctionExpression toDate(Object prop) {
+        return strToDate(prop, "yyyy-MM-dd HH:mm:ss");
+    }
+
+    public static FunctionExpression dateAdd(Object prop, Object amount, DateUnit unit) {
+        return new FunctionExpression("DATE_ADD", toExpression(prop), amount, unit.name());
+    }
+
+    public static FunctionExpression dateAdd(Object prop, Object amount, String unit) {
+        return new FunctionExpression("DATE_ADD", toExpression(prop), amount, unit);
+    }
+
+    public static FunctionExpression dateAdd(Object prop, Object amount) {
+        return dateAdd(prop, amount, DateUnit.DAY);
+    }
+
+    public static FunctionExpression dateAddDays(Object prop, Object days) {
+        return dateAdd(prop, days, DateUnit.DAY);
+    }
+
+    public static FunctionExpression dateAddMonths(Object prop, Object months) {
+        return dateAdd(prop, months, DateUnit.MONTH);
+    }
+
+    public static FunctionExpression dateAddYears(Object prop, Object years) {
+        return dateAdd(prop, years, DateUnit.YEAR);
+    }
+
+    public static FunctionExpression dateAddHours(Object prop, Object hours) {
+        return dateAdd(prop, hours, DateUnit.HOUR);
+    }
+
+    public static FunctionExpression dateAddMinutes(Object prop, Object minutes) {
+        return dateAdd(prop, minutes, DateUnit.MINUTE);
+    }
+
+    public static FunctionExpression dateAddSeconds(Object prop, Object seconds) {
+        return dateAdd(prop, seconds, DateUnit.SECOND);
+    }
+
+    public static FunctionExpression dateDiff(Object d1, Object d2) {
+        return new FunctionExpression("DATEDIFF", toExpressions(d1, d2));
+    }
+
+    public static FunctionExpression dayOfWeek(Object prop) {
+        return new FunctionExpression("DAYOFWEEK", toExpression(prop));
+    }
+
+    public static FunctionExpression dayOfYear(Object prop) {
+        return new FunctionExpression("DAYOFYEAR", toExpression(prop));
+    }
+
     public static FunctionExpression year(Object prop) {
         return new FunctionExpression("YEAR", toExpression(prop));
     }
@@ -210,13 +310,33 @@ public class SQL {
         return new FunctionExpression("NOW");
     }
 
+    public static FunctionExpression currentTimestamp() {
+        return now();
+    }
+
     public static FunctionExpression curDate() {
         return new FunctionExpression("CURDATE");
+    }
+
+    public static FunctionExpression currentDate() {
+        return curDate();
+    }
+
+    public static FunctionExpression curTime() {
+        return new FunctionExpression("CURTIME");
+    }
+
+    public static FunctionExpression currentTime() {
+        return curTime();
     }
 
     // ==================== 字符串函数 ====================
     public static FunctionExpression length(Object prop) {
         return new FunctionExpression("LENGTH", toExpression(prop));
+    }
+
+    public static FunctionExpression charLength(Object prop) {
+        return new FunctionExpression("CHAR_LENGTH", toExpression(prop));
     }
 
     public static FunctionExpression lower(Object prop) {
@@ -243,8 +363,35 @@ public class SQL {
         return new FunctionExpression("CONCAT", toExpressions(props));
     }
 
+    public static FunctionExpression concatWs(Object separator, Object... props) {
+        Object[] all = new Object[props.length + 1];
+        all[0] = separator;
+        System.arraycopy(props, 0, all, 1, props.length);
+        return new FunctionExpression("CONCAT_WS", toExpressions(all));
+    }
+
     public static FunctionExpression subString(Object prop, int start, int len) {
         return new FunctionExpression("SUBSTRING", toExpression(prop), start, len);
+    }
+
+    public static FunctionExpression subString(Object prop, int start) {
+        return new FunctionExpression("SUBSTRING", toExpression(prop), start);
+    }
+
+    public static FunctionExpression substring(Object prop, int start, int len) {
+        return subString(prop, start, len);
+    }
+
+    public static FunctionExpression substring(Object prop, int start) {
+        return subString(prop, start);
+    }
+
+    public static FunctionExpression substr(Object prop, int start, int len) {
+        return subString(prop, start, len);
+    }
+
+    public static FunctionExpression substr(Object prop, int start) {
+        return subString(prop, start);
     }
 
     public static FunctionExpression replace(Object prop, Object target, Object replacement) {
@@ -263,6 +410,26 @@ public class SQL {
         return new FunctionExpression("INSTR", toExpressions(str, substr));
     }
 
+    public static FunctionExpression lpad(Object prop, int len, Object pad) {
+        return new FunctionExpression("LPAD", toExpressions(prop, len, pad));
+    }
+
+    public static FunctionExpression rpad(Object prop, int len, Object pad) {
+        return new FunctionExpression("RPAD", toExpressions(prop, len, pad));
+    }
+
+    public static FunctionExpression reverse(Object prop) {
+        return new FunctionExpression("REVERSE", toExpression(prop));
+    }
+
+    public static FunctionExpression repeat(Object prop, int count) {
+        return new FunctionExpression("REPEAT", toExpression(prop), count);
+    }
+
+    public static FunctionExpression ascii(Object prop) {
+        return new FunctionExpression("ASCII", toExpression(prop));
+    }
+
     // ==================== 数值函数 ====================
     public static FunctionExpression abs(Object prop) {
         return new FunctionExpression("ABS", toExpression(prop));
@@ -272,8 +439,16 @@ public class SQL {
         return new FunctionExpression("ROUND", toExpression(prop), scale);
     }
 
+    public static FunctionExpression round(Object prop) {
+        return round(prop, 0);
+    }
+
     public static FunctionExpression ceil(Object prop) {
         return new FunctionExpression("CEIL", toExpression(prop));
+    }
+
+    public static FunctionExpression ceiling(Object prop) {
+        return ceil(prop);
     }
 
     public static FunctionExpression floor(Object prop) {
@@ -296,9 +471,41 @@ public class SQL {
         return new FunctionExpression("SIGN", toExpression(prop));
     }
 
+    public static FunctionExpression truncate(Object prop, int scale) {
+        return new FunctionExpression("TRUNCATE", toExpression(prop), scale);
+    }
+
+    public static FunctionExpression trunc(Object prop, int scale) {
+        return truncate(prop, scale);
+    }
+
+    public static FunctionExpression trunc(Object prop) {
+        return truncate(prop, 0);
+    }
+
+    public static FunctionExpression exp(Object prop) {
+        return new FunctionExpression("EXP", toExpression(prop));
+    }
+
+    public static FunctionExpression ln(Object prop) {
+        return new FunctionExpression("LN", toExpression(prop));
+    }
+
+    public static FunctionExpression log(Object prop) {
+        return ln(prop);
+    }
+
+    public static FunctionExpression log(Object base, Object prop) {
+        return new FunctionExpression("LOG", toExpressions(base, prop));
+    }
+
     // ==================== 空值控制与条件分支 ====================
     public static FunctionExpression ifNull(Object prop, Object def) {
         return new FunctionExpression("IFNULL", toExpression(prop), def);
+    }
+
+    public static FunctionExpression nvl(Object prop, Object def) {
+        return ifNull(prop, def);
     }
 
     public static FunctionExpression coalesce(Object... props) {
@@ -307,6 +514,14 @@ public class SQL {
 
     public static FunctionExpression nullIf(Object expr1, Object expr2) {
         return new FunctionExpression("NULLIF", toExpressions(expr1, expr2));
+    }
+
+    public static FunctionExpression greatest(Object... props) {
+        return new FunctionExpression("GREATEST", toExpressions(props));
+    }
+
+    public static FunctionExpression least(Object... props) {
+        return new FunctionExpression("LEAST", toExpressions(props));
     }
 
     public static CaseWhenBuilder caseWhen() {

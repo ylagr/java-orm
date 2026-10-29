@@ -31,7 +31,7 @@ public class Query<T> {
     private final Class<T> rootEntityClass;
     private final EntityMetadata rootMetadata;
     private final DataSource dataSource;
-    private final Dialect dialect;
+    private Dialect dialect;
     private final OrmConfig config;
     private Boolean printSqlOverride = null;
 
@@ -174,6 +174,11 @@ public class Query<T> {
         return effective;
     }
 
+    public Query<T> setDialect(Dialect dialect) {
+        this.dialect = dialect;
+        return this;
+    }
+
     /**
      * 随时获取当前生成的 SQL 及参数对象
      */
@@ -181,11 +186,19 @@ public class Query<T> {
         return dialect.buildSelect(statement);
     }
 
+    public com.javaorm.core.dialect.SqlAndParams toSqlAndParams(Dialect customDialect) {
+        return customDialect.buildSelect(statement);
+    }
+
     /**
      * 随时获取当前生成的 SQL 字符串
      */
     public String toSql() {
         return toSqlAndParams().getSql();
+    }
+
+    public String toSql(Dialect customDialect) {
+        return toSqlAndParams(customDialect).getSql();
     }
 
     @Override
@@ -317,6 +330,22 @@ public class Query<T> {
     public Query<T> where(WhereBuilder.BiWhereConsumer<T> consumer) {
         WhereBuilder<T> w = where();
         consumer.accept(w, w.proxy());
+        return this;
+    }
+
+    /**
+     * 直接单条件快速断言：orm.select(Student.class).where(s.getId(), SqlOperator.EQ, 1L)
+     */
+    public Query<T> where(SqlExpression expr, SqlOperator op, Object... values) {
+        where().and(expr).op(op, values);
+        return this;
+    }
+
+    public Query<T> where(Object prop, SqlOperator op, Object... values) {
+        if (prop instanceof SqlExpression) {
+            return where((SqlExpression) prop, op, values);
+        }
+        where().and(prop).op(op, values);
         return this;
     }
 
@@ -581,6 +610,16 @@ public class Query<T> {
         return new OrderByBuilder<>(this, statement, expr);
     }
 
+    public <R> Query<T> orderByAsc(R val) {
+        orderBy(val).asc();
+        return this;
+    }
+
+    public <R> Query<T> orderByDesc(R val) {
+        orderBy(val).desc();
+        return this;
+    }
+
     public Query<T> union(Object other) {
         statement.addUnion(new UnionClause(other, false));
         return this;
@@ -600,6 +639,12 @@ public class Query<T> {
 
     public Query<T> limit(int limit) {
         statement.setLimit(limit);
+        return this;
+    }
+
+    public Query<T> limit(int limit, int offset) {
+        statement.setLimit(limit);
+        statement.setOffset(offset);
         return this;
     }
 
@@ -655,6 +700,10 @@ public class Query<T> {
     }
 
     public List<Map<String, Object>> maps() {
+        return listMaps();
+    }
+
+    public List<Map<String, Object>> queryMaps() {
         return listMaps();
     }
 

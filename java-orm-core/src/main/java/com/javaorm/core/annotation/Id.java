@@ -7,8 +7,9 @@ import java.lang.annotation.Target;
 
 /**
  * 标记实体主键属性（可选）。
- * 若字段名为 "id"，即使不加 @Id 也会默认推断为主键。
+ * @deprecated 请使用 {@link JoId}
  */
+@Deprecated
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Id {

@@ -425,6 +425,9 @@ public abstract class AbstractDialect implements Dialect {
         }
 
         sql.append(name).append("(");
+        if (fn.isDistinct()) {
+            sql.append("DISTINCT ");
+        }
         for (int i = 0; i < args.size(); i++) {
             if (i > 0) sql.append(", ");
             Object arg = args.get(i);
@@ -443,6 +446,95 @@ public abstract class AbstractDialect implements Dialect {
     }
 
     protected boolean renderDialectSpecificFunction(String name, List<Object> args, StringBuilder sql, List<Object> params) {
+        if (("DATE_FORMAT".equals(name) || "DATE_TO_STRING".equals(name)) && !args.isEmpty()) {
+            sql.append("FORMATDATETIME(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            String fmt = args.size() > 1 ? String.valueOf(args.get(1)) : "yyyy-MM-dd HH:mm:ss";
+            String h2Fmt = DateFormatPatternConverter.toH2(fmt);
+            sql.append("'").append(h2Fmt).append("')");
+            return true;
+        }
+        if (("STR_TO_DATE".equals(name) || "TO_DATE".equals(name) || "STRING_TO_DATE".equals(name)) && !args.isEmpty()) {
+            sql.append("PARSEDATETIME(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", ");
+            String fmt = args.size() > 1 ? String.valueOf(args.get(1)) : "yyyy-MM-dd HH:mm:ss";
+            String h2Fmt = DateFormatPatternConverter.toH2(fmt);
+            sql.append("'").append(h2Fmt).append("')");
+            return true;
+        }
+        if ("DATE_ADD".equals(name) && args.size() >= 2) {
+            String unit = args.size() > 2 ? String.valueOf(args.get(2)).toUpperCase() : "DAY";
+            Object amount = args.get(1);
+            sql.append("DATEADD('").append(unit).append("', ");
+            if (amount instanceof Number) {
+                sql.append(amount);
+            } else {
+                renderArg(amount, sql, params);
+            }
+            sql.append(", ");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("DATEDIFF".equals(name) && args.size() >= 2) {
+            sql.append("DATEDIFF('DAY', ");
+            renderArg(args.get(1), sql, params);
+            sql.append(", ");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("NOW".equals(name) || "CURRENT_TIMESTAMP".equals(name)) {
+            sql.append("CURRENT_TIMESTAMP");
+            return true;
+        }
+        if ("CURDATE".equals(name) || "CURRENT_DATE".equals(name)) {
+            sql.append("CURRENT_DATE");
+            return true;
+        }
+        if ("CURTIME".equals(name) || "CURRENT_TIME".equals(name)) {
+            sql.append("CURRENT_TIME");
+            return true;
+        }
+        if ("DAYOFWEEK".equals(name) && !args.isEmpty()) {
+            sql.append("DAYOFWEEK(");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("DAYOFYEAR".equals(name) && !args.isEmpty()) {
+            sql.append("DAYOFYEAR(");
+            renderArg(args.get(0), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("GROUP_CONCAT".equals(name) && !args.isEmpty()) {
+            sql.append("GROUP_CONCAT(");
+            renderArg(args.get(0), sql, params);
+            if (args.size() > 1) {
+                sql.append(" SEPARATOR ");
+                Object sep = args.get(1);
+                if (sep instanceof SqlExpression) {
+                    renderArg(sep, sql, params);
+                } else {
+                    sql.append("'").append(String.valueOf(sep).replace("'", "''")).append("'");
+                }
+            }
+            sql.append(")");
+            return true;
+        }
+        if (("TRUNCATE".equals(name) || "TRUNC".equals(name)) && !args.isEmpty()) {
+            sql.append("TRUNC(");
+            renderArg(args.get(0), sql, params);
+            if (args.size() > 1) {
+                sql.append(", ");
+                renderArg(args.get(1), sql, params);
+            }
+            sql.append(")");
+            return true;
+        }
         return false;
     }
 

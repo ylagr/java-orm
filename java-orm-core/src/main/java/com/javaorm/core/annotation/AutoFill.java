@@ -7,7 +7,9 @@ import java.lang.annotation.Target;
 
 /**
  * 字段自动填充注解（例如 create_time, update_time, creator 等）。
+ * @deprecated 请使用 {@link JoAutoFill}
  */
+@Deprecated
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface AutoFill {

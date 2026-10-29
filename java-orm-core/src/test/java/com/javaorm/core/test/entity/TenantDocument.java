@@ -1,20 +1,20 @@
 package com.javaorm.core.test.entity;
 
-import com.javaorm.core.annotation.Id;
-import com.javaorm.core.annotation.Table;
-import com.javaorm.core.annotation.TenantId;
+import com.javaorm.core.annotation.JoId;
+import com.javaorm.core.annotation.JoTable;
+import com.javaorm.core.annotation.JoTenantId;
 
-@Table(name = "t_tenant_document")
+@JoTable(name = "t_tenant_document")
 public class TenantDocument {
 
-    @Id
+    @JoId
     private Long id;
 
     private String title;
 
     private String content;
 
-    @TenantId
+    @JoTenantId
     private Long tenantId;
 
     public Long getId() {

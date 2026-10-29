@@ -1,14 +1,14 @@
 package com.benchmark.entity.javaorm;
 
-import com.javaorm.core.annotation.Id;
-import com.javaorm.core.annotation.Table;
+import com.javaorm.core.annotation.JoId;
+import com.javaorm.core.annotation.JoTable;
 
 import java.util.List;
 
-@Table(name = "t_teacher")
+@JoTable(name = "t_teacher")
 public class Teacher {
 
-    @Id
+    @JoId
     private Long id;
 
     private String teacherName;
