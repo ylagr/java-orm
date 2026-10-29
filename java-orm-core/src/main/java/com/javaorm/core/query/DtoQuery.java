@@ -167,8 +167,6 @@ public class DtoQuery<DTO, T> {
             return EntityHydrator.queryDtoList(conn, underlyingQuery.getStatement(), dtoClass, dialect, underlyingQuery.getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to query DTO list for " + dtoClass.getName(), e);
-        } finally {
-            Query.resetAliasSeq();
         }
     }
 

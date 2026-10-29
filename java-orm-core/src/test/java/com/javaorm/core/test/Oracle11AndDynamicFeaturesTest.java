@@ -402,4 +402,122 @@ public class Oracle11AndDynamicFeaturesTest {
         Query<Student> afterDelete = orm.select(Student.class);
         assertEquals("t0", afterDelete.getStatement().getRootTableAlias());
     }
+
+    /**
+     * 7. 测试错位写 SQL 的方式（如一个 SQL 写一半，另一个 SQL 开始写，验证 alias sequence 完全隔离且从 0 开始）
+     */
+    @Test
+    public void testInterleavedQueryConstruction() {
+        Student s = orm.proxy(Student.class);
+        Teacher t = orm.proxy(Teacher.class);
+
+        // 场景 1: 不同实体的两个查询错位交替书写（包含主表条件与 JOIN 级联关联）
+        // 1.1 第一个查询 q1 开始写
+        Query<Student> q1 = orm.select(Student.class);
+        WhereBuilder<Student> w1 = q1.where();
+        w1.and(s.getAge()).gt(18);
+
+        // 1.2 第二个查询 q2 在 q1 未完成时开始写
+        Query<Teacher> q2 = orm.select(Teacher.class);
+        WhereBuilder<Teacher> w2 = q2.where();
+        w2.and(t.getAge()).gt(30);
+
+        // 1.3 交替继续写 q1: 增加 join 级联条件
+        w1.and(s.getTeacher().getTeacherName()).like("Prof%");
+
+        // 1.4 交替继续写 q2: 增加主表条件
+        w2.and(t.getTitle()).eq("Dean");
+
+        // 1.5 交替继续写 q1: 增加主表条件
+        w1.and(s.getStudentName()).eq("Alice");
+
+        // 1.6 交替继续写 q2: 增加另一个主表条件
+        w2.and(t.getTeacherName()).like("Bob%");
+
+        String sql1 = q1.toSql();
+        String sql2 = q2.toSql();
+
+        // 验证 q1 别名完全从 t0 开始，其 join 表为 t1，无全局递增错位
+        assertEquals("t0", q1.getStatement().getRootTableAlias());
+        assertTrue("q1 should have FROM t_student t0", sql1.contains("FROM \"t_student\" t0"));
+        assertTrue("q1 should have LEFT JOIN t_teacher t1", sql1.contains("LEFT JOIN \"t_teacher\" t1"));
+        assertTrue("q1 should have t0.age > ?", sql1.contains("t0.\"age\" > ?"));
+        assertTrue("q1 should have t1.teacher_name LIKE ?", sql1.contains("t1.\"teacher_name\" LIKE ?"));
+        assertTrue("q1 should have t0.student_name = ?", sql1.contains("t0.\"student_name\" = ?"));
+
+        // 验证 q2 别名也独立从 t0 开始，未被 q1 污染成 t2 或 t3
+        assertEquals("t0", q2.getStatement().getRootTableAlias());
+        assertTrue("q2 should have FROM t_teacher t0", sql2.contains("FROM \"t_teacher\" t0"));
+        assertTrue("q2 should have t0.age > ?", sql2.contains("t0.\"age\" > ?"));
+        assertTrue("q2 should have t0.title = ?", sql2.contains("t0.\"title\" = ?"));
+        assertTrue("q2 should have t0.teacher_name LIKE ?", sql2.contains("t0.\"teacher_name\" LIKE ?"));
+
+        // 场景 2: 相同实体的两个查询错位交替书写
+        Query<Student> qA = orm.select(Student.class);
+        WhereBuilder<Student> wA = qA.where().and(s.getAge()).gt(20);
+
+        Query<Student> qB = orm.select(Student.class);
+        WhereBuilder<Student> wB = qB.where().and(s.getAge()).lt(25);
+
+        wA.and(s.getTeacher().getTeacherName()).eq("TeacherA");
+        wB.and(s.getTeacher().getTeacherName()).eq("TeacherB");
+
+        wA.and(s.getStudentName()).eq("StudentA");
+        wB.and(s.getStudentName()).eq("StudentB");
+
+        String sqlA = qA.toSql();
+        String sqlB = qB.toSql();
+
+        assertEquals("t0", qA.getStatement().getRootTableAlias());
+        assertEquals("t0", qB.getStatement().getRootTableAlias());
+        assertTrue(sqlA.contains("FROM \"t_student\" t0") && sqlA.contains("LEFT JOIN \"t_teacher\" t1"));
+        assertTrue(sqlB.contains("FROM \"t_student\" t0") && sqlB.contains("LEFT JOIN \"t_teacher\" t1"));
+        assertTrue(sqlA.contains("t0.\"student_name\" = ?"));
+        assertTrue(sqlB.contains("t0.\"student_name\" = ?"));
+
+        // 场景 3: 书写中间调用 toSql() 或执行查询，不破坏正在编写的其他查询状态
+        Query<Student> qX = orm.select(Student.class);
+        WhereBuilder<Student> wX = qX.where().and(s.getAge()).gt(18);
+        String sqlXPart = qX.toSql();
+        assertTrue(sqlXPart.contains("FROM \"t_student\" t0"));
+
+        // 中途开启并执行另一个完整查询
+        List<Teacher> teachers = orm.select(Teacher.class).where().and(t.getAge()).gt(30).list();
+        assertNotNull(teachers);
+
+        // 继续完成 qX 的书写
+        wX.and(s.getTeacher().getTeacherName()).like("Prof%");
+        String sqlXFull = qX.toSql();
+        assertEquals("t0", qX.getStatement().getRootTableAlias());
+        assertTrue(sqlXFull.contains("FROM \"t_student\" t0"));
+        assertTrue(sqlXFull.contains("LEFT JOIN \"t_teacher\" t1"));
+
+        // 场景 4: 错位书写中包含关联子查询
+        Query<Student> qOuter = orm.select(Student.class);
+        WhereBuilder<Student> wOuter = qOuter.where().and(s.getAge()).gt(18);
+
+        // 中途插入独立查询
+        Query<Teacher> qUnrelated = orm.select(Teacher.class);
+        qUnrelated.where().and(t.getAge()).gt(40);
+
+        // 为 qOuter 增加关联子查询
+        wOuter.andExists(
+                orm.select(t.getId())
+                        .from(Teacher.class)
+                        .where()
+                        .and(t.getId()).eq(s.getTeacherId())
+        );
+
+        String sqlOuter = qOuter.toSql();
+        String sqlUnrelated = qUnrelated.toSql();
+
+        // 独立查询仍为 t0
+        assertEquals("t0", qUnrelated.getStatement().getRootTableAlias());
+        assertTrue(sqlUnrelated.contains("FROM \"t_teacher\" t0"));
+
+        // 关联子查询自动避让外层 t0，子查询自身变为 t1，条件正确绑定 t1.id = t0.teacher_id
+        assertTrue(sqlOuter.contains("FROM \"t_student\" t0"));
+        assertTrue(sqlOuter.contains("FROM \"t_teacher\" t1"));
+        assertTrue(sqlOuter.contains("t1.\"id\" = t0.\"teacher_id\""));
+    }
 }

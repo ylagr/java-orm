@@ -6,9 +6,9 @@ package com.javaorm.core.ast;
 public class ColumnEqualityCondition implements Condition {
 
     private LogicalOperator logicalOperator = LogicalOperator.AND;
-    private final String leftTableAlias;
+    private String leftTableAlias;
     private final String leftColumn;
-    private final String rightTableAlias;
+    private String rightTableAlias;
     private final String rightColumn;
 
     public ColumnEqualityCondition(String leftTableAlias, String leftColumn, String rightTableAlias, String rightColumn) {
@@ -24,7 +24,12 @@ public class ColumnEqualityCondition implements Condition {
     public void setLogicalOperator(LogicalOperator logicalOperator) { this.logicalOperator = logicalOperator; }
 
     public String getLeftTableAlias() { return leftTableAlias; }
+    public void setLeftTableAlias(String leftTableAlias) { this.leftTableAlias = leftTableAlias; }
+
     public String getLeftColumn() { return leftColumn; }
+
     public String getRightTableAlias() { return rightTableAlias; }
+    public void setRightTableAlias(String rightTableAlias) { this.rightTableAlias = rightTableAlias; }
+
     public String getRightColumn() { return rightColumn; }
 }

@@ -35,10 +35,13 @@ public class Query<T> {
     private final SelectStatement statement;
     private final Map<String, String> relationJoinAliases = new LinkedHashMap<>();
     private final List<PropertyPath> includes = new ArrayList<>();
-    private static final ThreadLocal<Integer> ALIAS_SEQ = ThreadLocal.withInitial(() -> 0);
+    private int aliasSeq = 0;
+
+    public String nextAlias() {
+        return "t" + (aliasSeq++);
+    }
 
     public static void resetAliasSeq() {
-        ALIAS_SEQ.set(0);
         RecordingContext.clearAliases();
     }
 
@@ -58,15 +61,7 @@ public class Query<T> {
             return;
         }
 
-        // 如果当前线程没有活跃的表别名，或者当前实体已作为根实体存在（开启新查询），重置别名计数器从 0 开始
-        if (RecordingContext.getActiveAliasCount() == 0 || RecordingContext.getAlias(rootEntityClass) != null) {
-            ALIAS_SEQ.set(0);
-            RecordingContext.clearAliases();
-        }
-
-        int seq = ALIAS_SEQ.get();
-        ALIAS_SEQ.set(seq + 1);
-        String rootAlias = "t" + seq;
+        String rootAlias = nextAlias();
         this.statement = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), rootAlias);
         RecordingContext.registerAlias(rootEntityClass, rootAlias);
 
@@ -75,6 +70,10 @@ public class Query<T> {
             ColumnMetadata ld = rootMetadata.getLogicDeleteColumn();
             statement.addWhereCondition(new BinaryCondition(rootAlias, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
         }
+    }
+
+    public Class<T> getRootEntityClass() {
+        return rootEntityClass;
     }
 
     /**
@@ -110,11 +109,7 @@ public class Query<T> {
      * 随时获取当前生成的 SQL 及参数对象
      */
     public com.javaorm.core.dialect.SqlAndParams toSqlAndParams() {
-        try {
-            return dialect.buildSelect(statement);
-        } finally {
-            resetAliasSeq();
-        }
+        return dialect.buildSelect(statement);
     }
 
     /**
@@ -445,8 +440,6 @@ public class Query<T> {
             return result;
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute query list", e);
-        } finally {
-            resetAliasSeq();
         }
     }
 
@@ -455,8 +448,6 @@ public class Query<T> {
             return EntityHydrator.queryMaps(conn, statement, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute listMaps query", e);
-        } finally {
-            resetAliasSeq();
         }
     }
 
@@ -470,8 +461,6 @@ public class Query<T> {
             return EntityHydrator.queryScalar(conn, statement, targetType, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to fetch one scalar", e);
-        } finally {
-            resetAliasSeq();
         }
     }
 
@@ -480,8 +469,6 @@ public class Query<T> {
             return EntityHydrator.queryScalarList(conn, statement, targetType, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to fetch scalar list", e);
-        } finally {
-            resetAliasSeq();
         }
     }
 
@@ -509,8 +496,6 @@ public class Query<T> {
             return EntityHydrator.queryCount(conn, countStmt, dialect, getEffectiveConfig());
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute count query", e);
-        } finally {
-            resetAliasSeq();
         }
     }
 
@@ -598,11 +583,111 @@ public class Query<T> {
         if (!path.hasRelations()) {
             if (path.getRootEntityClass() != null && path.getRootEntityClass() != rootEntityClass) {
                 String reg = RecordingContext.getAlias(path.getRootEntityClass());
-                if (reg != null) return reg;
+                if (reg != null) {
+                    if (reg.equalsIgnoreCase(statement.getRootTableAlias())) {
+                        shiftRootTableAlias();
+                    }
+                    return reg;
+                }
             }
             return statement.getRootTableAlias();
         }
         return resolveJoinAlias(path);
+    }
+
+    public String shiftRootTableAlias() {
+        String oldAlias = statement.getRootTableAlias();
+        String newAlias = nextAlias();
+        while (RecordingContext.hasAlias(newAlias)) {
+            newAlias = nextAlias();
+        }
+        statement.setRootTableAlias(newAlias);
+        RecordingContext.registerAlias(rootEntityClass, newAlias);
+
+        for (SqlExpression expr : statement.getProjectExpressions()) {
+            updateExpressionTableAlias(expr, oldAlias, newAlias);
+        }
+        updateConditionsTableAlias(statement.getWhereConditions(), oldAlias, newAlias);
+        for (TableJoin join : statement.getJoins()) {
+            updateConditionsTableAlias(join.getOnConditions(), oldAlias, newAlias);
+        }
+        for (SqlExpression expr : statement.getGroupByExpressions()) {
+            updateExpressionTableAlias(expr, oldAlias, newAlias);
+        }
+        updateConditionsTableAlias(statement.getHavingConditions(), oldAlias, newAlias);
+        for (OrderBy ob : statement.getOrderBys()) {
+            if (ob.getExpression() != null) {
+                updateExpressionTableAlias(ob.getExpression(), oldAlias, newAlias);
+            }
+        }
+        return newAlias;
+    }
+
+    private void updateConditionsTableAlias(List<Condition> conditions, String oldAlias, String newAlias) {
+        if (conditions == null) return;
+        for (Condition cond : conditions) {
+            if (cond instanceof BinaryCondition) {
+                BinaryCondition bc = (BinaryCondition) cond;
+                if (oldAlias.equalsIgnoreCase(bc.getTableAlias())) {
+                    bc.setTableAlias(newAlias);
+                }
+                if (bc.getValues() != null) {
+                    for (Object v : bc.getValues()) {
+                        if (v instanceof SqlExpression) {
+                            updateExpressionTableAlias((SqlExpression) v, oldAlias, newAlias);
+                        }
+                    }
+                }
+            } else if (cond instanceof ColumnEqualityCondition) {
+                ColumnEqualityCondition cec = (ColumnEqualityCondition) cond;
+                if (oldAlias.equalsIgnoreCase(cec.getLeftTableAlias())) {
+                    cec.setLeftTableAlias(newAlias);
+                }
+                if (oldAlias.equalsIgnoreCase(cec.getRightTableAlias())) {
+                    cec.setRightTableAlias(newAlias);
+                }
+            } else if (cond instanceof ExpressionCondition) {
+                ExpressionCondition ec = (ExpressionCondition) cond;
+                updateExpressionTableAlias(ec.getExpression(), oldAlias, newAlias);
+                if (ec.getValues() != null) {
+                    for (Object v : ec.getValues()) {
+                        if (v instanceof SqlExpression) {
+                            updateExpressionTableAlias((SqlExpression) v, oldAlias, newAlias);
+                        }
+                    }
+                }
+            } else if (cond instanceof GroupCondition) {
+                updateConditionsTableAlias(((GroupCondition) cond).getChildren(), oldAlias, newAlias);
+            }
+        }
+    }
+
+    private void updateExpressionTableAlias(SqlExpression expr, String oldAlias, String newAlias) {
+        if (expr == null) return;
+        if (expr instanceof ColumnExpression) {
+            ColumnExpression ce = (ColumnExpression) expr;
+            if (oldAlias.equalsIgnoreCase(ce.getTableAlias())) {
+                ce.setTableAlias(newAlias);
+            }
+        } else if (expr instanceof FunctionExpression) {
+            FunctionExpression fe = (FunctionExpression) expr;
+            for (Object arg : fe.getArguments()) {
+                if (arg instanceof SqlExpression) {
+                    updateExpressionTableAlias((SqlExpression) arg, oldAlias, newAlias);
+                }
+            }
+        } else if (expr instanceof WindowFunctionExpression) {
+            WindowFunctionExpression wfe = (WindowFunctionExpression) expr;
+            updateExpressionTableAlias(wfe.getFunctionExpr(), oldAlias, newAlias);
+            for (SqlExpression part : wfe.getPartitionBys()) {
+                updateExpressionTableAlias(part, oldAlias, newAlias);
+            }
+            for (OrderBy ob : wfe.getOrderBys()) {
+                if (ob.getExpression() != null) {
+                    updateExpressionTableAlias(ob.getExpression(), oldAlias, newAlias);
+                }
+            }
+        }
     }
 
     public String resolveColumnName(PropertyPath path) {
@@ -642,9 +727,7 @@ public class Query<T> {
                 throw new IllegalStateException("Relation property '" + step + "' not found on " + currentClass.getName());
             }
 
-            int joinSeq = ALIAS_SEQ.get();
-            ALIAS_SEQ.set(joinSeq + 1);
-            String nextAlias = "t" + joinSeq;
+            String nextAlias = nextAlias();
             RecordingContext.registerAlias(rel.getTargetEntityClass(), nextAlias);
             Class<?> targetClass = rel.getTargetEntityClass();
             EntityMetadata targetMeta = EntityMetadataManager.get(targetClass, config);

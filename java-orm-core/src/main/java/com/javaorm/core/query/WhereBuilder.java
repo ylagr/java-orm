@@ -30,7 +30,7 @@ public class WhereBuilder<T> {
 
     private final Class<T> entityClass;
     private final Query<?> rootQuery;
-    private final String scopeAlias;
+    private String scopeAlias;
     private final Consumer<Condition> conditionReceiver;
     private final Supplier<List<?>> customListSupplier;
     private final java.util.function.IntSupplier executeSupplier;
@@ -286,6 +286,18 @@ public class WhereBuilder<T> {
     }
 
     private void appendCondition(LogicalOperator logOp, PropertyPath path, SqlOperator op, Object... vals) {
+        if (vals != null && rootQuery != null) {
+            for (Object v : vals) {
+                if (v instanceof SqlExpression) {
+                    rootQuery.resolveExpression((SqlExpression) v);
+                }
+            }
+        }
+
+        if (rootQuery != null && entityClass == rootQuery.getRootEntityClass() && rootQuery.getStatement().getRootTableAlias() != null) {
+            this.scopeAlias = rootQuery.getStatement().getRootTableAlias();
+        }
+
         String alias;
         String colName;
 
@@ -296,6 +308,9 @@ public class WhereBuilder<T> {
             if (path.getRootEntityClass() != null && path.getRootEntityClass() != entityClass) {
                 String reg = RecordingContext.getAlias(path.getRootEntityClass());
                 if (reg != null) {
+                    if (reg.equalsIgnoreCase(scopeAlias) && rootQuery != null) {
+                        this.scopeAlias = rootQuery.shiftRootTableAlias();
+                    }
                     alias = reg;
                 } else {
                     alias = scopeAlias;
@@ -306,6 +321,12 @@ public class WhereBuilder<T> {
             colName = rootQuery != null ? rootQuery.resolveColumnName(path) : path.getTerminalProperty();
         }
 
+        BinaryCondition cond = new BinaryCondition(alias, colName, op, vals);
+        cond.setLogicalOperator(logOp);
+        conditionReceiver.accept(cond);
+    }
+
+    private void appendDynamicCondition(LogicalOperator logOp, String propertyOrColumn, SqlOperator op, Object... vals) {
         if (vals != null && rootQuery != null) {
             for (Object v : vals) {
                 if (v instanceof SqlExpression) {
@@ -314,12 +335,10 @@ public class WhereBuilder<T> {
             }
         }
 
-        BinaryCondition cond = new BinaryCondition(alias, colName, op, vals);
-        cond.setLogicalOperator(logOp);
-        conditionReceiver.accept(cond);
-    }
+        if (rootQuery != null && entityClass == rootQuery.getRootEntityClass() && rootQuery.getStatement().getRootTableAlias() != null) {
+            this.scopeAlias = rootQuery.getStatement().getRootTableAlias();
+        }
 
-    private void appendDynamicCondition(LogicalOperator logOp, String propertyOrColumn, SqlOperator op, Object... vals) {
         String str = propertyOrColumn.trim();
         String alias;
         String colName;
@@ -351,14 +370,6 @@ public class WhereBuilder<T> {
                     colName = dbCol.getColumnName();
                 } else if (rootQuery.getConfig() != null && rootQuery.getConfig().getNameConversion() != null) {
                     colName = rootQuery.getConfig().getNameConversion().convert(colName);
-                }
-            }
-        }
-
-        if (vals != null && rootQuery != null) {
-            for (Object v : vals) {
-                if (v instanceof SqlExpression) {
-                    rootQuery.resolveExpression((SqlExpression) v);
                 }
             }
         }

@@ -37,6 +37,11 @@ public class RecordingContext {
         return entityClass != null ? ACTIVE_ALIASES.get().get(entityClass) : null;
     }
 
+    public static boolean hasAlias(String alias) {
+        if (alias == null) return false;
+        return ACTIVE_ALIASES.get().containsValue(alias);
+    }
+
     public static int getActiveAliasCount() {
         return ACTIVE_ALIASES.get().size();
     }
