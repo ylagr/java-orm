@@ -882,7 +882,10 @@ public class WhereBuilder<T> {
         String alias;
         String colName;
 
-        if (path.hasRelations()) {
+        if (path.getExplicitAlias() != null) {
+            alias = path.getExplicitAlias();
+            colName = rootQuery != null ? rootQuery.resolveColumnName(path) : path.getTerminalProperty();
+        } else if (path.hasRelations()) {
             alias = rootQuery != null ? rootQuery.resolveJoinAlias(path) : null;
             colName = rootQuery != null ? rootQuery.resolveColumnName(path) : path.getTerminalProperty();
         } else {
@@ -1211,5 +1214,42 @@ public class WhereBuilder<T> {
     @SuppressWarnings("unchecked")
     public Query<T> toQuery() {
         return (Query<T>) rootQuery;
+    }
+
+    public Query<?> getRootQuery() {
+        return rootQuery;
+    }
+
+    public Class<T> getEntityClass() {
+        return entityClass;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<T> toList() {
+        return (List<T>) list();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<T> toList(java.sql.Connection conn) {
+        if (rootQuery instanceof Query) {
+            return (List<T>) ((Query<?>) rootQuery).list(conn);
+        }
+        return (List<T>) list();
+    }
+
+    public Cte<T> asCte(String name) {
+        return new Cte<>(name, entityClass, this, false);
+    }
+
+    public <C> Cte<C> asCte(String name, Class<C> cteClass) {
+        return new Cte<>(name, cteClass, this, false);
+    }
+
+    public Cte<T> asCteRecursive(String name) {
+        return new Cte<>(name, entityClass, this, true);
+    }
+
+    public <C> Cte<C> asCteRecursive(String name, Class<C> cteClass) {
+        return new Cte<>(name, cteClass, this, true);
     }
 }

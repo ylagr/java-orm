@@ -33,6 +33,14 @@ public class DtoFromStageQuery<DTO> {
         return query;
     }
 
+    public <T> DtoQuery<DTO, T> from(Cte<T> cte) {
+        DtoQuery<DTO, T> query = new DtoQuery<>(dtoClass, cte, dataSource, dialect, config);
+        if (expressions != null && expressions.length > 0) {
+            query.select(expressions);
+        }
+        return query;
+    }
+
     private boolean hasSubQuery() {
         if (expressions == null) return false;
         for (Object expr : expressions) {

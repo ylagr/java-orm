@@ -1,0 +1,109 @@
+package com.javaorm.core.query;
+
+import com.javaorm.core.ast.TableJoin;
+import com.javaorm.core.proxy.ProxyFactory;
+import com.javaorm.core.proxy.RecordingContext;
+
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+
+/**
+ * 关联 JOIN 条件构造器。
+ * 支持针对实体表或 CTE 结果集以强类型 Lambda 表达式方式配置 ON 条件。
+ *
+ * @param <TRoot> 主表实体类型
+ * @param <TJoin> 连接表实体或 CTE 契约类型
+ */
+public class JoinBuilder<TRoot, TJoin> {
+
+    private final Query<TRoot> rootQuery;
+    private final TableJoin.JoinType joinType;
+    private final String tableName;
+    private final Class<TJoin> joinClass;
+    private final String joinAlias;
+    private final Cte<TJoin> cte;
+    private final Runnable onComplete;
+
+    public JoinBuilder(Query<TRoot> rootQuery, TableJoin.JoinType joinType, String tableName,
+                       Class<TJoin> joinClass, String joinAlias, Cte<TJoin> cte) {
+        this(rootQuery, joinType, tableName, joinClass, joinAlias, cte, null);
+    }
+
+    public JoinBuilder(Query<TRoot> rootQuery, TableJoin.JoinType joinType, String tableName,
+                       Class<TJoin> joinClass, String joinAlias, Cte<TJoin> cte, Runnable onComplete) {
+        this.rootQuery = rootQuery;
+        this.joinType = joinType;
+        this.tableName = tableName;
+        this.joinClass = joinClass;
+        this.joinAlias = joinAlias;
+        this.cte = cte;
+        this.onComplete = onComplete;
+    }
+
+    public Query<TRoot> on(TriConsumer<WhereBuilder<TJoin>, TRoot, TJoin> onConsumer) {
+        TableJoin join = new TableJoin(joinType, tableName, joinAlias);
+        if (cte == null && rootQuery.getConfig() != null && joinClass != null) {
+            com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(joinClass, rootQuery.getConfig());
+            if (meta != null) {
+                if (meta.hasLogicDelete()) {
+                    com.javaorm.core.metadata.ColumnMetadata ld = meta.getLogicDeleteColumn();
+                    join.addOnCondition(new com.javaorm.core.ast.BinaryCondition(joinAlias, ld.getColumnName(), com.javaorm.core.operator.SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+                }
+                if (meta.hasTenant()) {
+                    com.javaorm.core.metadata.ColumnMetadata tc = meta.getTenantColumn();
+                    Object tenantId = rootQuery.getConfig().getCurrentTenantId();
+                    if (tenantId == null) {
+                        tenantId = com.javaorm.core.tenant.TenantContext.getTenantId();
+                    }
+                    if (tenantId != null) {
+                        join.addOnCondition(new com.javaorm.core.ast.BinaryCondition(joinAlias, tc.getColumnName(), com.javaorm.core.operator.SqlOperator.EQ, tenantId));
+                    }
+                }
+            }
+        }
+        WhereBuilder<TJoin> onBuilder = new WhereBuilder<>(joinClass, rootQuery, joinAlias,
+                join::addOnCondition, null, null, null, null);
+
+        TRoot rootProxy = ProxyFactory.createProxy(rootQuery.getRootEntityClass(), rootQuery.getStatement().getRootTableAlias());
+        TJoin joinProxy = ProxyFactory.createProxy(joinClass, joinAlias);
+
+        try {
+            RecordingContext.registerAlias(joinClass, joinAlias);
+            RecordingContext.registerAlias(rootQuery.getRootEntityClass(), rootQuery.getStatement().getRootTableAlias());
+            if (onConsumer != null) {
+                onConsumer.accept(onBuilder, rootProxy, joinProxy);
+            }
+        } finally {
+            RecordingContext.clearRecording();
+        }
+
+        rootQuery.getStatement().addJoin(join);
+        if (cte != null) {
+            rootQuery.ensureCteAdded(cte);
+        }
+        if (onComplete != null) {
+            onComplete.run();
+        }
+        return rootQuery;
+    }
+
+    public Query<TRoot> on(BiConsumer<WhereBuilder<TJoin>, TJoin> onConsumer) {
+        return on((on, root, join) -> {
+            if (onConsumer != null) {
+                onConsumer.accept(on, join);
+            }
+        });
+    }
+
+    public Query<TRoot> on(Consumer<WhereBuilder<TJoin>> onConsumer) {
+        return on((on, root, join) -> {
+            if (onConsumer != null) {
+                onConsumer.accept(on);
+            }
+        });
+    }
+
+    public String getJoinAlias() {
+        return joinAlias;
+    }
+}

@@ -11,6 +11,7 @@ public class RecordingContext {
     private static final ThreadLocal<LinkedList<PropertyPath>> RECORDED_QUEUE = ThreadLocal.withInitial(LinkedList::new);
     private static final ThreadLocal<PropertyPath> CURRENT_PATH = new ThreadLocal<>();
     private static final ThreadLocal<Map<Class<?>, String>> ACTIVE_ALIASES = ThreadLocal.withInitial(HashMap::new);
+    private static final ThreadLocal<Map<Object, String>> PROXY_ALIASES = ThreadLocal.withInitial(IdentityHashMap::new);
 
     public static void start(Class<?> rootEntityClass) {
         clearRecording(rootEntityClass);
@@ -51,8 +52,19 @@ public class RecordingContext {
         return ACTIVE_ALIASES.get().size();
     }
 
+    public static void registerProxyAlias(Object proxy, String alias) {
+        if (proxy != null && alias != null) {
+            PROXY_ALIASES.get().put(proxy, alias);
+        }
+    }
+
+    public static String getProxyAlias(Object proxy) {
+        return proxy != null ? PROXY_ALIASES.get().get(proxy) : null;
+    }
+
     public static void clearAliases() {
         ACTIVE_ALIASES.remove();
+        PROXY_ALIASES.remove();
     }
 
     public static void clearRecording() {

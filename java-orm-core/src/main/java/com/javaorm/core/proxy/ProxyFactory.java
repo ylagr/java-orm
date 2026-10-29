@@ -24,6 +24,21 @@ public class ProxyFactory {
     }
 
     @SuppressWarnings("unchecked")
+    public static <T> T createProxy(Class<T> entityClass, String alias) {
+        T singleton = getProxy(entityClass);
+        if (alias == null) {
+            return singleton;
+        }
+        try {
+            T newInstance = (T) singleton.getClass().getDeclaredConstructor().newInstance();
+            RecordingContext.registerProxyAlias(newInstance, alias);
+            return newInstance;
+        } catch (Exception e) {
+            return singleton;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     private static <T> T createProxyInstance(Class<T> entityClass) {
         try {
             DynamicType.Unloaded<T> make = BYTE_BUDDY

@@ -767,6 +767,38 @@ public class SQL {
         return new SubQueryExpression<>(query);
     }
 
+    // ==================== 通用表表达式（CTE） ====================
+    public static <T> com.javaorm.core.query.Cte<T> cte(String name, com.javaorm.core.query.Query<T> query) {
+        return new com.javaorm.core.query.Cte<>(name, query.getRootEntityClass(), query, false);
+    }
+
+    public static <T> com.javaorm.core.query.Cte<T> cte(String name, com.javaorm.core.query.WhereBuilder<T> whereBuilder) {
+        return new com.javaorm.core.query.Cte<>(name, whereBuilder.getEntityClass(), whereBuilder, false);
+    }
+
+    public static <T> com.javaorm.core.query.Cte<T> cte(String name, Class<T> cteClass, Object query) {
+        return new com.javaorm.core.query.Cte<>(name, cteClass, query, false);
+    }
+
+    public static <T> com.javaorm.core.query.Cte<T> cteRecursive(String name, com.javaorm.core.query.Query<T> query) {
+        return new com.javaorm.core.query.Cte<>(name, query.getRootEntityClass(), query, true);
+    }
+
+    public static <T> com.javaorm.core.query.Cte<T> cteRecursive(String name, com.javaorm.core.query.WhereBuilder<T> whereBuilder) {
+        return new com.javaorm.core.query.Cte<>(name, whereBuilder.getEntityClass(), whereBuilder, true);
+    }
+
+    public static <T> com.javaorm.core.query.Cte<T> cteRecursive(String name, Class<T> cteClass, Object query) {
+        return new com.javaorm.core.query.Cte<>(name, cteClass, query, true);
+    }
+
+    public static <T> com.javaorm.core.query.Cte<T> cteRecursive(String name, Class<T> cteClass, java.util.function.Function<com.javaorm.core.query.Cte<T>, Object> queryBuilder) {
+        com.javaorm.core.query.Cte<T> cte = new com.javaorm.core.query.Cte<>(name, cteClass, null, true);
+        Object query = queryBuilder.apply(cte);
+        cte.setQuery(query);
+        return cte;
+    }
+
     // ==================== 原地自增与算术表达式 ====================
     public static <T extends Number> IncrementExpression<T> increment(T step) {
         return new IncrementExpression<>(step, "+");

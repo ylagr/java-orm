@@ -17,6 +17,9 @@ import java.util.List;
 public interface Dialect {
     String quote(String identifier);
     SqlAndParams buildSelect(SelectStatement stmt);
+    default SqlAndParams buildSelect(SelectStatement stmt, boolean renderCte) {
+        return buildSelect(stmt);
+    }
     SqlAndParams buildUpdate(UpdateStatement stmt);
     SqlAndParams buildDelete(DeleteStatement stmt);
     SqlAndParams buildInsert(InsertStatement stmt);

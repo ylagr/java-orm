@@ -41,6 +41,13 @@ public class RecorderInterceptor {
 
         Class<?> entityClass = proxy.getClass().getSuperclass();
         RecordingContext.ensureStarted(entityClass);
+        String explicitAlias = RecordingContext.getProxyAlias(proxy);
+        if (explicitAlias != null) {
+            PropertyPath cur = RecordingContext.get();
+            if (cur != null) {
+                cur.setExplicitAlias(explicitAlias);
+            }
+        }
 
         // 检查该属性名是否为关联关系（纯静态反射结构，无需加载全量 ORM 映射元数据）
         RelationMetadata relation = EntityMetadataManager.getRelation(entityClass, propName);

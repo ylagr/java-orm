@@ -12,9 +12,18 @@ public class PropertyPath {
     private final List<String> relationSteps = new ArrayList<>();
     private String terminalProperty;
     private Class<?> terminalType;
+    private String explicitAlias;
 
     public PropertyPath(Class<?> rootEntityClass) {
         this.rootEntityClass = rootEntityClass;
+    }
+
+    public String getExplicitAlias() {
+        return explicitAlias;
+    }
+
+    public void setExplicitAlias(String explicitAlias) {
+        this.explicitAlias = explicitAlias;
     }
 
     public void addRelationStep(String relationProperty) {

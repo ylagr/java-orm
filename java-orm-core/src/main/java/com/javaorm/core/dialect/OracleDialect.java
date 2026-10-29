@@ -1,9 +1,11 @@
 package com.javaorm.core.dialect;
 
+import com.javaorm.core.ast.CteClause;
 import com.javaorm.core.ast.SelectStatement;
 import com.javaorm.core.function.BuiltinSqlFunction;
 import com.javaorm.core.function.FunctionRenderer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -30,14 +32,24 @@ public class OracleDialect extends AbstractDialect {
     }
 
     @Override
+    public boolean supportsRecursiveKeyword() {
+        return false;
+    }
+
+    @Override
     public SqlAndParams buildSelect(SelectStatement stmt) {
+        return buildSelect(stmt, true);
+    }
+
+    @Override
+    public SqlAndParams buildSelect(SelectStatement stmt, boolean renderCte) {
         if (stmt.getRootTableName() == null || stmt.getRootTableName().isEmpty()) {
             stmt.setRootTableName("DUAL");
         }
         if (oracle11 && (stmt.getLimit() != null || (stmt.getOffset() != null && stmt.getOffset() > 0))) {
             return buildOracle11Select(stmt);
         }
-        return super.buildSelect(stmt);
+        return super.buildSelect(stmt, renderCte);
     }
 
     private SqlAndParams buildOracle11Select(SelectStatement stmt) {
@@ -47,14 +59,38 @@ public class OracleDialect extends AbstractDialect {
         stmt.setOffset(null);
         SqlAndParams inner;
         try {
-            inner = super.buildSelect(stmt);
+            inner = super.buildSelect(stmt, false);
         } finally {
             stmt.setLimit(limit);
             stmt.setOffset(offset);
         }
 
         StringBuilder sql = new StringBuilder();
-        java.util.List<Object> params = new java.util.ArrayList<>(inner.getParams());
+        List<Object> params = new ArrayList<>();
+
+        if (!stmt.getCtes().isEmpty()) {
+            List<CteClause> allCtes = collectAllCtes(stmt);
+            sql.append("WITH ");
+            for (int i = 0; i < allCtes.size(); i++) {
+                if (i > 0) sql.append(", ");
+                CteClause cte = allCtes.get(i);
+                sql.append(quote(cte.getName()));
+                if (cte.getColumnNames() != null && !cte.getColumnNames().isEmpty()) {
+                    sql.append(" (");
+                    for (int c = 0; c < cte.getColumnNames().size(); c++) {
+                        if (c > 0) sql.append(", ");
+                        sql.append(quote(cte.getColumnNames().get(c)));
+                    }
+                    sql.append(")");
+                }
+                sql.append(" AS (");
+                renderCteSubQuery(cte.getQuery(), sql, params);
+                sql.append(")");
+            }
+            sql.append(" ");
+        }
+
+        params.addAll(inner.getParams());
 
         int off = (offset != null && offset > 0) ? offset : 0;
         if (off > 0) {

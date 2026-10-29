@@ -43,6 +43,18 @@ public class DtoQuery<DTO, T> {
         this.underlyingQuery = new Query<>(entityClass, dataSource, dialect, config, rootAlias);
     }
 
+    public DtoQuery(Class<DTO> dtoClass, Cte<T> cte, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        if (cte == null) {
+            throw new IllegalArgumentException("CTE must not be null");
+        }
+        this.dtoClass = dtoClass;
+        this.entityClass = cte.getEntityClass();
+        this.dataSource = dataSource;
+        this.dialect = dialect;
+        this.config = config;
+        this.underlyingQuery = new Query<>(cte, dataSource, dialect, config);
+    }
+
     public T proxy() {
         return ProxyFactory.getProxy(entityClass);
     }
@@ -216,6 +228,70 @@ public class DtoQuery<DTO, T> {
         } catch (Exception e) {
             throw new RuntimeException("Failed to query DTO list for " + dtoClass.getName(), e);
         }
+    }
+
+    public List<DTO> toList() {
+        return list();
+    }
+
+    public Cte<DTO> asCte(String name) {
+        return new Cte<>(name, dtoClass, this, false);
+    }
+
+    public Cte<DTO> asCteRecursive(String name) {
+        return new Cte<>(name, dtoClass, this, true);
+    }
+
+    public DtoQuery<DTO, T> with(Cte<?> cte) {
+        underlyingQuery.with(cte);
+        return this;
+    }
+
+    public DtoQuery<DTO, T> with(String name, Object query) {
+        underlyingQuery.with(name, query);
+        return this;
+    }
+
+    public DtoQuery<DTO, T> with(String name, Class<?> cteClass, Object query) {
+        underlyingQuery.with(name, cteClass, query);
+        return this;
+    }
+
+    public DtoQuery<DTO, T> withRecursive(String name, Object query) {
+        underlyingQuery.withRecursive(name, query);
+        return this;
+    }
+
+    public DtoQuery<DTO, T> withRecursive(String name, Class<?> cteClass, Object query) {
+        underlyingQuery.withRecursive(name, cteClass, query);
+        return this;
+    }
+
+    public <TJoin> JoinBuilder<T, TJoin> leftJoin(Cte<TJoin> cte) {
+        return underlyingQuery.leftJoin(cte);
+    }
+
+    public <TJoin> DtoQuery<DTO, T> leftJoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
+        underlyingQuery.leftJoin(cte, onConsumer);
+        return this;
+    }
+
+    public <TJoin> JoinBuilder<T, TJoin> innerJoin(Cte<TJoin> cte) {
+        return underlyingQuery.innerJoin(cte);
+    }
+
+    public <TJoin> DtoQuery<DTO, T> innerJoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
+        underlyingQuery.innerJoin(cte, onConsumer);
+        return this;
+    }
+
+    public <TJoin> JoinBuilder<T, TJoin> rightJoin(Cte<TJoin> cte) {
+        return underlyingQuery.rightJoin(cte);
+    }
+
+    public <TJoin> DtoQuery<DTO, T> rightJoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
+        underlyingQuery.rightJoin(cte, onConsumer);
+        return this;
     }
 
     public DTO single() {

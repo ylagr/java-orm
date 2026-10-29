@@ -16,6 +16,7 @@ public class SelectStatement {
     private final List<Condition> havingConditions = new ArrayList<>();
     private final List<OrderBy> orderBys = new ArrayList<>();
     private final List<UnionClause> unions = new ArrayList<>();
+    private final List<CteClause> ctes = new ArrayList<>();
     private Integer limit;
     private Integer offset;
     private boolean distinct;
@@ -35,6 +36,7 @@ public class SelectStatement {
     public void addHavingCondition(Condition condition) { havingConditions.add(condition); }
     public void addOrderBy(OrderBy orderBy) { orderBys.add(orderBy); }
     public void addUnion(UnionClause union) { unions.add(union); }
+    public void addCte(CteClause cte) { if (cte != null) ctes.add(cte); }
 
     public Class<?> getRootEntityClass() { return rootEntityClass; }
     public void setRootEntityClass(Class<?> rootEntityClass) { this.rootEntityClass = rootEntityClass; }
@@ -52,6 +54,13 @@ public class SelectStatement {
     public List<Condition> getHavingConditions() { return havingConditions; }
     public List<OrderBy> getOrderBys() { return orderBys; }
     public List<UnionClause> getUnions() { return unions; }
+    public List<CteClause> getCtes() { return ctes; }
+    public boolean isRecursive() {
+        for (CteClause c : ctes) {
+            if (c.isRecursive()) return true;
+        }
+        return false;
+    }
 
     public Integer getLimit() { return limit; }
     public void setLimit(Integer limit) { this.limit = limit; }

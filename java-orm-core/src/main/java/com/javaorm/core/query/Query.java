@@ -141,6 +141,21 @@ public class Query<T> {
         }
     }
 
+    public Query(Cte<T> cte, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        if (cte == null) {
+            throw new IllegalArgumentException("CTE must not be null");
+        }
+        this.rootEntityClass = cte.getEntityClass();
+        this.dataSource = dataSource;
+        this.dialect = dialect;
+        this.config = config;
+        this.rootMetadata = EntityMetadataManager.get(rootEntityClass, config);
+        String rootAlias = nextAlias();
+        this.statement = new SelectStatement(rootEntityClass, cte.getName(), rootAlias);
+        this.statement.addCte(cte.toClause());
+        RecordingContext.registerAlias(rootEntityClass, rootAlias);
+    }
+
     public Class<T> getRootEntityClass() {
         return rootEntityClass;
     }
@@ -434,6 +449,128 @@ public class Query<T> {
             RecordingContext.clearRecording();
         }
         return this;
+    }
+
+    /**
+     * 将当前查询构建器封装为强类型 CTE
+     */
+    public Cte<T> asCte(String name) {
+        return new Cte<>(name, rootEntityClass, this, false);
+    }
+
+    public <C> Cte<C> asCte(String name, Class<C> cteClass) {
+        return new Cte<>(name, cteClass, this, false);
+    }
+
+    /**
+     * 将当前查询构建器封装为强类型递归 CTE
+     */
+    public Cte<T> asCteRecursive(String name) {
+        return new Cte<>(name, rootEntityClass, this, true);
+    }
+
+    public <C> Cte<C> asCteRecursive(String name, Class<C> cteClass) {
+        return new Cte<>(name, cteClass, this, true);
+    }
+
+    /**
+     * 附加通用表表达式 CTE
+     */
+    public Query<T> with(Cte<?> cte) {
+        if (cte != null) {
+            statement.addCte(cte.toClause());
+        }
+        return this;
+    }
+
+    public Query<T> with(String name, Object query) {
+        statement.addCte(new CteClause(name, query));
+        return this;
+    }
+
+    public Query<T> with(String name, Class<?> cteClass, Object query) {
+        statement.addCte(new CteClause(name, query, false, null, cteClass));
+        return this;
+    }
+
+    public Query<T> withRecursive(String name, Object query) {
+        statement.addCte(new CteClause(name, query, true));
+        return this;
+    }
+
+    public Query<T> withRecursive(String name, Class<?> cteClass, Object query) {
+        statement.addCte(new CteClause(name, query, true, null, cteClass));
+        return this;
+    }
+
+    public Query<T> ensureCteAdded(Cte<?> cte) {
+        if (cte == null) return this;
+        for (CteClause existing : statement.getCtes()) {
+            if (existing.getName().equalsIgnoreCase(cte.getName())) {
+                return this;
+            }
+        }
+        statement.addCte(cte.toClause());
+        return this;
+    }
+
+    // --- CTE 连接支持 ---
+    public <TJoin> JoinBuilder<T, TJoin> leftJoin(Cte<TJoin> cte) {
+        String joinAlias = nextAlias();
+        return new JoinBuilder<>(this, TableJoin.JoinType.LEFT_JOIN, cte.getName(), cte.getEntityClass(), joinAlias, cte);
+    }
+
+    public <TJoin> Query<T> leftJoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
+        return leftJoin(cte).on(onConsumer);
+    }
+
+    public <TJoin> JoinBuilder<T, TJoin> innerJoin(Cte<TJoin> cte) {
+        String joinAlias = nextAlias();
+        return new JoinBuilder<>(this, TableJoin.JoinType.INNER_JOIN, cte.getName(), cte.getEntityClass(), joinAlias, cte);
+    }
+
+    public <TJoin> Query<T> innerJoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
+        return innerJoin(cte).on(onConsumer);
+    }
+
+    public <TJoin> JoinBuilder<T, TJoin> rightJoin(Cte<TJoin> cte) {
+        String joinAlias = nextAlias();
+        return new JoinBuilder<>(this, TableJoin.JoinType.RIGHT_JOIN, cte.getName(), cte.getEntityClass(), joinAlias, cte);
+    }
+
+    public <TJoin> Query<T> rightJoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
+        return rightJoin(cte).on(onConsumer);
+    }
+
+    // --- 实体表连接支持 ---
+    public <TJoin> JoinBuilder<T, TJoin> leftJoin(Class<TJoin> entityClass) {
+        EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
+        String joinAlias = nextAlias();
+        return new JoinBuilder<>(this, TableJoin.JoinType.LEFT_JOIN, meta.getTableName(), entityClass, joinAlias, null);
+    }
+
+    public <TJoin> Query<T> leftJoin(Class<TJoin> entityClass, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
+        return leftJoin(entityClass).on(onConsumer);
+    }
+
+    public <TJoin> JoinBuilder<T, TJoin> innerJoin(Class<TJoin> entityClass) {
+        EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
+        String joinAlias = nextAlias();
+        return new JoinBuilder<>(this, TableJoin.JoinType.INNER_JOIN, meta.getTableName(), entityClass, joinAlias, null);
+    }
+
+    public <TJoin> Query<T> innerJoin(Class<TJoin> entityClass, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
+        return innerJoin(entityClass).on(onConsumer);
+    }
+
+    public <TJoin> JoinBuilder<T, TJoin> rightJoin(Class<TJoin> entityClass) {
+        EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
+        String joinAlias = nextAlias();
+        return new JoinBuilder<>(this, TableJoin.JoinType.RIGHT_JOIN, meta.getTableName(), entityClass, joinAlias, null);
+    }
+
+    public <TJoin> Query<T> rightJoin(Class<TJoin> entityClass, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
+        return rightJoin(entityClass).on(onConsumer);
     }
 
     /**
@@ -758,7 +895,6 @@ public class Query<T> {
         return this;
     }
 
-    // 执行方法
     public List<T> list() {
         Connection conn = null;
         boolean isTx = false;
@@ -771,6 +907,14 @@ public class Query<T> {
         } finally {
             if (!isTx) ConnectionUtils.closeConnection(conn);
         }
+    }
+
+    public List<T> toList() {
+        return list();
+    }
+
+    public List<T> toList(Connection conn) {
+        return list(conn);
     }
 
     public List<T> list(Connection conn) {
@@ -859,7 +1003,10 @@ public class Query<T> {
             isTx = ConnectionUtils.isTransactionConnection(conn);
 
             if (!isComplex) {
-                SelectStatement countStmt = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), statement.getRootTableAlias());
+                SelectStatement countStmt = new SelectStatement(rootEntityClass, statement.getRootTableName(), statement.getRootTableAlias());
+                for (CteClause cte : statement.getCtes()) {
+                    countStmt.addCte(cte);
+                }
                 countStmt.addSelectColumn("COUNT(1)");
                 for (TableJoin join : statement.getJoins()) {
                     countStmt.addJoin(join);
@@ -873,7 +1020,10 @@ public class Query<T> {
                 return EntityHydrator.queryCount(conn, countStmt, dialect, getEffectiveConfig());
             } else {
                 // 复杂查询保留 DISTINCT / GROUP BY / HAVING / UNION 语义，忽略分页并以外层子查询包装计数
-                SelectStatement innerStmt = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), statement.getRootTableAlias());
+                SelectStatement innerStmt = new SelectStatement(rootEntityClass, statement.getRootTableName(), statement.getRootTableAlias());
+                for (CteClause cte : statement.getCtes()) {
+                    innerStmt.addCte(cte);
+                }
                 innerStmt.setDistinct(statement.isDistinct());
                 for (SqlExpression expr : statement.getProjectExpressions()) {
                     innerStmt.addProjectExpression(expr);
@@ -1052,6 +1202,9 @@ public class Query<T> {
     }
 
     public String resolveTableAlias(PropertyPath path) {
+        if (path.getExplicitAlias() != null) {
+            return path.getExplicitAlias();
+        }
         if (!path.hasRelations()) {
             if (path.getRootEntityClass() != null && path.getRootEntityClass() != rootEntityClass) {
                 String reg = RecordingContext.getAlias(path.getRootEntityClass());

@@ -29,11 +29,7 @@ public class EntityHydrator {
         }
 
         List<T> list = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
-            }
-
+        try (PreparedStatement ps = prepareStatement(conn, sqlAndParams, dialect, stmt != null && !stmt.getCtes().isEmpty())) {
             try (ResultSet rs = ps.executeQuery()) {
                 ResultSetMetaData rsmd = rs.getMetaData();
                 int colCount = rsmd.getColumnCount();
@@ -81,10 +77,7 @@ public class EntityHydrator {
             curr = curr.getSuperclass();
         }
 
-        try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
-            }
+        try (PreparedStatement ps = prepareStatement(conn, sqlAndParams, dialect, stmt != null && !stmt.getCtes().isEmpty())) {
 
             try (ResultSet rs = ps.executeQuery()) {
                 ResultSetMetaData rsmd = rs.getMetaData();
@@ -129,10 +122,7 @@ public class EntityHydrator {
         }
 
         List<Map<String, Object>> list = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
-            }
+        try (PreparedStatement ps = prepareStatement(conn, sqlAndParams, dialect, stmt != null && !stmt.getCtes().isEmpty())) {
 
             try (ResultSet rs = ps.executeQuery()) {
                 ResultSetMetaData rsmd = rs.getMetaData();
@@ -206,10 +196,7 @@ public class EntityHydrator {
             log.info("==> [Scalar] Parameters: {}", sqlAndParams.getParams());
         }
 
-        try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
-            }
+        try (PreparedStatement ps = prepareStatement(conn, sqlAndParams, dialect, stmt != null && !stmt.getCtes().isEmpty())) {
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     Object val = rs.getObject(1);
@@ -229,10 +216,7 @@ public class EntityHydrator {
         }
 
         List<V> list = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
-            }
+        try (PreparedStatement ps = prepareStatement(conn, sqlAndParams, dialect, stmt != null && !stmt.getCtes().isEmpty())) {
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     Object val = rs.getObject(1);
@@ -244,19 +228,20 @@ public class EntityHydrator {
     }
 
     public static long queryCount(Connection conn, SelectStatement stmt, Dialect dialect, OrmConfig config) throws Exception {
-        return queryCount(conn, dialect.buildSelect(stmt), config);
+        return queryCount(conn, dialect.buildSelect(stmt), config, stmt != null && !stmt.getCtes().isEmpty(), dialect);
     }
 
     public static long queryCount(Connection conn, SqlAndParams sqlAndParams, OrmConfig config) throws Exception {
+        return queryCount(conn, sqlAndParams, config, false, null);
+    }
+
+    public static long queryCount(Connection conn, SqlAndParams sqlAndParams, OrmConfig config, boolean hasCte, Dialect dialect) throws Exception {
         if (config.isPrintSql()) {
             log.info("==> [Count] Preparing: {}", sqlAndParams.getSql());
             log.info("==> [Count] Parameters: {}", sqlAndParams.getParams());
         }
 
-        try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-            for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                ps.setObject(i + 1, sqlAndParams.getParams().get(i));
-            }
+        try (PreparedStatement ps = prepareStatement(conn, sqlAndParams, dialect, hasCte)) {
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getLong(1);
@@ -264,5 +249,45 @@ public class EntityHydrator {
             }
         }
         return 0L;
+    }
+
+    public static String inlineParams(String sql, List<Object> params) {
+        if (params == null || params.isEmpty()) {
+            return sql;
+        }
+        StringBuilder sb = new StringBuilder();
+        int paramIdx = 0;
+        boolean inQuotes = false;
+        for (int i = 0; i < sql.length(); i++) {
+            char c = sql.charAt(i);
+            if (c == '\'') {
+                inQuotes = !inQuotes;
+                sb.append(c);
+            } else if (c == '?' && !inQuotes && paramIdx < params.size()) {
+                Object p = params.get(paramIdx++);
+                if (p == null) {
+                    sb.append("NULL");
+                } else if (p instanceof Number || p instanceof Boolean) {
+                    sb.append(p);
+                } else {
+                    sb.append("'").append(String.valueOf(p).replace("'", "''")).append("'");
+                }
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private static PreparedStatement prepareStatement(Connection conn, SqlAndParams sqlAndParams, Dialect dialect, boolean hasCte) throws Exception {
+        if (hasCte && dialect instanceof com.javaorm.core.dialect.H2Dialect && !sqlAndParams.getParams().isEmpty()) {
+            String inlinedSql = inlineParams(sqlAndParams.getSql(), sqlAndParams.getParams());
+            return conn.prepareStatement(inlinedSql);
+        }
+        PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql());
+        for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
+            ps.setObject(i + 1, sqlAndParams.getParams().get(i));
+        }
+        return ps;
     }
 }

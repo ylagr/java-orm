@@ -29,6 +29,12 @@ public class FromStageQuery {
         return query;
     }
 
+    public <T> Query<T> from(Cte<T> cte) {
+        Query<T> query = new Query<>(cte, dataSource, dialect, config);
+        query.select(expressions);
+        return query;
+    }
+
     private boolean hasSubQuery() {
         if (expressions == null) return false;
         for (Object expr : expressions) {

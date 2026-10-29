@@ -94,6 +94,10 @@ public class JavaOrm {
         return com.javaorm.core.proxy.ProxyFactory.getProxy(entityClass);
     }
 
+    public <T> T proxy(Cte<T> cte) {
+        return cte.proxy();
+    }
+
     /**
      * 快捷静态方法：获取实体的录制代理单例对象
      */
@@ -101,11 +105,71 @@ public class JavaOrm {
         return com.javaorm.core.proxy.ProxyFactory.getProxy(entityClass);
     }
 
+    public static <T> T $(Cte<T> cte) {
+        return cte.proxy();
+    }
+
     /**
      * 开启流式查询：orm.select(Student.class).where().and(s -> s.getAge()).gt(18)...
      */
     public <T> Query<T> select(Class<T> entityClass) {
         return new Query<>(entityClass, dataSource, dialect, config);
+    }
+
+    /**
+     * 开启 CTE 强类型流式查询：orm.select(cte).where()...
+     */
+    public <T> Query<T> select(Cte<T> cte) {
+        return new Query<>(cte, dataSource, dialect, config);
+    }
+
+    /**
+     * 定义强类型 CTE
+     */
+    public <T> Cte<T> cte(String name, Query<T> query) {
+        return new Cte<>(name, query.getRootEntityClass(), query, false);
+    }
+
+    public <T> Cte<T> cte(String name, WhereBuilder<T> whereBuilder) {
+        return new Cte<>(name, whereBuilder.getEntityClass(), whereBuilder, false);
+    }
+
+    public <T> Cte<T> cte(String name, Class<T> cteClass, Object query) {
+        return new Cte<>(name, cteClass, query, false);
+    }
+
+    public <T> Cte<T> cteRecursive(String name, Query<T> query) {
+        return new Cte<>(name, query.getRootEntityClass(), query, true);
+    }
+
+    public <T> Cte<T> cteRecursive(String name, WhereBuilder<T> whereBuilder) {
+        return new Cte<>(name, whereBuilder.getEntityClass(), whereBuilder, true);
+    }
+
+    public <T> Cte<T> cteRecursive(String name, Class<T> cteClass, Object query) {
+        return new Cte<>(name, cteClass, query, true);
+    }
+
+    public <T> Cte<T> cteRecursive(String name, Class<T> cteClass, java.util.function.Function<Cte<T>, Object> queryBuilder) {
+        Cte<T> cte = new Cte<>(name, cteClass, null, true);
+        Object query = queryBuilder.apply(cte);
+        cte.setQuery(query);
+        return cte;
+    }
+
+    /**
+     * 以 WITH 子句起始构建主查询
+     */
+    public WithStage with(Cte<?> cte) {
+        return new WithStage(dataSource, dialect, config).with(cte);
+    }
+
+    public WithStage with(String name, Object query) {
+        return new WithStage(dataSource, dialect, config).with(name, query);
+    }
+
+    public WithStage withRecursive(String name, Object query) {
+        return new WithStage(dataSource, dialect, config).withRecursive(name, query);
     }
 
     /**

@@ -85,10 +85,114 @@ public abstract class AbstractDialect implements Dialect {
         return operator.getSql();
     }
 
+    public boolean supportsRecursiveKeyword() {
+        return true;
+    }
+
+    protected List<CteClause> collectAllCtes(SelectStatement stmt) {
+        List<CteClause> result = new ArrayList<>();
+        Set<String> visited = new HashSet<>();
+        for (CteClause cte : stmt.getCtes()) {
+            collectCteDependencies(cte, result, visited);
+        }
+        return result;
+    }
+
+    private void collectCteDependencies(CteClause cte, List<CteClause> result, Set<String> visited) {
+        if (cte == null || cte.getName() == null) return;
+        String nameUpper = cte.getName().toUpperCase();
+        if (visited.contains(nameUpper)) {
+            return;
+        }
+        Object queryObj = cte.getQuery();
+        if (queryObj != null) {
+            try {
+                Method getStatement = queryObj.getClass().getMethod("getStatement");
+                SelectStatement subStmt = (SelectStatement) getStatement.invoke(queryObj);
+                if (subStmt != null && !subStmt.getCtes().isEmpty()) {
+                    for (CteClause subCte : subStmt.getCtes()) {
+                        if (!subCte.getName().equalsIgnoreCase(cte.getName())) {
+                            collectCteDependencies(subCte, result, visited);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (visited.add(nameUpper)) {
+            result.add(cte);
+        }
+    }
+
+    protected void renderCteSubQuery(Object queryObj, StringBuilder sql, List<Object> params) {
+        if (queryObj == null) return;
+        if (queryObj instanceof String) {
+            sql.append((String) queryObj);
+            return;
+        }
+        if (queryObj instanceof RawSqlExpression) {
+            RawSqlExpression raw = (RawSqlExpression) queryObj;
+            sql.append(raw.getRawSql());
+            if (raw.getParams() != null) {
+                Collections.addAll(params, raw.getParams());
+            }
+            return;
+        }
+        try {
+            Method getStatement = queryObj.getClass().getMethod("getStatement");
+            SelectStatement subStmt = (SelectStatement) getStatement.invoke(queryObj);
+            SqlAndParams subSqlAndParams = buildSelect(subStmt, false);
+            sql.append(subSqlAndParams.getSql());
+            params.addAll(subSqlAndParams.getParams());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to render CTE subquery", e);
+        }
+    }
+
     @Override
     public SqlAndParams buildSelect(SelectStatement stmt) {
-        StringBuilder sql = new StringBuilder("SELECT ");
+        return buildSelect(stmt, true);
+    }
+
+    @Override
+    public SqlAndParams buildSelect(SelectStatement stmt, boolean renderCte) {
+        StringBuilder sql = new StringBuilder();
         List<Object> params = new ArrayList<>();
+
+        // 0. Common Table Expressions (WITH ...)
+        if (renderCte && !stmt.getCtes().isEmpty()) {
+            List<CteClause> allCtes = collectAllCtes(stmt);
+            boolean isRecursive = false;
+            for (CteClause c : allCtes) {
+                if (c.isRecursive()) {
+                    isRecursive = true;
+                    break;
+                }
+            }
+            sql.append("WITH ");
+            if (isRecursive && supportsRecursiveKeyword()) {
+                sql.append("RECURSIVE ");
+            }
+            for (int i = 0; i < allCtes.size(); i++) {
+                if (i > 0) sql.append(", ");
+                CteClause cte = allCtes.get(i);
+                sql.append(quote(cte.getName()));
+                if (cte.getColumnNames() != null && !cte.getColumnNames().isEmpty()) {
+                    sql.append(" (");
+                    for (int c = 0; c < cte.getColumnNames().size(); c++) {
+                        if (c > 0) sql.append(", ");
+                        sql.append(quote(cte.getColumnNames().get(c)));
+                    }
+                    sql.append(")");
+                }
+                sql.append(" AS (");
+                renderCteSubQuery(cte.getQuery(), sql, params);
+                sql.append(")");
+            }
+            sql.append(" ");
+        }
+
+        sql.append("SELECT ");
 
         if (stmt.isDistinct()) {
             sql.append("DISTINCT ");
@@ -719,7 +823,7 @@ public abstract class AbstractDialect implements Dialect {
         try {
             Method getStatement = queryObj.getClass().getMethod("getStatement");
             SelectStatement subStmt = (SelectStatement) getStatement.invoke(queryObj);
-            SqlAndParams subSqlAndParams = buildSelect(subStmt);
+            SqlAndParams subSqlAndParams = buildSelect(subStmt, false);
             sql.append(subSqlAndParams.getSql());
             params.addAll(subSqlAndParams.getParams());
         } catch (Exception e) {
