@@ -31,6 +31,18 @@ public class PropertyOperator<TQuery, R> {
         this.appender = (op, values) -> appender.append(path, op, values);
     }
 
+    private boolean checkCondition(boolean condition) {
+        if (!condition) {
+            if (query instanceof WhereBuilder) {
+                ((WhereBuilder<?>) query).cancelCurrentCondition();
+            } else {
+                RecordingContext.finish();
+            }
+            return false;
+        }
+        return true;
+    }
+
     public TQuery op(SqlOperator op, Object... values) {
         if (values != null && values.length == 1) {
             Object operand = resolveOperand(values[0]);
@@ -39,6 +51,17 @@ public class PropertyOperator<TQuery, R> {
             appender.append(op, values);
         }
         return query;
+    }
+
+    public TQuery eq(boolean condition, R value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return eq(value);
+    }
+
+    public TQuery eqIf(boolean condition, R value) {
+        return eq(condition, value);
     }
 
     public TQuery eq(R value) {
@@ -50,9 +73,31 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
+    public TQuery eq(boolean condition, Number value, Object... dummy) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return eq(value, dummy);
+    }
+
+    public TQuery eqIf(boolean condition, Number value, Object... dummy) {
+        return eq(condition, value, dummy);
+    }
+
     public TQuery eq(Number value, Object... dummy) {
         appender.append(SqlOperator.EQ, value);
         return query;
+    }
+
+    public TQuery eq(boolean condition, SqlExpression<? extends R> expr, Object... dummy) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return eq(expr, dummy);
+    }
+
+    public TQuery eqIf(boolean condition, SqlExpression<? extends R> expr, Object... dummy) {
+        return eq(condition, expr, dummy);
     }
 
     public TQuery eq(SqlExpression<? extends R> expr, Object... dummy) {
@@ -60,14 +105,47 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
+    public TQuery eq(boolean condition, Query<?> subQuery, Object... dummy) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return eq(subQuery, dummy);
+    }
+
+    public TQuery eqIf(boolean condition, Query<?> subQuery, Object... dummy) {
+        return eq(condition, subQuery, dummy);
+    }
+
     public TQuery eq(Query<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.EQ, subQuery);
         return query;
     }
 
+    public TQuery eq(boolean condition, WhereBuilder<?> subQuery, Object... dummy) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return eq(subQuery, dummy);
+    }
+
+    public TQuery eqIf(boolean condition, WhereBuilder<?> subQuery, Object... dummy) {
+        return eq(condition, subQuery, dummy);
+    }
+
     public TQuery eq(WhereBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.EQ, subQuery);
         return query;
+    }
+
+    public TQuery ne(boolean condition, R value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return ne(value);
+    }
+
+    public TQuery neIf(boolean condition, R value) {
+        return ne(condition, value);
     }
 
     public TQuery ne(R value) {
@@ -99,6 +177,17 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
+    public TQuery gt(boolean condition, R value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return gt(value);
+    }
+
+    public TQuery gtIf(boolean condition, R value) {
+        return gt(condition, value);
+    }
+
     public TQuery gt(R value) {
         Object operand = resolveOperand(value);
         if (operand == null) {
@@ -126,6 +215,17 @@ public class PropertyOperator<TQuery, R> {
     public TQuery gt(WhereBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.GT, subQuery);
         return query;
+    }
+
+    public TQuery ge(boolean condition, R value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return ge(value);
+    }
+
+    public TQuery geIf(boolean condition, R value) {
+        return ge(condition, value);
     }
 
     public TQuery ge(R value) {
@@ -157,6 +257,17 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
+    public TQuery lt(boolean condition, R value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return lt(value);
+    }
+
+    public TQuery ltIf(boolean condition, R value) {
+        return lt(condition, value);
+    }
+
     public TQuery lt(R value) {
         Object operand = resolveOperand(value);
         if (operand == null) {
@@ -184,6 +295,17 @@ public class PropertyOperator<TQuery, R> {
     public TQuery lt(WhereBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.LT, subQuery);
         return query;
+    }
+
+    public TQuery le(boolean condition, R value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return le(value);
+    }
+
+    public TQuery leIf(boolean condition, R value) {
+        return le(condition, value);
     }
 
     public TQuery le(R value) {
@@ -219,11 +341,22 @@ public class PropertyOperator<TQuery, R> {
         if (value instanceof SqlExpression) {
             return value;
         }
-        PropertyPath rightPath = RecordingContext.finish();
+        PropertyPath rightPath = RecordingContext.finishCurrent();
         if (rightPath != null) {
             return new ColumnExpression<>(rightPath);
         }
         return value;
+    }
+
+    public TQuery like(boolean condition, String pattern) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return like(pattern);
+    }
+
+    public TQuery likeIf(boolean condition, String pattern) {
+        return like(condition, pattern);
     }
 
     public TQuery like(String pattern) {
@@ -231,16 +364,48 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
+    public TQuery likeLeft(boolean condition, String value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return likeLeft(value);
+    }
+
     public TQuery likeLeft(String value) {
         return like("%" + value);
+    }
+
+    public TQuery likeRight(boolean condition, String value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return likeRight(value);
     }
 
     public TQuery likeRight(String value) {
         return like(value + "%");
     }
 
+    public TQuery likeAll(boolean condition, String value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return likeAll(value);
+    }
+
     public TQuery likeAll(String value) {
         return like("%" + value + "%");
+    }
+
+    public TQuery notLike(boolean condition, String pattern) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return notLike(pattern);
+    }
+
+    public TQuery notLikeIf(boolean condition, String pattern) {
+        return notLike(condition, pattern);
     }
 
     public TQuery notLike(String pattern) {
@@ -248,9 +413,31 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
+    public TQuery isNull(boolean condition) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return isNull();
+    }
+
+    public TQuery isNullIf(boolean condition) {
+        return isNull(condition);
+    }
+
     public TQuery isNull() {
         appender.append(SqlOperator.IS_NULL);
         return query;
+    }
+
+    public TQuery isNotNull(boolean condition) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return isNotNull();
+    }
+
+    public TQuery isNotNullIf(boolean condition) {
+        return isNotNull(condition);
     }
 
     public TQuery isNotNull() {
@@ -258,9 +445,24 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
+    public TQuery in(boolean condition, Collection<? extends R> values) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return in(values);
+    }
+
     public TQuery in(Collection<? extends R> values) {
         appender.append(SqlOperator.IN, values);
         return query;
+    }
+
+    @SafeVarargs
+    public final TQuery in(boolean condition, R... values) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return in(values);
     }
 
     @SafeVarargs
@@ -287,9 +489,24 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
+    public TQuery notIn(boolean condition, Collection<? extends R> values) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return notIn(values);
+    }
+
     public TQuery notIn(Collection<? extends R> values) {
         appender.append(SqlOperator.NOT_IN, values);
         return query;
+    }
+
+    @SafeVarargs
+    public final TQuery notIn(boolean condition, R... values) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return notIn(values);
     }
 
     @SafeVarargs
@@ -314,6 +531,17 @@ public class PropertyOperator<TQuery, R> {
     public TQuery notIn(SqlExpression<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.NOT_IN, subQuery);
         return query;
+    }
+
+    public TQuery between(boolean condition, R min, R max) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return between(min, max);
+    }
+
+    public TQuery betweenIf(boolean condition, R min, R max) {
+        return between(condition, min, max);
     }
 
     public TQuery between(R min, R max) {

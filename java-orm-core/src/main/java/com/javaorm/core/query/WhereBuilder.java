@@ -8,6 +8,7 @@ import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.ProxyFactory;
 import com.javaorm.core.proxy.RecordingContext;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -36,6 +37,13 @@ public class WhereBuilder<T> {
     private final java.util.function.IntSupplier executeSupplier;
     private final Supplier<com.javaorm.core.dialect.SqlAndParams> sqlAndParamsSupplier;
     private final Consumer<Boolean> printSqlConsumer;
+
+    private LogicalOperator currentLogOp = LogicalOperator.AND;
+    private Object currentLeftOperand = null;
+    private boolean currentCondition = true;
+
+    @SuppressWarnings("rawtypes")
+    private final PropertyOperator reusableOperator;
 
     public WhereBuilder(Query<T> query) {
         this(query, null);
@@ -79,6 +87,9 @@ public class WhereBuilder<T> {
         this.executeSupplier = executeSupplier;
         this.sqlAndParamsSupplier = sqlAndParamsSupplier;
         this.printSqlConsumer = printSqlConsumer;
+        this.reusableOperator = new PropertyOperator<>(this, (op, values) -> {
+            dispatchCurrentCondition(this.currentCondition, this.currentLogOp, this.currentLeftOperand, op, values);
+        });
     }
 
     public int execute() {
@@ -102,30 +113,288 @@ public class WhereBuilder<T> {
         return this;
     }
 
-    /**
-     * SQL 表达式与函数断言：w.and(min(s.getAge())).gt(18)
-     */
-    public <R> PropertyOperator<WhereBuilder<T>, R> and(SqlExpression<R> expr) {
-        rootQuery.resolveExpression(expr);
-        return new PropertyOperator<>(this, (op, vals) -> {
-            ExpressionCondition cond = new ExpressionCondition(expr, op, vals);
-            cond.setLogicalOperator(LogicalOperator.AND);
-            conditionReceiver.accept(cond);
-        });
+    public void cancelCurrentCondition() {
+        this.currentCondition = true;
+        this.currentLogOp = LogicalOperator.AND;
+        this.currentLeftOperand = null;
+        RecordingContext.clearRecording();
     }
 
+    void dispatchCurrentCondition(boolean condition, LogicalOperator logOp, Object leftOperand, SqlOperator op, Object... vals) {
+        this.currentCondition = true;
+        this.currentLogOp = LogicalOperator.AND;
+        this.currentLeftOperand = null;
+        if (!condition) {
+            RecordingContext.clearRecording();
+            return;
+        }
+        addResolvedCondition(logOp, leftOperand, op, vals);
+    }
+
+    private Object resolveOperandValue(Object value) {
+        if (value instanceof SqlExpression) {
+            return value;
+        }
+        PropertyPath rightPath = RecordingContext.finishCurrent();
+        if (rightPath != null) {
+            return new ColumnExpression<>(rightPath);
+        }
+        return value;
+    }
+
+    private void addResolvedCondition(LogicalOperator logOp, Object leftOperand, SqlOperator op, Object... vals) {
+        if (leftOperand instanceof SqlExpression) {
+            SqlExpression<?> expr = (SqlExpression<?>) leftOperand;
+            if (rootQuery != null) {
+                rootQuery.resolveExpression(expr);
+            }
+            ExpressionCondition cond = new ExpressionCondition(expr, op, vals);
+            cond.setLogicalOperator(logOp);
+            conditionReceiver.accept(cond);
+        } else if (leftOperand instanceof Function) {
+            PropertyPath path = recordPath((Function<T, ?>) leftOperand);
+            appendCondition(logOp, path, op, vals);
+        } else if (leftOperand instanceof PropertyPath) {
+            appendCondition(logOp, (PropertyPath) leftOperand, op, vals);
+        } else if (leftOperand instanceof String) {
+            appendDynamicCondition(logOp, (String) leftOperand, op, vals);
+        } else {
+            throw new IllegalStateException("No property path or column specified for condition");
+        }
+    }
+
+    private WhereBuilder<T> executeFlatCondition(boolean condition, Object propOrExpr, SqlOperator op, Object... vals) {
+        LogicalOperator logOp = this.currentLogOp;
+        this.currentLogOp = LogicalOperator.AND;
+
+        if (!condition) {
+            RecordingContext.clearRecording();
+            return this;
+        }
+
+        Object leftOperand;
+        if (propOrExpr instanceof SqlExpression) {
+            leftOperand = propOrExpr;
+        } else if (propOrExpr instanceof Function) {
+            leftOperand = recordPath((Function<T, ?>) propOrExpr);
+        } else {
+            List<PropertyPath> paths = RecordingContext.finishLast(vals != null ? 1 + vals.length : 1);
+            if (!paths.isEmpty()) {
+                leftOperand = paths.get(0);
+                if (paths.size() > 1 && vals != null) {
+                    Object[] resolvedVals = new Object[vals.length];
+                    int pathIdx = 1;
+                    for (int i = 0; i < vals.length; i++) {
+                        if (pathIdx < paths.size()) {
+                            resolvedVals[i] = new ColumnExpression<>(paths.get(pathIdx++));
+                        } else {
+                            resolvedVals[i] = vals[i];
+                        }
+                    }
+                    addResolvedCondition(logOp, leftOperand, op, resolvedVals);
+                    return this;
+                }
+            } else if (propOrExpr instanceof String) {
+                leftOperand = propOrExpr;
+            } else {
+                throw new IllegalStateException("No property path or column specified for condition");
+            }
+        }
+
+        Object[] resolvedVals = vals;
+        if (vals != null && vals.length > 0) {
+            resolvedVals = new Object[vals.length];
+            for (int i = 0; i < vals.length; i++) {
+                resolvedVals[i] = resolveOperandValue(vals[i]);
+            }
+        }
+
+        addResolvedCondition(logOp, leftOperand, op, resolvedVals);
+        return this;
+    }
+
+    public WhereBuilder<T> and() {
+        this.currentLogOp = LogicalOperator.AND;
+        return this;
+    }
+
+    public WhereBuilder<T> or() {
+        this.currentLogOp = LogicalOperator.OR;
+        return this;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> and(R val) {
+        return and(true, val);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> and(boolean condition, R val) {
+        this.currentCondition = condition;
+        this.currentLogOp = LogicalOperator.AND;
+        PropertyPath recorded = RecordingContext.finishCurrent();
+        if (recorded != null) {
+            this.currentLeftOperand = recorded;
+        } else {
+            this.currentLeftOperand = val;
+        }
+        return (PropertyOperator<WhereBuilder<T>, R>) this.reusableOperator;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> and(Function<T, R> getter) {
+        return and(true, getter);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> and(boolean condition, Function<T, R> getter) {
+        this.currentCondition = condition;
+        this.currentLogOp = LogicalOperator.AND;
+        if (condition && getter != null) {
+            this.currentLeftOperand = recordPath(getter);
+        } else {
+            this.currentLeftOperand = null;
+        }
+        return (PropertyOperator<WhereBuilder<T>, R>) this.reusableOperator;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> and(SqlExpression<R> expr) {
+        return and(true, expr);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> and(boolean condition, SqlExpression<R> expr) {
+        this.currentCondition = condition;
+        this.currentLogOp = LogicalOperator.AND;
+        if (expr != null && rootQuery != null) {
+            rootQuery.resolveExpression(expr);
+        }
+        this.currentLeftOperand = expr;
+        return (PropertyOperator<WhereBuilder<T>, R>) this.reusableOperator;
+    }
+
+    @SuppressWarnings("unchecked")
     public <R> PropertyOperator<WhereBuilder<T>, R> and(String propertyOrColumn) {
-        PropertyPath path = RecordingContext.finish();
-        if (path != null) {
-            return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.AND, p, op, vals));
+        return and(true, propertyOrColumn);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> and(boolean condition, String propertyOrColumn) {
+        this.currentCondition = condition;
+        this.currentLogOp = LogicalOperator.AND;
+        PropertyPath recorded = RecordingContext.finishCurrent();
+        if (recorded != null) {
+            this.currentLeftOperand = recorded;
+        } else {
+            this.currentLeftOperand = propertyOrColumn;
         }
-        if (propertyOrColumn == null) {
-            throw new IllegalArgumentException("Column or property name cannot be null");
+        return (PropertyOperator<WhereBuilder<T>, R>) this.reusableOperator;
+    }
+
+    public <R> PropertyOperator<WhereBuilder<T>, R> andIf(boolean condition, R val) {
+        return and(condition, val);
+    }
+    public <R> PropertyOperator<WhereBuilder<T>, R> andIf(boolean condition, Function<T, R> getter) {
+        return and(condition, getter);
+    }
+    public <R> PropertyOperator<WhereBuilder<T>, R> andIf(boolean condition, SqlExpression<R> expr) {
+        return and(condition, expr);
+    }
+    public <R> PropertyOperator<WhereBuilder<T>, R> andIf(boolean condition, String propertyOrColumn) {
+        return and(condition, propertyOrColumn);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> or(R val) {
+        return or(true, val);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> or(boolean condition, R val) {
+        this.currentCondition = condition;
+        this.currentLogOp = LogicalOperator.OR;
+        PropertyPath recorded = RecordingContext.finishCurrent();
+        if (recorded != null) {
+            this.currentLeftOperand = recorded;
+        } else {
+            this.currentLeftOperand = val;
         }
-        return new PropertyOperator<>(this, (op, vals) -> appendDynamicCondition(LogicalOperator.AND, propertyOrColumn, op, vals));
+        return (PropertyOperator<WhereBuilder<T>, R>) this.reusableOperator;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> or(Function<T, R> getter) {
+        return or(true, getter);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> or(boolean condition, Function<T, R> getter) {
+        this.currentCondition = condition;
+        this.currentLogOp = LogicalOperator.OR;
+        if (condition && getter != null) {
+            this.currentLeftOperand = recordPath(getter);
+        } else {
+            this.currentLeftOperand = null;
+        }
+        return (PropertyOperator<WhereBuilder<T>, R>) this.reusableOperator;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> or(SqlExpression<R> expr) {
+        return or(true, expr);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> or(boolean condition, SqlExpression<R> expr) {
+        this.currentCondition = condition;
+        this.currentLogOp = LogicalOperator.OR;
+        if (expr != null && rootQuery != null) {
+            rootQuery.resolveExpression(expr);
+        }
+        this.currentLeftOperand = expr;
+        return (PropertyOperator<WhereBuilder<T>, R>) this.reusableOperator;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> or(String propertyOrColumn) {
+        return or(true, propertyOrColumn);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<WhereBuilder<T>, R> or(boolean condition, String propertyOrColumn) {
+        this.currentCondition = condition;
+        this.currentLogOp = LogicalOperator.OR;
+        PropertyPath recorded = RecordingContext.finishCurrent();
+        if (recorded != null) {
+            this.currentLeftOperand = recorded;
+        } else {
+            this.currentLeftOperand = propertyOrColumn;
+        }
+        return (PropertyOperator<WhereBuilder<T>, R>) this.reusableOperator;
+    }
+
+    public <R> PropertyOperator<WhereBuilder<T>, R> orIf(boolean condition, R val) {
+        return or(condition, val);
+    }
+    public <R> PropertyOperator<WhereBuilder<T>, R> orIf(boolean condition, Function<T, R> getter) {
+        return or(condition, getter);
+    }
+    public <R> PropertyOperator<WhereBuilder<T>, R> orIf(boolean condition, SqlExpression<R> expr) {
+        return or(condition, expr);
+    }
+    public <R> PropertyOperator<WhereBuilder<T>, R> orIf(boolean condition, String propertyOrColumn) {
+        return or(condition, propertyOrColumn);
     }
 
     public WhereBuilder<T> andRaw(String rawSql, Object... params) {
+        return andRaw(true, rawSql, params);
+    }
+
+    public WhereBuilder<T> andRaw(boolean condition, String rawSql, Object... params) {
+        if (!condition) {
+            return this;
+        }
         RawSqlExpression<?> raw = new RawSqlExpression<>(rawSql, params);
         ExpressionCondition cond = new ExpressionCondition(raw, null);
         cond.setLogicalOperator(LogicalOperator.AND);
@@ -133,44 +402,14 @@ public class WhereBuilder<T> {
         return this;
     }
 
-    /**
-     * 方式 1：直接传入代理 getter 调用结果，如 w.and(s.getAge()).gt(18)
-     */
-    @SuppressWarnings("unchecked")
-    public <R> PropertyOperator<WhereBuilder<T>, R> and(R val) {
-        if (val instanceof SqlExpression) {
-            return and((SqlExpression<R>) val);
-        }
-        PropertyPath path = RecordingContext.finish();
-        if (path == null) {
-            if (val instanceof String) {
-                return and((String) val);
-            }
-            throw new IllegalStateException("No proxy property accessed before calling and(...)! Did you call s.getFoo()?");
-        }
-        return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.AND, p, op, vals));
-    }
-
-    /**
-     * 方式 2：传入 Lambda 表达式，如 w.and(s -> s.getAge()).gt(18)
-     */
-    public <R> PropertyOperator<WhereBuilder<T>, R> and(Function<T, R> getter) {
-        PropertyPath path = recordPath(getter);
-        return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.AND, p, op, vals));
-    }
-
-    public <R> PropertyOperator<WhereBuilder<T>, R> or(String propertyOrColumn) {
-        PropertyPath path = RecordingContext.finish();
-        if (path != null) {
-            return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.OR, p, op, vals));
-        }
-        if (propertyOrColumn == null) {
-            throw new IllegalArgumentException("Column or property name cannot be null");
-        }
-        return new PropertyOperator<>(this, (op, vals) -> appendDynamicCondition(LogicalOperator.OR, propertyOrColumn, op, vals));
-    }
-
     public WhereBuilder<T> orRaw(String rawSql, Object... params) {
+        return orRaw(true, rawSql, params);
+    }
+
+    public WhereBuilder<T> orRaw(boolean condition, String rawSql, Object... params) {
+        if (!condition) {
+            return this;
+        }
         RawSqlExpression<?> raw = new RawSqlExpression<>(rawSql, params);
         ExpressionCondition cond = new ExpressionCondition(raw, null);
         cond.setLogicalOperator(LogicalOperator.OR);
@@ -178,48 +417,14 @@ public class WhereBuilder<T> {
         return this;
     }
 
-    /**
-     * SQL 表达式与函数断言：w.or(min(s.getAge())).gt(18)
-     */
-    public <R> PropertyOperator<WhereBuilder<T>, R> or(SqlExpression<R> expr) {
-        rootQuery.resolveExpression(expr);
-        return new PropertyOperator<>(this, (op, vals) -> {
-            ExpressionCondition cond = new ExpressionCondition(expr, op, vals);
-            cond.setLogicalOperator(LogicalOperator.OR);
-            conditionReceiver.accept(cond);
-        });
-    }
-
-    /**
-     * 方式 1：直接传入代理 getter 调用结果，如 w.or(s.getAge()).lt(10)
-     */
-    @SuppressWarnings("unchecked")
-    public <R> PropertyOperator<WhereBuilder<T>, R> or(R val) {
-        if (val instanceof SqlExpression) {
-            return or((SqlExpression<R>) val);
-        }
-        PropertyPath path = RecordingContext.finish();
-        if (path == null) {
-            if (val instanceof String) {
-                return or((String) val);
-            }
-            throw new IllegalStateException("No proxy property accessed before calling or(...)! Did you call s.getFoo()?");
-        }
-        return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.OR, p, op, vals));
-    }
-
-    /**
-     * 方式 2：传入 Lambda 表达式，如 w.or(s -> s.getAge()).lt(10)
-     */
-    public <R> PropertyOperator<WhereBuilder<T>, R> or(Function<T, R> getter) {
-        PropertyPath path = recordPath(getter);
-        return new PropertyOperator<>(this, path, (p, op, vals) -> appendCondition(LogicalOperator.OR, p, op, vals));
-    }
-
-    /**
-     * 子查询 EXISTS 断言
-     */
     public WhereBuilder<T> andExists(Object subQuery) {
+        return andExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> andExists(boolean condition, Object subQuery) {
+        if (!condition) {
+            return this;
+        }
         ExistsCondition cond = new ExistsCondition(subQuery, false);
         cond.setLogicalOperator(LogicalOperator.AND);
         conditionReceiver.accept(cond);
@@ -227,6 +432,13 @@ public class WhereBuilder<T> {
     }
 
     public WhereBuilder<T> andNotExists(Object subQuery) {
+        return andNotExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> andNotExists(boolean condition, Object subQuery) {
+        if (!condition) {
+            return this;
+        }
         ExistsCondition cond = new ExistsCondition(subQuery, true);
         cond.setLogicalOperator(LogicalOperator.AND);
         conditionReceiver.accept(cond);
@@ -234,6 +446,13 @@ public class WhereBuilder<T> {
     }
 
     public WhereBuilder<T> orExists(Object subQuery) {
+        return orExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> orExists(boolean condition, Object subQuery) {
+        if (!condition) {
+            return this;
+        }
         ExistsCondition cond = new ExistsCondition(subQuery, false);
         cond.setLogicalOperator(LogicalOperator.OR);
         conditionReceiver.accept(cond);
@@ -241,6 +460,13 @@ public class WhereBuilder<T> {
     }
 
     public WhereBuilder<T> orNotExists(Object subQuery) {
+        return orNotExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> orNotExists(boolean condition, Object subQuery) {
+        if (!condition) {
+            return this;
+        }
         ExistsCondition cond = new ExistsCondition(subQuery, true);
         cond.setLogicalOperator(LogicalOperator.OR);
         conditionReceiver.accept(cond);
@@ -248,6 +474,13 @@ public class WhereBuilder<T> {
     }
 
     public WhereBuilder<T> andGroup(Consumer<WhereBuilder<T>> groupConsumer) {
+        return andGroup(true, groupConsumer);
+    }
+
+    public WhereBuilder<T> andGroup(boolean condition, Consumer<WhereBuilder<T>> groupConsumer) {
+        if (!condition) {
+            return this;
+        }
         GroupCondition group = new GroupCondition(LogicalOperator.AND);
         WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub);
@@ -258,6 +491,13 @@ public class WhereBuilder<T> {
     }
 
     public WhereBuilder<T> andGroup(BiWhereConsumer<T> groupConsumer) {
+        return andGroup(true, groupConsumer);
+    }
+
+    public WhereBuilder<T> andGroup(boolean condition, BiWhereConsumer<T> groupConsumer) {
+        if (!condition) {
+            return this;
+        }
         GroupCondition group = new GroupCondition(LogicalOperator.AND);
         WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub, sub.proxy());
@@ -268,6 +508,13 @@ public class WhereBuilder<T> {
     }
 
     public WhereBuilder<T> orGroup(Consumer<WhereBuilder<T>> groupConsumer) {
+        return orGroup(true, groupConsumer);
+    }
+
+    public WhereBuilder<T> orGroup(boolean condition, Consumer<WhereBuilder<T>> groupConsumer) {
+        if (!condition) {
+            return this;
+        }
         GroupCondition group = new GroupCondition(LogicalOperator.OR);
         WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub);
@@ -278,6 +525,13 @@ public class WhereBuilder<T> {
     }
 
     public WhereBuilder<T> orGroup(BiWhereConsumer<T> groupConsumer) {
+        return orGroup(true, groupConsumer);
+    }
+
+    public WhereBuilder<T> orGroup(boolean condition, BiWhereConsumer<T> groupConsumer) {
+        if (!condition) {
+            return this;
+        }
         GroupCondition group = new GroupCondition(LogicalOperator.OR);
         WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub, sub.proxy());
@@ -285,6 +539,412 @@ public class WhereBuilder<T> {
             conditionReceiver.accept(group);
         }
         return this;
+    }
+
+    // ==================== 快捷扁平断言语法 (eq, ne, gt, ge, lt, le, like 等) ====================
+
+    // --- eq ---
+    public <R> WhereBuilder<T> eq(R propOrExpr, Object val) {
+        return eq(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> eq(boolean condition, R propOrExpr, Object val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.EQ, val);
+    }
+    public <R> WhereBuilder<T> eq(SqlExpression<R> expr, Object val) {
+        return eq(true, expr, val);
+    }
+    public <R> WhereBuilder<T> eq(boolean condition, SqlExpression<R> expr, Object val) {
+        return executeFlatCondition(condition, expr, SqlOperator.EQ, val);
+    }
+    public WhereBuilder<T> eq(String propertyOrColumn, Object val) {
+        return eq(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> eq(boolean condition, String propertyOrColumn, Object val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.EQ, val);
+    }
+    public <R> WhereBuilder<T> eq(Function<T, R> getter, R val) {
+        return eq(true, getter, val);
+    }
+    public <R> WhereBuilder<T> eq(boolean condition, Function<T, R> getter, R val) {
+        return executeFlatCondition(condition, getter, SqlOperator.EQ, val);
+    }
+
+    // --- ne ---
+    public <R> WhereBuilder<T> ne(R propOrExpr, Object val) {
+        return ne(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> ne(boolean condition, R propOrExpr, Object val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NE, val);
+    }
+    public <R> WhereBuilder<T> ne(SqlExpression<R> expr, Object val) {
+        return ne(true, expr, val);
+    }
+    public <R> WhereBuilder<T> ne(boolean condition, SqlExpression<R> expr, Object val) {
+        return executeFlatCondition(condition, expr, SqlOperator.NE, val);
+    }
+    public WhereBuilder<T> ne(String propertyOrColumn, Object val) {
+        return ne(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> ne(boolean condition, String propertyOrColumn, Object val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NE, val);
+    }
+    public <R> WhereBuilder<T> ne(Function<T, R> getter, R val) {
+        return ne(true, getter, val);
+    }
+    public <R> WhereBuilder<T> ne(boolean condition, Function<T, R> getter, R val) {
+        return executeFlatCondition(condition, getter, SqlOperator.NE, val);
+    }
+
+    // --- gt ---
+    public <R> WhereBuilder<T> gt(R propOrExpr, Object val) {
+        return gt(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> gt(boolean condition, R propOrExpr, Object val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.GT, val);
+    }
+    public <R> WhereBuilder<T> gt(SqlExpression<R> expr, Object val) {
+        return gt(true, expr, val);
+    }
+    public <R> WhereBuilder<T> gt(boolean condition, SqlExpression<R> expr, Object val) {
+        return executeFlatCondition(condition, expr, SqlOperator.GT, val);
+    }
+    public WhereBuilder<T> gt(String propertyOrColumn, Object val) {
+        return gt(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> gt(boolean condition, String propertyOrColumn, Object val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.GT, val);
+    }
+    public <R> WhereBuilder<T> gt(Function<T, R> getter, R val) {
+        return gt(true, getter, val);
+    }
+    public <R> WhereBuilder<T> gt(boolean condition, Function<T, R> getter, R val) {
+        return executeFlatCondition(condition, getter, SqlOperator.GT, val);
+    }
+
+    // --- ge ---
+    public <R> WhereBuilder<T> ge(R propOrExpr, Object val) {
+        return ge(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> ge(boolean condition, R propOrExpr, Object val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.GE, val);
+    }
+    public <R> WhereBuilder<T> ge(SqlExpression<R> expr, Object val) {
+        return ge(true, expr, val);
+    }
+    public <R> WhereBuilder<T> ge(boolean condition, SqlExpression<R> expr, Object val) {
+        return executeFlatCondition(condition, expr, SqlOperator.GE, val);
+    }
+    public WhereBuilder<T> ge(String propertyOrColumn, Object val) {
+        return ge(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> ge(boolean condition, String propertyOrColumn, Object val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.GE, val);
+    }
+    public <R> WhereBuilder<T> ge(Function<T, R> getter, R val) {
+        return ge(true, getter, val);
+    }
+    public <R> WhereBuilder<T> ge(boolean condition, Function<T, R> getter, R val) {
+        return executeFlatCondition(condition, getter, SqlOperator.GE, val);
+    }
+
+    // --- lt ---
+    public <R> WhereBuilder<T> lt(R propOrExpr, Object val) {
+        return lt(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> lt(boolean condition, R propOrExpr, Object val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LT, val);
+    }
+    public <R> WhereBuilder<T> lt(SqlExpression<R> expr, Object val) {
+        return lt(true, expr, val);
+    }
+    public <R> WhereBuilder<T> lt(boolean condition, SqlExpression<R> expr, Object val) {
+        return executeFlatCondition(condition, expr, SqlOperator.LT, val);
+    }
+    public WhereBuilder<T> lt(String propertyOrColumn, Object val) {
+        return lt(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> lt(boolean condition, String propertyOrColumn, Object val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LT, val);
+    }
+    public <R> WhereBuilder<T> lt(Function<T, R> getter, R val) {
+        return lt(true, getter, val);
+    }
+    public <R> WhereBuilder<T> lt(boolean condition, Function<T, R> getter, R val) {
+        return executeFlatCondition(condition, getter, SqlOperator.LT, val);
+    }
+
+    // --- le ---
+    public <R> WhereBuilder<T> le(R propOrExpr, Object val) {
+        return le(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> le(boolean condition, R propOrExpr, Object val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LE, val);
+    }
+    public <R> WhereBuilder<T> le(SqlExpression<R> expr, Object val) {
+        return le(true, expr, val);
+    }
+    public <R> WhereBuilder<T> le(boolean condition, SqlExpression<R> expr, Object val) {
+        return executeFlatCondition(condition, expr, SqlOperator.LE, val);
+    }
+    public WhereBuilder<T> le(String propertyOrColumn, Object val) {
+        return le(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> le(boolean condition, String propertyOrColumn, Object val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LE, val);
+    }
+    public <R> WhereBuilder<T> le(Function<T, R> getter, R val) {
+        return le(true, getter, val);
+    }
+    public <R> WhereBuilder<T> le(boolean condition, Function<T, R> getter, R val) {
+        return executeFlatCondition(condition, getter, SqlOperator.LE, val);
+    }
+
+    // --- like ---
+    public <R> WhereBuilder<T> like(R propOrExpr, Object val) {
+        return like(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> like(boolean condition, R propOrExpr, Object val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LIKE, val);
+    }
+    public WhereBuilder<T> like(String propertyOrColumn, Object val) {
+        return like(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> like(boolean condition, String propertyOrColumn, Object val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, val);
+    }
+    public <R> WhereBuilder<T> like(Function<T, R> getter, Object val) {
+        return like(true, getter, val);
+    }
+    public <R> WhereBuilder<T> like(boolean condition, Function<T, R> getter, Object val) {
+        return executeFlatCondition(condition, getter, SqlOperator.LIKE, val);
+    }
+
+    public <R> WhereBuilder<T> likeLeft(R propOrExpr, Object val) {
+        return likeLeft(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> likeLeft(boolean condition, R propOrExpr, Object val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LIKE, "%" + val);
+    }
+    public WhereBuilder<T> likeLeft(String propertyOrColumn, Object val) {
+        return likeLeft(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> likeLeft(boolean condition, String propertyOrColumn, Object val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, "%" + val);
+    }
+    public <R> WhereBuilder<T> likeLeft(Function<T, R> getter, Object val) {
+        return likeLeft(true, getter, val);
+    }
+    public <R> WhereBuilder<T> likeLeft(boolean condition, Function<T, R> getter, Object val) {
+        return executeFlatCondition(condition, getter, SqlOperator.LIKE, "%" + val);
+    }
+
+    public <R> WhereBuilder<T> likeRight(R propOrExpr, Object val) {
+        return likeRight(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> likeRight(boolean condition, R propOrExpr, Object val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LIKE, val + "%");
+    }
+    public WhereBuilder<T> likeRight(String propertyOrColumn, Object val) {
+        return likeRight(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> likeRight(boolean condition, String propertyOrColumn, Object val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, val + "%");
+    }
+    public <R> WhereBuilder<T> likeRight(Function<T, R> getter, Object val) {
+        return likeRight(true, getter, val);
+    }
+    public <R> WhereBuilder<T> likeRight(boolean condition, Function<T, R> getter, Object val) {
+        return executeFlatCondition(condition, getter, SqlOperator.LIKE, val + "%");
+    }
+
+    public <R> WhereBuilder<T> likeAll(R propOrExpr, Object val) {
+        return likeAll(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> likeAll(boolean condition, R propOrExpr, Object val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LIKE, "%" + val + "%");
+    }
+    public WhereBuilder<T> likeAll(String propertyOrColumn, Object val) {
+        return likeAll(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> likeAll(boolean condition, String propertyOrColumn, Object val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, "%" + val + "%");
+    }
+    public <R> WhereBuilder<T> likeAll(Function<T, R> getter, Object val) {
+        return likeAll(true, getter, val);
+    }
+    public <R> WhereBuilder<T> likeAll(boolean condition, Function<T, R> getter, Object val) {
+        return executeFlatCondition(condition, getter, SqlOperator.LIKE, "%" + val + "%");
+    }
+
+    public <R> WhereBuilder<T> notLike(R propOrExpr, Object val) {
+        return notLike(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> notLike(boolean condition, R propOrExpr, Object val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_LIKE, val);
+    }
+    public WhereBuilder<T> notLike(String propertyOrColumn, Object val) {
+        return notLike(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> notLike(boolean condition, String propertyOrColumn, Object val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_LIKE, val);
+    }
+    public <R> WhereBuilder<T> notLike(Function<T, R> getter, Object val) {
+        return notLike(true, getter, val);
+    }
+    public <R> WhereBuilder<T> notLike(boolean condition, Function<T, R> getter, Object val) {
+        return executeFlatCondition(condition, getter, SqlOperator.NOT_LIKE, val);
+    }
+
+    // --- isNull / isNotNull ---
+    public <R> WhereBuilder<T> isNull(R propOrExpr) {
+        return isNull(true, propOrExpr);
+    }
+    public <R> WhereBuilder<T> isNull(boolean condition, R propOrExpr) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.IS_NULL);
+    }
+    public WhereBuilder<T> isNull(String propertyOrColumn) {
+        return isNull(true, propertyOrColumn);
+    }
+    public WhereBuilder<T> isNull(boolean condition, String propertyOrColumn) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.IS_NULL);
+    }
+    public <R> WhereBuilder<T> isNull(Function<T, R> getter) {
+        return isNull(true, getter);
+    }
+    public <R> WhereBuilder<T> isNull(boolean condition, Function<T, R> getter) {
+        return executeFlatCondition(condition, getter, SqlOperator.IS_NULL);
+    }
+
+    public <R> WhereBuilder<T> isNotNull(R propOrExpr) {
+        return isNotNull(true, propOrExpr);
+    }
+    public <R> WhereBuilder<T> isNotNull(boolean condition, R propOrExpr) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.IS_NOT_NULL);
+    }
+    public WhereBuilder<T> isNotNull(String propertyOrColumn) {
+        return isNotNull(true, propertyOrColumn);
+    }
+    public WhereBuilder<T> isNotNull(boolean condition, String propertyOrColumn) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.IS_NOT_NULL);
+    }
+    public <R> WhereBuilder<T> isNotNull(Function<T, R> getter) {
+        return isNotNull(true, getter);
+    }
+    public <R> WhereBuilder<T> isNotNull(boolean condition, Function<T, R> getter) {
+        return executeFlatCondition(condition, getter, SqlOperator.IS_NOT_NULL);
+    }
+
+    // --- in / notIn ---
+    public <R> WhereBuilder<T> in(R propOrExpr, Collection<?> values) {
+        return in(true, propOrExpr, values);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, R propOrExpr, Collection<?> values) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.IN, values);
+    }
+    public <R> WhereBuilder<T> in(R propOrExpr, Object... values) {
+        return in(true, propOrExpr, values);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, R propOrExpr, Object... values) {
+        if (values != null && values.length == 1 && values[0] instanceof Collection) {
+            return in(condition, propOrExpr, (Collection<?>) values[0]);
+        }
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.IN, values);
+    }
+    public WhereBuilder<T> in(String propertyOrColumn, Collection<?> values) {
+        return in(true, propertyOrColumn, values);
+    }
+    public WhereBuilder<T> in(boolean condition, String propertyOrColumn, Collection<?> values) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.IN, values);
+    }
+    public WhereBuilder<T> in(String propertyOrColumn, Object... values) {
+        return in(true, propertyOrColumn, values);
+    }
+    public WhereBuilder<T> in(boolean condition, String propertyOrColumn, Object... values) {
+        if (values != null && values.length == 1 && values[0] instanceof Collection) {
+            return in(condition, propertyOrColumn, (Collection<?>) values[0]);
+        }
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.IN, values);
+    }
+    public <R> WhereBuilder<T> in(Function<T, R> getter, Collection<?> values) {
+        return in(true, getter, values);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, Function<T, R> getter, Collection<?> values) {
+        return executeFlatCondition(condition, getter, SqlOperator.IN, values);
+    }
+    public <R> WhereBuilder<T> in(Function<T, R> getter, Object... values) {
+        return in(true, getter, values);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, Function<T, R> getter, Object... values) {
+        if (values != null && values.length == 1 && values[0] instanceof Collection) {
+            return in(condition, getter, (Collection<?>) values[0]);
+        }
+        return executeFlatCondition(condition, getter, SqlOperator.IN, values);
+    }
+
+    public <R> WhereBuilder<T> notIn(R propOrExpr, Collection<?> values) {
+        return notIn(true, propOrExpr, values);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, R propOrExpr, Collection<?> values) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_IN, values);
+    }
+    public <R> WhereBuilder<T> notIn(R propOrExpr, Object... values) {
+        return notIn(true, propOrExpr, values);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, R propOrExpr, Object... values) {
+        if (values != null && values.length == 1 && values[0] instanceof Collection) {
+            return notIn(condition, propOrExpr, (Collection<?>) values[0]);
+        }
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_IN, values);
+    }
+    public WhereBuilder<T> notIn(String propertyOrColumn, Collection<?> values) {
+        return notIn(true, propertyOrColumn, values);
+    }
+    public WhereBuilder<T> notIn(boolean condition, String propertyOrColumn, Collection<?> values) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_IN, values);
+    }
+    public WhereBuilder<T> notIn(String propertyOrColumn, Object... values) {
+        return notIn(true, propertyOrColumn, values);
+    }
+    public WhereBuilder<T> notIn(boolean condition, String propertyOrColumn, Object... values) {
+        if (values != null && values.length == 1 && values[0] instanceof Collection) {
+            return notIn(condition, propertyOrColumn, (Collection<?>) values[0]);
+        }
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_IN, values);
+    }
+    public <R> WhereBuilder<T> notIn(Function<T, R> getter, Collection<?> values) {
+        return notIn(true, getter, values);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, Function<T, R> getter, Collection<?> values) {
+        return executeFlatCondition(condition, getter, SqlOperator.NOT_IN, values);
+    }
+    public <R> WhereBuilder<T> notIn(Function<T, R> getter, Object... values) {
+        return notIn(true, getter, values);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, Function<T, R> getter, Object... values) {
+        if (values != null && values.length == 1 && values[0] instanceof Collection) {
+            return notIn(condition, getter, (Collection<?>) values[0]);
+        }
+        return executeFlatCondition(condition, getter, SqlOperator.NOT_IN, values);
+    }
+
+    // --- between ---
+    public <R> WhereBuilder<T> between(R propOrExpr, Object min, Object max) {
+        return between(true, propOrExpr, min, max);
+    }
+    public <R> WhereBuilder<T> between(boolean condition, R propOrExpr, Object min, Object max) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.BETWEEN, min, max);
+    }
+    public WhereBuilder<T> between(String propertyOrColumn, Object min, Object max) {
+        return between(true, propertyOrColumn, min, max);
+    }
+    public WhereBuilder<T> between(boolean condition, String propertyOrColumn, Object min, Object max) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.BETWEEN, min, max);
+    }
+    public <R> WhereBuilder<T> between(Function<T, R> getter, R min, R max) {
+        return between(true, getter, min, max);
+    }
+    public <R> WhereBuilder<T> between(boolean condition, Function<T, R> getter, R min, R max) {
+        return executeFlatCondition(condition, getter, SqlOperator.BETWEEN, min, max);
     }
 
     private void appendCondition(LogicalOperator logOp, PropertyPath path, SqlOperator op, Object... vals) {

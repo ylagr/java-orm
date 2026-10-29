@@ -106,6 +106,27 @@ public class RecordingContext {
         return null;
     }
 
+    /**
+     * 按先进先出（FIFO）顺序提取并移除一个录制的属性路径。
+     * 若队列中有较早录制的属性，则优先出队；否则提取当前最新的属性。
+     */
+    public static PropertyPath poll() {
+        LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
+        if (queue != null && !queue.isEmpty()) {
+            PropertyPath polled = queue.poll();
+            if (queue.isEmpty() && CURRENT_PATH.get() == null) {
+                RECORDED_QUEUE.remove();
+            }
+            return polled;
+        }
+        PropertyPath cur = CURRENT_PATH.get();
+        if (cur != null) {
+            CURRENT_PATH.remove();
+            return cur;
+        }
+        return null;
+    }
+
     public static PropertyPath finish() {
         return finish((Class<?>) null);
     }
