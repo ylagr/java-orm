@@ -10,20 +10,22 @@ import java.util.List;
 /**
  * SQL 开窗函数表达式（Window Function）。
  * 例如：ROW_NUMBER() OVER (PARTITION BY teacher_id ORDER BY age DESC) AS "rn"
+ *
+ * @param <T> 开窗计算结果的 Java 映射强类型
  */
-public class WindowFunctionExpression implements SqlExpression {
+public class WindowFunctionExpression<T> implements SqlExpression<T> {
 
-    private final SqlExpression functionExpr;
-    private final List<SqlExpression> partitionBys = new ArrayList<>();
+    private final SqlExpression<?> functionExpr;
+    private final List<SqlExpression<?>> partitionBys = new ArrayList<>();
     private final List<OrderBy> orderBys = new ArrayList<>();
     private String frameClause;
     private String alias;
 
-    public WindowFunctionExpression(SqlExpression functionExpr) {
+    public WindowFunctionExpression(SqlExpression<?> functionExpr) {
         this.functionExpr = functionExpr;
     }
 
-    public WindowFunctionExpression partitionBy(Object... props) {
+    public WindowFunctionExpression<T> partitionBy(Object... props) {
         if (props != null && props.length > 0) {
             int proxyCount = 0;
             for (Object prop : props) {
@@ -35,9 +37,9 @@ public class WindowFunctionExpression implements SqlExpression {
             int pathIdx = 0;
             for (Object prop : props) {
                 if (prop instanceof SqlExpression) {
-                    partitionBys.add((SqlExpression) prop);
+                    partitionBys.add((SqlExpression<?>) prop);
                 } else if (pathIdx < paths.size()) {
-                    partitionBys.add(new ColumnExpression(paths.get(pathIdx++)));
+                    partitionBys.add(new ColumnExpression<>(paths.get(pathIdx++)));
                 } else {
                     partitionBys.add(SQL.toExpression(prop));
                 }
@@ -46,16 +48,16 @@ public class WindowFunctionExpression implements SqlExpression {
         return this;
     }
 
-    public WindowOrderByBuilder orderBy(Object prop) {
-        return new WindowOrderByBuilder(this, SQL.toExpression(prop));
+    public WindowOrderByBuilder<T> orderBy(Object prop) {
+        return new WindowOrderByBuilder<>(this, SQL.toExpression(prop));
     }
 
-    public WindowFunctionExpression rowsBetween(String frameClause) {
+    public WindowFunctionExpression<T> rowsBetween(String frameClause) {
         this.frameClause = frameClause;
         return this;
     }
 
-    public WindowFunctionExpression rowsBetween(long preceding, long following) {
+    public WindowFunctionExpression<T> rowsBetween(long preceding, long following) {
         String pStr = (preceding == Long.MIN_VALUE) ? "UNBOUNDED PRECEDING" : (preceding + " PRECEDING");
         String fStr;
         if (following == Long.MAX_VALUE) {
@@ -71,12 +73,12 @@ public class WindowFunctionExpression implements SqlExpression {
         return this;
     }
 
-    public WindowFunctionExpression rowsUnboundedPreceding() {
+    public WindowFunctionExpression<T> rowsUnboundedPreceding() {
         this.frameClause = "ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW";
         return this;
     }
 
-    public WindowFunctionExpression rowsCurrentRow() {
+    public WindowFunctionExpression<T> rowsCurrentRow() {
         this.frameClause = "ROWS CURRENT ROW";
         return this;
     }
@@ -86,7 +88,7 @@ public class WindowFunctionExpression implements SqlExpression {
     }
 
     @Override
-    public WindowFunctionExpression as(String alias) {
+    public WindowFunctionExpression<T> as(String alias) {
         this.alias = alias;
         return this;
     }
@@ -97,15 +99,15 @@ public class WindowFunctionExpression implements SqlExpression {
     }
 
     @Override
-    public WindowFunctionExpression over() {
+    public WindowFunctionExpression<T> over() {
         return this;
     }
 
-    public SqlExpression getFunctionExpr() {
+    public SqlExpression<?> getFunctionExpr() {
         return functionExpr;
     }
 
-    public List<SqlExpression> getPartitionBys() {
+    public List<SqlExpression<?>> getPartitionBys() {
         return partitionBys;
     }
 

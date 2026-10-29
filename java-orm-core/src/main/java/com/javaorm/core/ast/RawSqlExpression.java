@@ -1,6 +1,6 @@
 package com.javaorm.core.ast;
 
-public class RawSqlExpression implements SqlExpression {
+public class RawSqlExpression<T> implements SqlExpression<T> {
 
     private final String rawSql;
     private final Object[] params;
@@ -17,7 +17,7 @@ public class RawSqlExpression implements SqlExpression {
     }
 
     @Override
-    public RawSqlExpression as(String alias) {
+    public RawSqlExpression<T> as(String alias) {
         this.alias = alias;
         return this;
     }

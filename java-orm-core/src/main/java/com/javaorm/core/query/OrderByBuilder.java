@@ -9,7 +9,7 @@ public class OrderByBuilder<TQuery> {
     private final SelectStatement statement;
     private String tableAlias;
     private String columnName;
-    private SqlExpression expression;
+    private SqlExpression<?> expression;
 
     public OrderByBuilder(TQuery query, SelectStatement statement, String tableAlias, String columnName) {
         this.query = query;
@@ -18,7 +18,7 @@ public class OrderByBuilder<TQuery> {
         this.columnName = columnName;
     }
 
-    public OrderByBuilder(TQuery query, SelectStatement statement, SqlExpression expression) {
+    public OrderByBuilder(TQuery query, SelectStatement statement, SqlExpression<?> expression) {
         this.query = query;
         this.statement = statement;
         this.expression = expression;

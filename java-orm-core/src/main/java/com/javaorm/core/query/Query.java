@@ -605,7 +605,7 @@ public class Query<T> {
         return new OrderByBuilder<>(this, statement, ce.getTableAlias(), ce.getColumnName());
     }
 
-    public OrderByBuilder<Query<T>> orderBy(SqlExpression expr) {
+    public OrderByBuilder<Query<T>> orderBy(SqlExpression<?> expr) {
         resolveExpression(expr);
         return new OrderByBuilder<>(this, statement, expr);
     }
@@ -830,7 +830,7 @@ public class Query<T> {
         }
     }
 
-    public void resolveExpression(SqlExpression expr) {
+    public void resolveExpression(SqlExpression<?> expr) {
         if (expr == null) return;
         if (expr instanceof WindowOrderByBuilder) {
             expr = ((WindowOrderByBuilder) expr).getWindowExpr();
@@ -871,9 +871,9 @@ public class Query<T> {
                 }
             }
         } else if (expr instanceof WindowFunctionExpression) {
-            WindowFunctionExpression wfe = (WindowFunctionExpression) expr;
+            WindowFunctionExpression<?> wfe = (WindowFunctionExpression<?>) expr;
             resolveExpression(wfe.getFunctionExpr());
-            for (SqlExpression part : wfe.getPartitionBys()) {
+            for (SqlExpression<?> part : wfe.getPartitionBys()) {
                 resolveExpression(part);
             }
             for (OrderBy ob : wfe.getOrderBys()) {
@@ -882,15 +882,15 @@ public class Query<T> {
                 }
             }
         } else if (expr instanceof CaseWhenBuilder) {
-            CaseWhenBuilder cwb = (CaseWhenBuilder) expr;
+            CaseWhenBuilder<?> cwb = (CaseWhenBuilder<?>) expr;
             for (CaseWhenBuilder.WhenBranch branch : cwb.getBranches()) {
                 resolveCondition(branch.getCondition());
                 if (branch.getThenVal() instanceof SqlExpression) {
-                    resolveExpression((SqlExpression) branch.getThenVal());
+                    resolveExpression((SqlExpression<?>) branch.getThenVal());
                 }
             }
             if (cwb.getElseVal() instanceof SqlExpression) {
-                resolveExpression((SqlExpression) cwb.getElseVal());
+                resolveExpression((SqlExpression<?>) cwb.getElseVal());
             }
         }
     }
@@ -1042,7 +1042,7 @@ public class Query<T> {
         }
     }
 
-    private void updateExpressionTableAlias(SqlExpression expr, String oldAlias, String newAlias) {
+    private void updateExpressionTableAlias(SqlExpression<?> expr, String oldAlias, String newAlias) {
         if (expr == null) return;
         if (expr instanceof ColumnExpression) {
             ColumnExpression ce = (ColumnExpression) expr;
@@ -1057,9 +1057,9 @@ public class Query<T> {
                 }
             }
         } else if (expr instanceof WindowFunctionExpression) {
-            WindowFunctionExpression wfe = (WindowFunctionExpression) expr;
+            WindowFunctionExpression<?> wfe = (WindowFunctionExpression<?>) expr;
             updateExpressionTableAlias(wfe.getFunctionExpr(), oldAlias, newAlias);
-            for (SqlExpression part : wfe.getPartitionBys()) {
+            for (SqlExpression<?> part : wfe.getPartitionBys()) {
                 updateExpressionTableAlias(part, oldAlias, newAlias);
             }
             for (OrderBy ob : wfe.getOrderBys()) {

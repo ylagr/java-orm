@@ -1,8 +1,8 @@
 package com.javaorm.core.ast;
 
-public class SubQueryExpression implements SqlExpression {
+public class SubQueryExpression<T> implements SqlExpression<T> {
 
-    private final Object query; // Query<?>
+    private final Object query;
     private String alias;
 
     public SubQueryExpression(Object query) {
@@ -15,7 +15,7 @@ public class SubQueryExpression implements SqlExpression {
     }
 
     @Override
-    public SubQueryExpression as(String alias) {
+    public SubQueryExpression<T> as(String alias) {
         this.alias = alias;
         return this;
     }

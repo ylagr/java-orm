@@ -459,7 +459,7 @@ public abstract class AbstractDialect implements Dialect {
         }
     }
 
-    public void renderWindowFunction(WindowFunctionExpression wfe, StringBuilder sql, List<Object> params) {
+    public void renderWindowFunction(WindowFunctionExpression<?> wfe, StringBuilder sql, List<Object> params) {
         renderExpression(wfe.getFunctionExpr(), sql, params);
         sql.append(" OVER (");
         boolean hasPartition = false;
@@ -699,7 +699,7 @@ public abstract class AbstractDialect implements Dialect {
         return false;
     }
 
-    public void renderCaseWhen(CaseWhenBuilder builder, StringBuilder sql, List<Object> params) {
+    public void renderCaseWhen(CaseWhenBuilder<?> builder, StringBuilder sql, List<Object> params) {
         sql.append("CASE");
         for (CaseWhenBuilder.WhenBranch branch : builder.getBranches()) {
             sql.append(" WHEN ");

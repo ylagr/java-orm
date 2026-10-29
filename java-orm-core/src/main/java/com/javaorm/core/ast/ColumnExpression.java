@@ -2,7 +2,7 @@ package com.javaorm.core.ast;
 
 import com.javaorm.core.proxy.PropertyPath;
 
-public class ColumnExpression implements SqlExpression {
+public class ColumnExpression<T> implements SqlExpression<T> {
 
     private PropertyPath path;
     private String tableAlias;
@@ -24,7 +24,7 @@ public class ColumnExpression implements SqlExpression {
     }
 
     @Override
-    public ColumnExpression as(String alias) {
+    public ColumnExpression<T> as(String alias) {
         this.alias = alias;
         return this;
     }

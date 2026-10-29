@@ -105,7 +105,7 @@ public class WhereBuilder<T> {
     /**
      * SQL 表达式与函数断言：w.and(min(s.getAge())).gt(18)
      */
-    public <R> PropertyOperator<WhereBuilder<T>, R> and(SqlExpression expr) {
+    public <R> PropertyOperator<WhereBuilder<T>, R> and(SqlExpression<R> expr) {
         rootQuery.resolveExpression(expr);
         return new PropertyOperator<>(this, (op, vals) -> {
             ExpressionCondition cond = new ExpressionCondition(expr, op, vals);
@@ -126,7 +126,7 @@ public class WhereBuilder<T> {
     }
 
     public WhereBuilder<T> andRaw(String rawSql, Object... params) {
-        RawSqlExpression raw = new RawSqlExpression(rawSql, params);
+        RawSqlExpression<?> raw = new RawSqlExpression<>(rawSql, params);
         ExpressionCondition cond = new ExpressionCondition(raw, null);
         cond.setLogicalOperator(LogicalOperator.AND);
         conditionReceiver.accept(cond);
@@ -136,9 +136,10 @@ public class WhereBuilder<T> {
     /**
      * 方式 1：直接传入代理 getter 调用结果，如 w.and(s.getAge()).gt(18)
      */
+    @SuppressWarnings("unchecked")
     public <R> PropertyOperator<WhereBuilder<T>, R> and(R val) {
         if (val instanceof SqlExpression) {
-            return and((SqlExpression) val);
+            return and((SqlExpression<R>) val);
         }
         PropertyPath path = RecordingContext.finish();
         if (path == null) {
@@ -170,7 +171,7 @@ public class WhereBuilder<T> {
     }
 
     public WhereBuilder<T> orRaw(String rawSql, Object... params) {
-        RawSqlExpression raw = new RawSqlExpression(rawSql, params);
+        RawSqlExpression<?> raw = new RawSqlExpression<>(rawSql, params);
         ExpressionCondition cond = new ExpressionCondition(raw, null);
         cond.setLogicalOperator(LogicalOperator.OR);
         conditionReceiver.accept(cond);
@@ -180,7 +181,7 @@ public class WhereBuilder<T> {
     /**
      * SQL 表达式与函数断言：w.or(min(s.getAge())).gt(18)
      */
-    public <R> PropertyOperator<WhereBuilder<T>, R> or(SqlExpression expr) {
+    public <R> PropertyOperator<WhereBuilder<T>, R> or(SqlExpression<R> expr) {
         rootQuery.resolveExpression(expr);
         return new PropertyOperator<>(this, (op, vals) -> {
             ExpressionCondition cond = new ExpressionCondition(expr, op, vals);
@@ -192,9 +193,10 @@ public class WhereBuilder<T> {
     /**
      * 方式 1：直接传入代理 getter 调用结果，如 w.or(s.getAge()).lt(10)
      */
+    @SuppressWarnings("unchecked")
     public <R> PropertyOperator<WhereBuilder<T>, R> or(R val) {
         if (val instanceof SqlExpression) {
-            return or((SqlExpression) val);
+            return or((SqlExpression<R>) val);
         }
         PropertyPath path = RecordingContext.finish();
         if (path == null) {

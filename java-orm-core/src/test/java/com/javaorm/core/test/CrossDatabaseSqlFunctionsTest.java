@@ -652,4 +652,33 @@ public class CrossDatabaseSqlFunctionsTest {
         SqlAndParams dmSql = dm.buildSelect(query.getStatement());
         assertTrue(dmSql.getSql().startsWith("SELECT NVL(t0.\"name\", ?) AS \"safe_name\" FROM \"t_cross_record\" t0"));
     }
+
+    @Test
+    public void testGenericSqlExpressionAndTypeSafety() {
+        CrossRecord s = $(CrossRecord.class);
+
+        // 1. 验证 count("*") 返回 FunctionExpression<Long>，强类型断言匹配 Long 或 Number
+        Query<CrossRecord> q1 = orm.select(CrossRecord.class)
+                .where(w -> w.and(count("*")).gt(1L)
+                             .and(count("*")).ge(2) // 支持 Number 隐式匹配
+                             .and(s.getAge()).gt(18) // Student/CrossRecord 的 Integer 属性
+                             .and(s.getName()).eq("Alice") // String 属性
+                             .and(s.getScore()).gt(90.5) // Double 属性
+                );
+        String sql = q1.toSql();
+        assertTrue(sql.contains("COUNT(*) > ?"));
+        assertTrue(sql.contains("COUNT(*) >= ?"));
+        assertTrue(sql.contains("\"age\" > ?"));
+        assertTrue(sql.contains("\"name\" = ?"));
+        assertTrue(sql.contains("\"score\" > ?"));
+
+        // 2. HAVING 中聚合函数的泛型强类型断言
+        Query<CrossRecord> q2 = orm.select(CrossRecord.class)
+                .groupBy(s.getName())
+                .having(h -> h.and(count(s.getId())).ge(5L)
+                              .and(avg(s.getScore())).gt(80.0)
+                );
+        String havingSql = q2.toSql();
+        assertTrue(havingSql.contains("HAVING COUNT(t0.\"id\") >= ? AND AVG(t0.\"score\") > ?"));
+    }
 }

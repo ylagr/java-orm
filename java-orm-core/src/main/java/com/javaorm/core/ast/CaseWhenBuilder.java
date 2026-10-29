@@ -11,8 +11,10 @@ import java.util.List;
 /**
  * CASE WHEN 条件分支表达式构建器。
  * 支持 ANSI SQL 标准 CASE WHEN ... THEN ... ELSE ... END
+ *
+ * @param <T> 分支返回值的 Java 映射强类型
  */
-public class CaseWhenBuilder implements SqlExpression {
+public class CaseWhenBuilder<T> implements SqlExpression<T> {
 
     public static class WhenBranch {
         private final Condition condition;
@@ -39,29 +41,29 @@ public class CaseWhenBuilder implements SqlExpression {
     public CaseWhenBuilder() {
     }
 
-    public CaseWhenBuilder(Condition condition, Object thenVal) {
+    public CaseWhenBuilder(Condition condition, T thenVal) {
         when(condition, thenVal);
     }
 
-    public CaseWhenBuilder(Object prop, SqlOperator op, Object val, Object thenVal) {
+    public CaseWhenBuilder(Object prop, SqlOperator op, Object val, T thenVal) {
         when(prop, op, val, thenVal);
     }
 
-    public CaseWhenBuilder when(Condition condition, Object thenVal) {
+    public CaseWhenBuilder<T> when(Condition condition, T thenVal) {
         branches.add(new WhenBranch(condition, thenVal));
         return this;
     }
 
-    public CaseWhenBuilder when(Object prop, SqlOperator op, Object val, Object thenVal) {
+    public CaseWhenBuilder<T> when(Object prop, SqlOperator op, Object val, T thenVal) {
         PropertyPath path = RecordingContext.finish();
         Condition condition;
         if (path != null) {
             condition = new BinaryCondition(path, op, val);
         } else if (prop instanceof ColumnExpression) {
-            ColumnExpression ce = (ColumnExpression) prop;
+            ColumnExpression<?> ce = (ColumnExpression<?>) prop;
             condition = new BinaryCondition(ce.getTableAlias(), ce.getColumnName(), op, val);
         } else if (prop instanceof SqlExpression) {
-            condition = new ExpressionCondition((SqlExpression) prop, op, val);
+            condition = new ExpressionCondition((SqlExpression<?>) prop, op, val);
         } else if (prop instanceof String) {
             condition = new BinaryCondition(null, (String) prop, op, val);
         } else {
@@ -71,13 +73,13 @@ public class CaseWhenBuilder implements SqlExpression {
         return this;
     }
 
-    public CaseWhenBuilder elseVal(Object elseVal) {
+    public CaseWhenBuilder<T> elseVal(T elseVal) {
         this.elseVal = elseVal;
         return this;
     }
 
     @Override
-    public CaseWhenBuilder as(String alias) {
+    public CaseWhenBuilder<T> as(String alias) {
         this.alias = alias;
         return this;
     }

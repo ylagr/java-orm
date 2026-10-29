@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class FunctionExpression implements SqlExpression {
+public class FunctionExpression<T> implements SqlExpression<T> {
 
     private final SqlFunction function;
     private final List<Object> arguments = new ArrayList<>();
@@ -31,12 +31,12 @@ public class FunctionExpression implements SqlExpression {
         return function;
     }
 
-    public FunctionExpression distinct() {
+    public FunctionExpression<T> distinct() {
         this.distinct = true;
         return this;
     }
 
-    public FunctionExpression distinct(boolean distinct) {
+    public FunctionExpression<T> distinct(boolean distinct) {
         this.distinct = distinct;
         return this;
     }
@@ -51,7 +51,7 @@ public class FunctionExpression implements SqlExpression {
     }
 
     @Override
-    public FunctionExpression as(String alias) {
+    public FunctionExpression<T> as(String alias) {
         this.alias = alias;
         return this;
     }

@@ -29,7 +29,7 @@ public class HavingBuilder<T> {
         this.customListSupplier = customListSupplier;
     }
 
-    public <R> PropertyOperator<HavingBuilder<T>, R> and(SqlExpression expr) {
+    public <R> PropertyOperator<HavingBuilder<T>, R> and(SqlExpression<R> expr) {
         query.resolveExpression(expr);
         return new PropertyOperator<>(this, (op, vals) -> {
             ExpressionCondition cond = new ExpressionCondition(expr, op, vals);
@@ -38,19 +38,33 @@ public class HavingBuilder<T> {
         });
     }
 
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<HavingBuilder<T>, R> and(String propertyOrColumn) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            SqlExpression<R> expr = (SqlExpression<R>) query.pathToColumnExpression(path);
+            return and(expr);
+        }
+        if (propertyOrColumn == null) {
+            throw new IllegalArgumentException("Column or expression cannot be null");
+        }
+        return and(new com.javaorm.core.ast.RawSqlExpression<R>(propertyOrColumn));
+    }
+
+    @SuppressWarnings("unchecked")
     public <R> PropertyOperator<HavingBuilder<T>, R> and(R val) {
         if (val instanceof SqlExpression) {
-            return and((SqlExpression) val);
+            return and((SqlExpression<R>) val);
         }
         if (val instanceof String) {
-            return and(new com.javaorm.core.ast.RawSqlExpression((String) val));
+            return and((String) val);
         }
         PropertyPath path = RecordingContext.finish();
-        SqlExpression expr = query.pathToColumnExpression(path);
+        SqlExpression<R> expr = (SqlExpression<R>) query.pathToColumnExpression(path);
         return and(expr);
     }
 
-    public <R> PropertyOperator<HavingBuilder<T>, R> or(SqlExpression expr) {
+    public <R> PropertyOperator<HavingBuilder<T>, R> or(SqlExpression<R> expr) {
         query.resolveExpression(expr);
         return new PropertyOperator<>(this, (op, vals) -> {
             ExpressionCondition cond = new ExpressionCondition(expr, op, vals);
@@ -59,15 +73,29 @@ public class HavingBuilder<T> {
         });
     }
 
+    @SuppressWarnings("unchecked")
+    public <R> PropertyOperator<HavingBuilder<T>, R> or(String propertyOrColumn) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            SqlExpression<R> expr = (SqlExpression<R>) query.pathToColumnExpression(path);
+            return or(expr);
+        }
+        if (propertyOrColumn == null) {
+            throw new IllegalArgumentException("Column or expression cannot be null");
+        }
+        return or(new com.javaorm.core.ast.RawSqlExpression<R>(propertyOrColumn));
+    }
+
+    @SuppressWarnings("unchecked")
     public <R> PropertyOperator<HavingBuilder<T>, R> or(R val) {
         if (val instanceof SqlExpression) {
-            return or((SqlExpression) val);
+            return or((SqlExpression<R>) val);
         }
         if (val instanceof String) {
-            return or(new com.javaorm.core.ast.RawSqlExpression((String) val));
+            return or((String) val);
         }
         PropertyPath path = RecordingContext.finish();
-        SqlExpression expr = query.pathToColumnExpression(path);
+        SqlExpression<R> expr = (SqlExpression<R>) query.pathToColumnExpression(path);
         return or(expr);
     }
 
@@ -81,7 +109,7 @@ public class HavingBuilder<T> {
 
     public <R> OrderByBuilder<HavingBuilder<T>> orderBy(R val) {
         if (val instanceof SqlExpression) {
-            return orderBy((SqlExpression) val);
+            return orderBy((SqlExpression<?>) val);
         }
         PropertyPath path = RecordingContext.finish();
         if (path == null) {
@@ -106,7 +134,7 @@ public class HavingBuilder<T> {
         return new OrderByBuilder<>(this, query.getStatement(), ce.getTableAlias(), ce.getColumnName());
     }
 
-    public OrderByBuilder<HavingBuilder<T>> orderBy(SqlExpression expr) {
+    public OrderByBuilder<HavingBuilder<T>> orderBy(SqlExpression<?> expr) {
         query.resolveExpression(expr);
         return new OrderByBuilder<>(this, query.getStatement(), expr);
     }
