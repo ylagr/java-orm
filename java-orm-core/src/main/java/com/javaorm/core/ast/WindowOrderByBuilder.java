@@ -40,6 +40,41 @@ public class WindowOrderByBuilder<T> implements SqlExpression<T> {
         return windowExpr;
     }
 
+    public WindowFunctionExpression<T> asc(boolean isAsc) {
+        return isAsc ? asc() : desc();
+    }
+
+    public WindowFunctionExpression<T> desc(boolean isDesc) {
+        return isDesc ? desc() : asc();
+    }
+
+    public WindowFunctionExpression<T> sort(boolean isAsc) {
+        return isAsc ? asc() : desc();
+    }
+
+    public WindowFunctionExpression<T> sort(OrderDirection direction) {
+        return (direction != null && !direction.isAscending()) ? desc() : asc();
+    }
+
+    public WindowFunctionExpression<T> sort(String direction) {
+        if ("desc".equalsIgnoreCase(direction != null ? direction.trim() : null)) {
+            return desc();
+        }
+        return asc();
+    }
+
+    public WindowFunctionExpression<T> direction(boolean isAsc) {
+        return sort(isAsc);
+    }
+
+    public WindowFunctionExpression<T> direction(OrderDirection direction) {
+        return sort(direction);
+    }
+
+    public WindowFunctionExpression<T> direction(String direction) {
+        return sort(direction);
+    }
+
     public WindowOrderByBuilder<T> orderBy(Object prop) {
         commitDefault();
         return windowExpr.orderBy(prop);

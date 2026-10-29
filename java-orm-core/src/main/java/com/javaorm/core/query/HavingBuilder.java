@@ -2,6 +2,7 @@ package com.javaorm.core.query;
 
 import com.javaorm.core.ast.ExpressionCondition;
 import com.javaorm.core.ast.LogicalOperator;
+import com.javaorm.core.ast.OrderDirection;
 import com.javaorm.core.ast.SqlExpression;
 import com.javaorm.core.operator.PropertyOperator;
 import com.javaorm.core.proxy.PropertyPath;
@@ -137,6 +138,50 @@ public class HavingBuilder<T> {
     public OrderByBuilder<HavingBuilder<T>> orderBy(SqlExpression<?> expr) {
         query.resolveExpression(expr);
         return new OrderByBuilder<>(this, query.getStatement(), expr);
+    }
+
+    public <R> HavingBuilder<T> orderByAsc(R val) {
+        orderBy(val).asc();
+        return this;
+    }
+
+    public <R> HavingBuilder<T> orderByDesc(R val) {
+        orderBy(val).desc();
+        return this;
+    }
+
+    public <R> HavingBuilder<T> orderBy(R val, boolean isAsc) {
+        orderBy(val).sort(isAsc);
+        return this;
+    }
+
+    public <R> HavingBuilder<T> orderBy(R val, OrderDirection direction) {
+        orderBy(val).sort(direction);
+        return this;
+    }
+
+    public <R> HavingBuilder<T> orderBy(R val, String direction) {
+        orderBy(val).sort(direction);
+        return this;
+    }
+
+    public <R> HavingBuilder<T> orderBy(boolean condition, R val, boolean isAsc) {
+        if (condition) {
+            orderBy(val).sort(isAsc);
+        }
+        return this;
+    }
+
+    public <R> HavingBuilder<T> orderBy(Function<T, R> getter, boolean isAsc) {
+        orderBy(getter).sort(isAsc);
+        return this;
+    }
+
+    public <R> HavingBuilder<T> orderBy(boolean condition, Function<T, R> getter, boolean isAsc) {
+        if (condition) {
+            orderBy(getter).sort(isAsc);
+        }
+        return this;
     }
 
     public HavingBuilder<T> printSql() {

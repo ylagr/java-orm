@@ -472,9 +472,53 @@ public class WhereBuilder<T> {
         return new OrderByBuilder<>(this, rootQuery.getStatement(), ce.getTableAlias(), ce.getColumnName());
     }
 
-    public OrderByBuilder<WhereBuilder<T>> orderBy(SqlExpression expr) {
+    public OrderByBuilder<WhereBuilder<T>> orderBy(SqlExpression<?> expr) {
         rootQuery.resolveExpression(expr);
         return new OrderByBuilder<>(this, rootQuery.getStatement(), expr);
+    }
+
+    public <R> WhereBuilder<T> orderByAsc(R val) {
+        orderBy(val).asc();
+        return this;
+    }
+
+    public <R> WhereBuilder<T> orderByDesc(R val) {
+        orderBy(val).desc();
+        return this;
+    }
+
+    public <R> WhereBuilder<T> orderBy(R val, boolean isAsc) {
+        orderBy(val).sort(isAsc);
+        return this;
+    }
+
+    public <R> WhereBuilder<T> orderBy(R val, OrderDirection direction) {
+        orderBy(val).sort(direction);
+        return this;
+    }
+
+    public <R> WhereBuilder<T> orderBy(R val, String direction) {
+        orderBy(val).sort(direction);
+        return this;
+    }
+
+    public <R> WhereBuilder<T> orderBy(boolean condition, R val, boolean isAsc) {
+        if (condition) {
+            orderBy(val).sort(isAsc);
+        }
+        return this;
+    }
+
+    public <R> WhereBuilder<T> orderBy(Function<T, R> getter, boolean isAsc) {
+        orderBy(getter).sort(isAsc);
+        return this;
+    }
+
+    public <R> WhereBuilder<T> orderBy(boolean condition, Function<T, R> getter, boolean isAsc) {
+        if (condition) {
+            orderBy(getter).sort(isAsc);
+        }
+        return this;
     }
 
     @SuppressWarnings("unchecked")

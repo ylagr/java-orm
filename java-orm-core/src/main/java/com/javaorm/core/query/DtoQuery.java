@@ -118,9 +118,53 @@ public class DtoQuery<DTO, T> {
         return new OrderByBuilder<>(this, getStatement(), ce.getTableAlias(), ce.getColumnName());
     }
 
-    public OrderByBuilder<DtoQuery<DTO, T>> orderBy(com.javaorm.core.ast.SqlExpression expr) {
+    public OrderByBuilder<DtoQuery<DTO, T>> orderBy(com.javaorm.core.ast.SqlExpression<?> expr) {
         underlyingQuery.resolveExpression(expr);
         return new OrderByBuilder<>(this, getStatement(), expr);
+    }
+
+    public <R> DtoQuery<DTO, T> orderByAsc(R val) {
+        orderBy(val).asc();
+        return this;
+    }
+
+    public <R> DtoQuery<DTO, T> orderByDesc(R val) {
+        orderBy(val).desc();
+        return this;
+    }
+
+    public <R> DtoQuery<DTO, T> orderBy(R val, boolean isAsc) {
+        orderBy(val).sort(isAsc);
+        return this;
+    }
+
+    public <R> DtoQuery<DTO, T> orderBy(R val, com.javaorm.core.ast.OrderDirection direction) {
+        orderBy(val).sort(direction);
+        return this;
+    }
+
+    public <R> DtoQuery<DTO, T> orderBy(R val, String direction) {
+        orderBy(val).sort(direction);
+        return this;
+    }
+
+    public <R> DtoQuery<DTO, T> orderBy(boolean condition, R val, boolean isAsc) {
+        if (condition) {
+            orderBy(val).sort(isAsc);
+        }
+        return this;
+    }
+
+    public <R> DtoQuery<DTO, T> orderBy(Function<T, R> getter, boolean isAsc) {
+        orderBy(getter).sort(isAsc);
+        return this;
+    }
+
+    public <R> DtoQuery<DTO, T> orderBy(boolean condition, Function<T, R> getter, boolean isAsc) {
+        if (condition) {
+            orderBy(getter).sort(isAsc);
+        }
+        return this;
     }
 
     public DtoQuery<DTO, T> printSql() {

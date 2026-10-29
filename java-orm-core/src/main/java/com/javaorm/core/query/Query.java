@@ -620,6 +620,106 @@ public class Query<T> {
         return this;
     }
 
+    public <R> Query<T> orderBy(R val, boolean isAsc) {
+        orderBy(val).sort(isAsc);
+        return this;
+    }
+
+    public <R> Query<T> orderBy(R val, OrderDirection direction) {
+        orderBy(val).sort(direction);
+        return this;
+    }
+
+    public <R> Query<T> orderBy(R val, String direction) {
+        orderBy(val).sort(direction);
+        return this;
+    }
+
+    public <R> Query<T> orderBy(boolean condition, R val, boolean isAsc) {
+        if (condition) {
+            orderBy(val).sort(isAsc);
+        }
+        return this;
+    }
+
+    public <R> Query<T> orderBy(boolean condition, R val, OrderDirection direction) {
+        if (condition) {
+            orderBy(val).sort(direction);
+        }
+        return this;
+    }
+
+    public <R> Query<T> orderBy(boolean condition, R val, String direction) {
+        if (condition) {
+            orderBy(val).sort(direction);
+        }
+        return this;
+    }
+
+    public <R> Query<T> orderByAsc(boolean condition, R val) {
+        if (condition) {
+            orderByAsc(val);
+        }
+        return this;
+    }
+
+    public <R> Query<T> orderByDesc(boolean condition, R val) {
+        if (condition) {
+            orderByDesc(val);
+        }
+        return this;
+    }
+
+    public <R> Query<T> orderBy(Function<T, R> getter, boolean isAsc) {
+        orderBy(getter).sort(isAsc);
+        return this;
+    }
+
+    public <R> Query<T> orderBy(Function<T, R> getter, OrderDirection direction) {
+        orderBy(getter).sort(direction);
+        return this;
+    }
+
+    public <R> Query<T> orderBy(Function<T, R> getter, String direction) {
+        orderBy(getter).sort(direction);
+        return this;
+    }
+
+    public <R> Query<T> orderBy(boolean condition, Function<T, R> getter, boolean isAsc) {
+        if (condition) {
+            orderBy(getter).sort(isAsc);
+        }
+        return this;
+    }
+
+    public <R> Query<T> orderBy(boolean condition, Function<T, R> getter, OrderDirection direction) {
+        if (condition) {
+            orderBy(getter).sort(direction);
+        }
+        return this;
+    }
+
+    public <R> Query<T> orderBy(boolean condition, Function<T, R> getter, String direction) {
+        if (condition) {
+            orderBy(getter).sort(direction);
+        }
+        return this;
+    }
+
+    public <R> Query<T> orderByAsc(boolean condition, Function<T, R> getter) {
+        if (condition) {
+            orderBy(getter).asc();
+        }
+        return this;
+    }
+
+    public <R> Query<T> orderByDesc(boolean condition, Function<T, R> getter) {
+        if (condition) {
+            orderBy(getter).desc();
+        }
+        return this;
+    }
+
     public Query<T> union(Object other) {
         statement.addUnion(new UnionClause(other, false));
         return this;
