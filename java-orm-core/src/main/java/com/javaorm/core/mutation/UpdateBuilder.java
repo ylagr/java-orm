@@ -3,6 +3,7 @@ package com.javaorm.core.mutation;
 import com.javaorm.core.ast.BinaryCondition;
 import com.javaorm.core.ast.Condition;
 import com.javaorm.core.ast.LogicalOperator;
+import com.javaorm.core.ast.SqlExpression;
 import com.javaorm.core.ast.UpdateStatement;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.Dialect;
@@ -85,13 +86,16 @@ public class UpdateBuilder<T> {
     }
 
     public UpdateBuilder<T> set(String propertyOrColumn, Object value) {
-        PropertyPath path = RecordingContext.finishCurrent();
+        PropertyPath path = RecordingContext.finishCurrent(entityClass);
         if (path == null) {
-            path = RecordingContext.finish();
+            path = RecordingContext.finish(entityClass);
         }
         if (path != null) {
             ColumnMetadata col = metadata.getColumnByProperty(path.getTerminalProperty());
             String colName = col != null ? col.getColumnName() : config.getNameConversion().convert(path.getTerminalProperty());
+            if (value instanceof SqlExpression) {
+                queryHelper.resolveExpression((SqlExpression) value);
+            }
             statement.addSet(colName, value);
             return this;
         }
@@ -110,14 +114,17 @@ public class UpdateBuilder<T> {
                 colName = config.getNameConversion().convert(propertyOrColumn);
             }
         }
+        if (value instanceof SqlExpression) {
+            queryHelper.resolveExpression((SqlExpression) value);
+        }
         statement.addSet(colName, value);
         return this;
     }
 
     public UpdateBuilder<T> set(Object propVal, Object value) {
-        PropertyPath path = RecordingContext.finishCurrent();
+        PropertyPath path = RecordingContext.finishCurrent(entityClass);
         if (path == null) {
-            path = RecordingContext.finish();
+            path = RecordingContext.finish(entityClass);
         }
         if (path == null) {
             if (propVal instanceof String) {
@@ -127,6 +134,9 @@ public class UpdateBuilder<T> {
         }
         ColumnMetadata col = metadata.getColumnByProperty(path.getTerminalProperty());
         String colName = col != null ? col.getColumnName() : config.getNameConversion().convert(path.getTerminalProperty());
+        if (value instanceof SqlExpression) {
+            queryHelper.resolveExpression((SqlExpression) value);
+        }
         statement.addSet(colName, value);
         return this;
     }
@@ -135,6 +145,9 @@ public class UpdateBuilder<T> {
         PropertyPath path = recordPath(propertyGetter);
         ColumnMetadata col = metadata.getColumnByProperty(path.getTerminalProperty());
         String colName = col != null ? col.getColumnName() : config.getNameConversion().convert(path.getTerminalProperty());
+        if (value instanceof SqlExpression) {
+            queryHelper.resolveExpression((SqlExpression) value);
+        }
         statement.addSet(colName, value);
         return this;
     }

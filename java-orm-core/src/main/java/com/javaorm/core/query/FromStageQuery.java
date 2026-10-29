@@ -23,8 +23,19 @@ public class FromStageQuery {
     }
 
     public <T> Query<T> from(Class<T> entityClass) {
-        Query<T> query = new Query<>(entityClass, dataSource, dialect, config);
+        String existingAlias = hasSubQuery() ? com.javaorm.core.proxy.RecordingContext.getAlias(entityClass) : null;
+        Query<T> query = new Query<>(entityClass, dataSource, dialect, config, existingAlias);
         query.select(expressions);
         return query;
+    }
+
+    private boolean hasSubQuery() {
+        if (expressions == null) return false;
+        for (Object expr : expressions) {
+            if (expr instanceof com.javaorm.core.ast.SubQueryExpression) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -31,12 +31,16 @@ public class DtoQuery<DTO, T> {
     private final Query<T> underlyingQuery;
 
     public DtoQuery(Class<DTO> dtoClass, Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        this(dtoClass, entityClass, dataSource, dialect, config, null);
+    }
+
+    public DtoQuery(Class<DTO> dtoClass, Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config, String rootAlias) {
         this.dtoClass = dtoClass;
         this.entityClass = entityClass;
         this.dataSource = dataSource;
         this.dialect = dialect;
         this.config = config;
-        this.underlyingQuery = new Query<>(entityClass, dataSource, dialect, config);
+        this.underlyingQuery = new Query<>(entityClass, dataSource, dialect, config, rootAlias);
     }
 
     public T proxy() {

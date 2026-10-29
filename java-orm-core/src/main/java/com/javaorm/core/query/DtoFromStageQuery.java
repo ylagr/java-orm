@@ -25,10 +25,21 @@ public class DtoFromStageQuery<DTO> {
     }
 
     public <T> DtoQuery<DTO, T> from(Class<T> entityClass) {
-        DtoQuery<DTO, T> query = new DtoQuery<>(dtoClass, entityClass, dataSource, dialect, config);
+        String existingAlias = hasSubQuery() ? com.javaorm.core.proxy.RecordingContext.getAlias(entityClass) : null;
+        DtoQuery<DTO, T> query = new DtoQuery<>(dtoClass, entityClass, dataSource, dialect, config, existingAlias);
         if (expressions != null && expressions.length > 0) {
             query.select(expressions);
         }
         return query;
+    }
+
+    private boolean hasSubQuery() {
+        if (expressions == null) return false;
+        for (Object expr : expressions) {
+            if (expr instanceof com.javaorm.core.ast.SubQueryExpression) {
+                return true;
+            }
+        }
+        return false;
     }
 }

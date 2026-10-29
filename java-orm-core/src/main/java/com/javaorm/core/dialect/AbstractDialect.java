@@ -81,7 +81,7 @@ public abstract class AbstractDialect implements Dialect {
                     sql.append(ob.isAscending() ? " ASC" : " DESC");
                 } else {
                     if (ob.getTableAlias() != null && !ob.getTableAlias().isEmpty()) {
-                        sql.append(ob.getTableAlias()).append(".");
+                        sql.append(renderTablePrefix(ob.getTableAlias()));
                     }
                     sql.append(quote(ob.getColumnName())).append(ob.isAscending() ? " ASC" : " DESC");
                 }
@@ -191,11 +191,21 @@ public abstract class AbstractDialect implements Dialect {
         }
     }
 
+    protected String renderTablePrefix(String alias) {
+        if (alias == null || alias.isEmpty()) {
+            return "";
+        }
+        if (alias.matches("^t\\d+$") || "tt".equalsIgnoreCase(alias)) {
+            return alias + ".";
+        }
+        return quote(alias) + ".";
+    }
+
     protected void renderSingleCondition(Condition cond, StringBuilder sql, List<Object> params) {
         if (cond instanceof BinaryCondition) {
             BinaryCondition bc = (BinaryCondition) cond;
             if (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty()) {
-                sql.append(bc.getTableAlias()).append(".");
+                sql.append(renderTablePrefix(bc.getTableAlias()));
             }
             sql.append(quote(bc.getColumnName())).append(" ");
             SqlOperator op = bc.getOperator();
@@ -211,11 +221,11 @@ public abstract class AbstractDialect implements Dialect {
         } else if (cond instanceof ColumnEqualityCondition) {
             ColumnEqualityCondition cec = (ColumnEqualityCondition) cond;
             if (cec.getLeftTableAlias() != null && !cec.getLeftTableAlias().isEmpty()) {
-                sql.append(cec.getLeftTableAlias()).append(".");
+                sql.append(renderTablePrefix(cec.getLeftTableAlias()));
             }
             sql.append(quote(cec.getLeftColumn())).append(" = ");
             if (cec.getRightTableAlias() != null && !cec.getRightTableAlias().isEmpty()) {
-                sql.append(cec.getRightTableAlias()).append(".");
+                sql.append(renderTablePrefix(cec.getRightTableAlias()));
             }
             sql.append(quote(cec.getRightColumn()));
         } else if (cond instanceof ExistsCondition) {
@@ -291,7 +301,7 @@ public abstract class AbstractDialect implements Dialect {
         if (expr instanceof ColumnExpression) {
             ColumnExpression ce = (ColumnExpression) expr;
             if (ce.getTableAlias() != null && !ce.getTableAlias().isEmpty()) {
-                sql.append(ce.getTableAlias()).append(".");
+                sql.append(renderTablePrefix(ce.getTableAlias()));
             }
             sql.append(quote(ce.getColumnName()));
         } else if (expr instanceof WindowOrderByBuilder) {

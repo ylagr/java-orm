@@ -305,7 +305,7 @@ public class SQL {
         if (objs == null) return new Object[0];
         int proxyCount = 0;
         for (Object obj : objs) {
-            if (!(obj instanceof SqlExpression)) {
+            if (!(obj instanceof SqlExpression) && isPotentialProxy(obj)) {
                 proxyCount++;
             }
         }
@@ -315,12 +315,21 @@ public class SQL {
         for (Object obj : objs) {
             if (obj instanceof SqlExpression) {
                 list.add(obj);
-            } else if (pathIdx < paths.size()) {
+            } else if (isPotentialProxy(obj) && pathIdx < paths.size()) {
                 list.add(new ColumnExpression(paths.get(pathIdx++)));
+            } else if (obj != null) {
+                list.add(new RawSqlExpression("?", obj));
             } else {
                 list.add(toExpression(obj));
             }
         }
         return list.toArray();
+    }
+
+    private static boolean isPotentialProxy(Object obj) {
+        if (obj == null) return true;
+        if (obj instanceof Number && ((Number) obj).longValue() == 0) return true;
+        if (obj instanceof Boolean && !((Boolean) obj)) return true;
+        return false;
     }
 }

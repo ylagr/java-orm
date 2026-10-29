@@ -38,7 +38,11 @@ public class Query<T> {
     private int aliasSeq = 0;
 
     public String nextAlias() {
-        return "t" + (aliasSeq++);
+        String alias = "t" + (aliasSeq++);
+        if (statement != null && alias.equalsIgnoreCase(statement.getRootTableAlias())) {
+            alias = "t" + (aliasSeq++);
+        }
+        return alias;
     }
 
     public static void resetAliasSeq() {
@@ -62,6 +66,35 @@ public class Query<T> {
         }
 
         String rootAlias = nextAlias();
+        this.statement = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), rootAlias);
+        RecordingContext.registerAlias(rootEntityClass, rootAlias);
+
+        // 默认自动注入逻辑删除过滤条件
+        if (rootMetadata.hasLogicDelete()) {
+            ColumnMetadata ld = rootMetadata.getLogicDeleteColumn();
+            statement.addWhereCondition(new BinaryCondition(rootAlias, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+        }
+    }
+
+    public Query(Class<T> rootEntityClass, DataSource dataSource, Dialect dialect, OrmConfig config, String rootAlias) {
+        this.rootEntityClass = rootEntityClass;
+        this.dataSource = dataSource;
+        this.dialect = dialect;
+        this.config = config;
+        this.rootMetadata = EntityMetadataManager.get(rootEntityClass, config);
+
+        if (rootAlias == null) {
+            rootAlias = nextAlias();
+        } else {
+            if (rootAlias.startsWith("t")) {
+                try {
+                    int num = Integer.parseInt(rootAlias.substring(1));
+                    if (aliasSeq <= num) {
+                        aliasSeq = num + 1;
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+        }
         this.statement = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), rootAlias);
         RecordingContext.registerAlias(rootEntityClass, rootAlias);
 
@@ -191,7 +224,7 @@ public class Query<T> {
     public Query<T> select(Object... expressions) {
         statement.getProjectExpressions().clear();
         if (expressions != null && expressions.length > 0) {
-            List<PropertyPath> paths = RecordingContext.finishAll();
+            List<PropertyPath> paths = RecordingContext.finishAll(rootEntityClass);
             int pathIdx = 0;
             for (Object item : expressions) {
                 SqlExpression expr;
@@ -202,7 +235,7 @@ public class Query<T> {
                 } else if (pathIdx < paths.size()) {
                     expr = pathToColumnExpression(paths.get(pathIdx++));
                 } else {
-                    PropertyPath p = RecordingContext.finish();
+                    PropertyPath p = RecordingContext.finish(rootEntityClass);
                     if (p != null) {
                         expr = pathToColumnExpression(p);
                     } else if (item instanceof String) {
@@ -256,7 +289,7 @@ public class Query<T> {
      */
     public Query<T> groupBy(Object... expressions) {
         if (expressions != null && expressions.length > 0) {
-            List<PropertyPath> paths = RecordingContext.finishAll();
+            List<PropertyPath> paths = RecordingContext.finishAll(rootEntityClass);
             int pathIdx = 0;
             for (Object item : expressions) {
                 SqlExpression expr;
@@ -265,7 +298,7 @@ public class Query<T> {
                 } else if (pathIdx < paths.size()) {
                     expr = pathToColumnExpression(paths.get(pathIdx++));
                 } else {
-                    PropertyPath p = RecordingContext.finish();
+                    PropertyPath p = RecordingContext.finish(rootEntityClass);
                     if (p != null) {
                         expr = pathToColumnExpression(p);
                     } else if (item instanceof String) {
@@ -588,6 +621,13 @@ public class Query<T> {
                         shiftRootTableAlias();
                     }
                     return reg;
+                } else {
+                    String extAlias = nextAlias();
+                    while (RecordingContext.hasAlias(extAlias) || extAlias.equalsIgnoreCase(statement.getRootTableAlias())) {
+                        extAlias = nextAlias();
+                    }
+                    RecordingContext.registerAlias(path.getRootEntityClass(), extAlias);
+                    return extAlias;
                 }
             }
             return statement.getRootTableAlias();
@@ -761,8 +801,8 @@ public class Query<T> {
     }
 
     private Class<?> resolveTargetClass(PropertyPath path) {
-        Class<?> current = rootEntityClass;
-        EntityMetadata currentMeta = rootMetadata;
+        Class<?> current = path.getRootEntityClass() != null ? path.getRootEntityClass() : rootEntityClass;
+        EntityMetadata currentMeta = EntityMetadataManager.get(current, config);
         for (String step : path.getRelationSteps()) {
             RelationMetadata rel = currentMeta.getRelation(step);
             if (rel == null) break;

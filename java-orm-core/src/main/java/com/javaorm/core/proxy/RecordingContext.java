@@ -13,12 +13,17 @@ public class RecordingContext {
     private static final ThreadLocal<Map<Class<?>, String>> ACTIVE_ALIASES = ThreadLocal.withInitial(HashMap::new);
 
     public static void start(Class<?> rootEntityClass) {
-        RECORDED_QUEUE.get().clear();
+        clearRecording(rootEntityClass);
         CURRENT_PATH.set(new PropertyPath(rootEntityClass));
     }
 
     public static void ensureStarted(Class<?> rootEntityClass) {
-        if (CURRENT_PATH.get() == null) {
+        PropertyPath cur = CURRENT_PATH.get();
+        if (cur == null) {
+            CURRENT_PATH.set(new PropertyPath(rootEntityClass));
+        } else if (cur.getTerminalProperty() != null) {
+            // 前一个属性已完成录制，推入队列，开启新实体的录制
+            RECORDED_QUEUE.get().offer(cur);
             CURRENT_PATH.set(new PropertyPath(rootEntityClass));
         }
     }
@@ -55,6 +60,19 @@ public class RecordingContext {
         CURRENT_PATH.remove();
     }
 
+    public static void clearRecording(Class<?> entityClass) {
+        if (entityClass == null) {
+            clearRecording();
+            return;
+        }
+        LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
+        queue.removeIf(p -> p.getRootEntityClass() == entityClass);
+        PropertyPath cur = CURRENT_PATH.get();
+        if (cur != null && cur.getRootEntityClass() == entityClass) {
+            CURRENT_PATH.remove();
+        }
+    }
+
     public static void recordRelation(String relationProperty) {
         PropertyPath path = CURRENT_PATH.get();
         if (path != null) {
@@ -76,35 +94,68 @@ public class RecordingContext {
     }
 
     public static PropertyPath finishCurrent() {
+        return finishCurrent(null);
+    }
+
+    public static PropertyPath finishCurrent(Class<?> entityClass) {
         PropertyPath path = CURRENT_PATH.get();
-        CURRENT_PATH.remove();
-        return path;
+        if (path != null && (entityClass == null || path.getRootEntityClass() == entityClass)) {
+            CURRENT_PATH.remove();
+            return path;
+        }
+        return null;
     }
 
     public static PropertyPath finish() {
-        LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
-        if (!queue.isEmpty()) {
-            PropertyPath polled = queue.poll();
-            if (queue.isEmpty() && CURRENT_PATH.get() == null) {
-                RECORDED_QUEUE.remove();
-            }
-            return polled;
+        return finish((Class<?>) null);
+    }
+
+    public static PropertyPath finish(Class<?> entityClass) {
+        PropertyPath cur = CURRENT_PATH.get();
+        if (cur != null && (entityClass == null || cur.getRootEntityClass() == entityClass)) {
+            CURRENT_PATH.remove();
+            return cur;
         }
-        PropertyPath path = CURRENT_PATH.get();
-        CURRENT_PATH.remove();
-        RECORDED_QUEUE.remove();
-        return path;
+
+        LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
+        if (entityClass == null) {
+            if (!queue.isEmpty()) {
+                PropertyPath polled = queue.poll();
+                if (queue.isEmpty() && CURRENT_PATH.get() == null) {
+                    RECORDED_QUEUE.remove();
+                }
+                return polled;
+            }
+            return null;
+        }
+
+        // 针对指定实体查找
+        for (Iterator<PropertyPath> it = queue.iterator(); it.hasNext(); ) {
+            PropertyPath p = it.next();
+            if (p.getRootEntityClass() == entityClass) {
+                it.remove();
+                if (queue.isEmpty() && CURRENT_PATH.get() == null) {
+                    RECORDED_QUEUE.remove();
+                }
+                return p;
+            }
+        }
+        return null;
     }
 
     /**
      * 获取最近录制的指定数量的属性（按调用先后正序返回），常用于多参数函数如 concat(a, b)、partitionBy(a, b)
      */
     public static List<PropertyPath> finishLast(int count) {
+        return finishLast(null, count);
+    }
+
+    public static List<PropertyPath> finishLast(Class<?> entityClass, int count) {
         List<PropertyPath> list = new ArrayList<>();
         if (count <= 0) return list;
 
         PropertyPath cur = CURRENT_PATH.get();
-        if (cur == null) {
+        if (cur == null || (entityClass != null && cur.getRootEntityClass() != entityClass)) {
             // 没有当前属性调用，说明不是通过 proxy getter 调用的，绝不偷取外层的 RECORDED_QUEUE
             return list;
         }
@@ -116,11 +167,15 @@ public class RecordingContext {
         if (count > 0) {
             LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
             List<PropertyPath> fromQueue = new ArrayList<>();
-            while (count > 0 && !queue.isEmpty()) {
-                fromQueue.add(queue.removeLast());
-                count--;
+            for (int i = queue.size() - 1; i >= 0 && count > 0; i--) {
+                PropertyPath p = queue.get(i);
+                if (entityClass == null || p.getRootEntityClass() == entityClass) {
+                    fromQueue.add(p);
+                    queue.remove(i);
+                    count--;
+                }
             }
-            if (queue.isEmpty()) {
+            if (queue.isEmpty() && CURRENT_PATH.get() == null) {
                 RECORDED_QUEUE.remove();
             }
             Collections.reverse(fromQueue);
@@ -132,17 +187,27 @@ public class RecordingContext {
     }
 
     public static List<PropertyPath> finishAll() {
+        return finishAll(null);
+    }
+
+    public static List<PropertyPath> finishAll(Class<?> entityClass) {
         List<PropertyPath> result = new ArrayList<>();
         LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
-        while (!queue.isEmpty()) {
-            result.add(queue.poll());
+        for (Iterator<PropertyPath> it = queue.iterator(); it.hasNext(); ) {
+            PropertyPath p = it.next();
+            if (entityClass == null || p.getRootEntityClass() == entityClass) {
+                result.add(p);
+                it.remove();
+            }
         }
         PropertyPath path = CURRENT_PATH.get();
-        if (path != null) {
+        if (path != null && (entityClass == null || path.getRootEntityClass() == entityClass)) {
             result.add(path);
             CURRENT_PATH.remove();
         }
-        RECORDED_QUEUE.remove();
+        if (queue.isEmpty() && CURRENT_PATH.get() == null) {
+            RECORDED_QUEUE.remove();
+        }
         return result;
     }
 
