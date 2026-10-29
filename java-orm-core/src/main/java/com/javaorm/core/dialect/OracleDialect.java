@@ -140,6 +140,28 @@ public class OracleDialect extends AbstractDialect {
             sql.append(")");
             return true;
         }
+        if (("HOUR".equals(name) || "MINUTE".equals(name) || "SECOND".equals(name)) && !args.isEmpty()) {
+            sql.append("EXTRACT(").append(name).append(" FROM CAST(");
+            renderArg(args.get(0), sql, params);
+            sql.append(" AS TIMESTAMP))");
+            return true;
+        }
+        if ("LEFT".equals(name) && args.size() >= 2) {
+            sql.append("SUBSTR(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", 1, ");
+            renderArg(args.get(1), sql, params);
+            sql.append(")");
+            return true;
+        }
+        if ("RIGHT".equals(name) && args.size() >= 2) {
+            sql.append("SUBSTR(");
+            renderArg(args.get(0), sql, params);
+            sql.append(", -(");
+            renderArg(args.get(1), sql, params);
+            sql.append("))");
+            return true;
+        }
         if ("SUBSTRING".equals(name) && args.size() >= 2) {
             sql.append("SUBSTR(");
             for (int i = 0; i < args.size(); i++) {

@@ -198,6 +198,14 @@ public class SQL {
         return new FunctionExpression("HOUR", toExpression(prop));
     }
 
+    public static FunctionExpression minute(Object prop) {
+        return new FunctionExpression("MINUTE", toExpression(prop));
+    }
+
+    public static FunctionExpression second(Object prop) {
+        return new FunctionExpression("SECOND", toExpression(prop));
+    }
+
     public static FunctionExpression now() {
         return new FunctionExpression("NOW");
     }
@@ -223,12 +231,36 @@ public class SQL {
         return new FunctionExpression("TRIM", toExpression(prop));
     }
 
+    public static FunctionExpression ltrim(Object prop) {
+        return new FunctionExpression("LTRIM", toExpression(prop));
+    }
+
+    public static FunctionExpression rtrim(Object prop) {
+        return new FunctionExpression("RTRIM", toExpression(prop));
+    }
+
     public static FunctionExpression concat(Object... props) {
         return new FunctionExpression("CONCAT", toExpressions(props));
     }
 
     public static FunctionExpression subString(Object prop, int start, int len) {
         return new FunctionExpression("SUBSTRING", toExpression(prop), start, len);
+    }
+
+    public static FunctionExpression replace(Object prop, Object target, Object replacement) {
+        return new FunctionExpression("REPLACE", toExpressions(prop, target, replacement));
+    }
+
+    public static FunctionExpression left(Object prop, int len) {
+        return new FunctionExpression("LEFT", toExpression(prop), len);
+    }
+
+    public static FunctionExpression right(Object prop, int len) {
+        return new FunctionExpression("RIGHT", toExpression(prop), len);
+    }
+
+    public static FunctionExpression instr(Object str, Object substr) {
+        return new FunctionExpression("INSTR", toExpressions(str, substr));
     }
 
     // ==================== 数值函数 ====================
@@ -248,13 +280,45 @@ public class SQL {
         return new FunctionExpression("FLOOR", toExpression(prop));
     }
 
-    // ==================== 空值控制函数 ====================
+    public static FunctionExpression mod(Object prop, Object divisor) {
+        return new FunctionExpression("MOD", toExpressions(prop, divisor));
+    }
+
+    public static FunctionExpression sqrt(Object prop) {
+        return new FunctionExpression("SQRT", toExpression(prop));
+    }
+
+    public static FunctionExpression power(Object prop, Object exponent) {
+        return new FunctionExpression("POWER", toExpressions(prop, exponent));
+    }
+
+    public static FunctionExpression sign(Object prop) {
+        return new FunctionExpression("SIGN", toExpression(prop));
+    }
+
+    // ==================== 空值控制与条件分支 ====================
     public static FunctionExpression ifNull(Object prop, Object def) {
         return new FunctionExpression("IFNULL", toExpression(prop), def);
     }
 
     public static FunctionExpression coalesce(Object... props) {
         return new FunctionExpression("COALESCE", toExpressions(props));
+    }
+
+    public static FunctionExpression nullIf(Object expr1, Object expr2) {
+        return new FunctionExpression("NULLIF", toExpressions(expr1, expr2));
+    }
+
+    public static CaseWhenBuilder caseWhen() {
+        return new CaseWhenBuilder();
+    }
+
+    public static CaseWhenBuilder caseWhen(Condition condition, Object thenVal) {
+        return new CaseWhenBuilder(condition, thenVal);
+    }
+
+    public static CaseWhenBuilder caseWhen(Object prop, com.javaorm.core.operator.SqlOperator op, Object val, Object thenVal) {
+        return new CaseWhenBuilder(prop, op, val, thenVal);
     }
 
     // ==================== 子查询与原生片段 ====================

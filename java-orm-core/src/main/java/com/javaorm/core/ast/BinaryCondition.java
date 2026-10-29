@@ -1,6 +1,7 @@
 package com.javaorm.core.ast;
 
 import com.javaorm.core.operator.SqlOperator;
+import com.javaorm.core.proxy.PropertyPath;
 
 public class BinaryCondition implements Condition {
     private LogicalOperator logicalOperator = LogicalOperator.AND;
@@ -8,10 +9,18 @@ public class BinaryCondition implements Condition {
     private String columnName;
     private SqlOperator operator;
     private Object[] values;
+    private PropertyPath path;
 
     public BinaryCondition(String tableAlias, String columnName, SqlOperator operator, Object... values) {
         this.tableAlias = tableAlias;
         this.columnName = columnName;
+        this.operator = operator;
+        this.values = values;
+    }
+
+    public BinaryCondition(PropertyPath path, SqlOperator operator, Object... values) {
+        this.path = path;
+        this.columnName = path != null ? path.getTerminalProperty() : null;
         this.operator = operator;
         this.values = values;
     }
@@ -32,4 +41,7 @@ public class BinaryCondition implements Condition {
 
     public Object[] getValues() { return values; }
     public void setValues(Object[] values) { this.values = values; }
+
+    public PropertyPath getPath() { return path; }
+    public void setPath(PropertyPath path) { this.path = path; }
 }

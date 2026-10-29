@@ -128,6 +128,10 @@ public abstract class AbstractDialect implements Dialect {
                 IncrementExpression inc = (IncrementExpression) val;
                 sql.append(colName).append(" = ").append(colName).append(" ").append(inc.getOperator()).append(" ?");
                 params.add(inc.getStep());
+            } else if (isQuery(val)) {
+                sql.append(colName).append(" = (");
+                renderSubQuery(val, sql, params);
+                sql.append(")");
             } else if (val instanceof SqlExpression) {
                 sql.append(colName).append(" = ");
                 renderExpression((SqlExpression) val, sql, params);
@@ -269,6 +273,8 @@ public abstract class AbstractDialect implements Dialect {
                 }
             } else if (isQuery(val)) {
                 renderSubQuery(val, sql, params);
+            } else if (val instanceof SubQueryExpression) {
+                renderSubQuery(((SubQueryExpression) val).getQuery(), sql, params);
             } else if (values != null) {
                 for (int k = 0; k < values.length; k++) {
                     if (k > 0) sql.append(", ");
@@ -310,6 +316,8 @@ public abstract class AbstractDialect implements Dialect {
             renderWindowFunction((WindowFunctionExpression) expr, sql, params);
         } else if (expr instanceof FunctionExpression) {
             renderFunction((FunctionExpression) expr, sql, params);
+        } else if (expr instanceof CaseWhenBuilder) {
+            renderCaseWhen((CaseWhenBuilder) expr, sql, params);
         } else if (expr instanceof SubQueryExpression) {
             sql.append("(");
             renderSubQuery(((SubQueryExpression) expr).getQuery(), sql, params);
@@ -396,6 +404,21 @@ public abstract class AbstractDialect implements Dialect {
 
     protected boolean renderDialectSpecificFunction(String name, List<Object> args, StringBuilder sql, List<Object> params) {
         return false;
+    }
+
+    public void renderCaseWhen(CaseWhenBuilder builder, StringBuilder sql, List<Object> params) {
+        sql.append("CASE");
+        for (CaseWhenBuilder.WhenBranch branch : builder.getBranches()) {
+            sql.append(" WHEN ");
+            renderSingleCondition(branch.getCondition(), sql, params);
+            sql.append(" THEN ");
+            renderArg(branch.getThenVal(), sql, params);
+        }
+        if (builder.getElseVal() != null) {
+            sql.append(" ELSE ");
+            renderArg(builder.getElseVal(), sql, params);
+        }
+        sql.append(" END");
     }
 
     public void renderSubQuery(Object queryObj, StringBuilder sql, List<Object> params) {

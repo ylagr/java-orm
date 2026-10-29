@@ -17,6 +17,7 @@ import com.javaorm.core.proxy.RecordingContext;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -34,8 +35,19 @@ public class Query<T> {
 
     private final SelectStatement statement;
     private final Map<String, String> relationJoinAliases = new LinkedHashMap<>();
-    private final List<PropertyPath> includes = new ArrayList<>();
+    private final List<IncludeSpec> includes = new ArrayList<>();
     private int aliasSeq = 0;
+
+    public List<IncludeSpec> getIncludeSpecs() {
+        return Collections.unmodifiableList(includes);
+    }
+
+    public Query<T> addIncludeSpec(IncludeSpec spec) {
+        if (spec != null) {
+            includes.add(spec);
+        }
+        return this;
+    }
 
     public String nextAlias() {
         String alias = "t" + (aliasSeq++);
@@ -372,7 +384,7 @@ public class Query<T> {
     }
 
     /**
-     * 声明显式装配关联对象（避免笛卡尔积，采用 Split IN 查询）
+     * 声明显式装配关联对象（避免笛卡尔积，采用 Split IN 查询，支持各级独立筛选与多层级嵌套）
      */
     public Query<T> include(Function<T, ?> relationGetter) {
         RecordingContext.start(rootEntityClass);
@@ -381,12 +393,125 @@ public class Query<T> {
             relationGetter.apply(proxy);
             PropertyPath path = RecordingContext.finish();
             if (path != null) {
-                includes.add(path);
+                includes.add(new IncludeSpec(path));
             }
         } finally {
             RecordingContext.clearRecording();
         }
         return this;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> Query<T> include(Function<T, ?> relationGetter, Consumer<Query<R>> config) {
+        RecordingContext.start(rootEntityClass);
+        try {
+            T proxy = ProxyFactory.getProxy(rootEntityClass);
+            relationGetter.apply(proxy);
+            PropertyPath path = RecordingContext.finish();
+            if (path != null) {
+                includes.add(new IncludeSpec(path, (Consumer<Query<?>>) (Consumer<?>) config));
+            }
+        } finally {
+            RecordingContext.clearRecording();
+        }
+        return this;
+    }
+
+    public <R> Query<T> include(Function<T, ?> relationGetter, BiConsumer<Query<R>, R> biConfig) {
+        RecordingContext.start(rootEntityClass);
+        try {
+            T proxy = ProxyFactory.getProxy(rootEntityClass);
+            relationGetter.apply(proxy);
+            PropertyPath path = RecordingContext.finish();
+            if (path != null) {
+                includes.add(IncludeSpec.ofBi(path, biConfig));
+            }
+        } finally {
+            RecordingContext.clearRecording();
+        }
+        return this;
+    }
+
+    public <R> Query<T> include(R relationProxy) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            includes.add(new IncludeSpec(path));
+        }
+        return this;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> Query<T> include(R relationProxy, Consumer<Query<R>> config) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            includes.add(new IncludeSpec(path, (Consumer<Query<?>>) (Consumer<?>) config));
+        }
+        return this;
+    }
+
+    public <R> Query<T> include(R relationProxy, BiConsumer<Query<R>, R> biConfig) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            includes.add(IncludeSpec.ofBi(path, biConfig));
+        }
+        return this;
+    }
+
+    public <E> Query<T> include(Collection<E> relationProxy) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            includes.add(new IncludeSpec(path));
+        }
+        return this;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <E> Query<T> include(Collection<E> relationProxy, Consumer<Query<E>> config) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            includes.add(new IncludeSpec(path, (Consumer<Query<?>>) (Consumer<?>) config));
+        }
+        return this;
+    }
+
+    public <E> Query<T> include(Collection<E> relationProxy, BiConsumer<Query<E>, E> biConfig) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            includes.add(IncludeSpec.ofBi(path, biConfig));
+        }
+        return this;
+    }
+
+    /**
+     * 显式重命名当前查询的根表别名（用于子查询或自连接消除歧义）
+     */
+    public Query<T> as(String alias) {
+        if (alias != null && !alias.isEmpty()) {
+            String oldAlias = statement.getRootTableAlias();
+            statement.setRootTableAlias(alias);
+            RecordingContext.registerAlias(rootEntityClass, alias);
+            shiftRootTableAliasTo(oldAlias, alias);
+        }
+        return this;
+    }
+
+    private void shiftRootTableAliasTo(String oldAlias, String newAlias) {
+        for (SqlExpression expr : statement.getProjectExpressions()) {
+            updateExpressionTableAlias(expr, oldAlias, newAlias);
+        }
+        updateConditionsTableAlias(statement.getWhereConditions(), oldAlias, newAlias);
+        for (TableJoin join : statement.getJoins()) {
+            updateConditionsTableAlias(join.getOnConditions(), oldAlias, newAlias);
+        }
+        for (SqlExpression expr : statement.getGroupByExpressions()) {
+            updateExpressionTableAlias(expr, oldAlias, newAlias);
+        }
+        updateConditionsTableAlias(statement.getHavingConditions(), oldAlias, newAlias);
+        for (OrderBy ob : statement.getOrderBys()) {
+            if (ob.getExpression() != null) {
+                updateExpressionTableAlias(ob.getExpression(), oldAlias, newAlias);
+            }
+        }
     }
 
     public <R> OrderByBuilder<Query<T>> orderBy(Function<T, R> propertyGetter) {
@@ -466,9 +591,17 @@ public class Query<T> {
     // 执行方法
     public List<T> list() {
         try (Connection conn = dataSource.getConnection()) {
+            return list(conn);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to execute query list", e);
+        }
+    }
+
+    public List<T> list(Connection conn) {
+        try {
             List<T> result = EntityHydrator.queryList(conn, statement, rootMetadata, dialect, getEffectiveConfig());
             if (!includes.isEmpty() && !result.isEmpty()) {
-                IncludeProcessor.processIncludes(conn, result, rootMetadata, includes, dialect, getEffectiveConfig());
+                IncludeProcessor.processIncludes(conn, result, rootMetadata, includes, dialect, getEffectiveConfig(), dataSource);
             }
             return result;
         } catch (Exception e) {
@@ -594,6 +727,59 @@ public class Query<T> {
                 if (ob.getExpression() != null) {
                     resolveExpression(ob.getExpression());
                 }
+            }
+        } else if (expr instanceof CaseWhenBuilder) {
+            CaseWhenBuilder cwb = (CaseWhenBuilder) expr;
+            for (CaseWhenBuilder.WhenBranch branch : cwb.getBranches()) {
+                resolveCondition(branch.getCondition());
+                if (branch.getThenVal() instanceof SqlExpression) {
+                    resolveExpression((SqlExpression) branch.getThenVal());
+                }
+            }
+            if (cwb.getElseVal() instanceof SqlExpression) {
+                resolveExpression((SqlExpression) cwb.getElseVal());
+            }
+        }
+    }
+
+    public void resolveCondition(Condition cond) {
+        if (cond == null) return;
+        if (cond instanceof BinaryCondition) {
+            BinaryCondition bc = (BinaryCondition) cond;
+            if (bc.getPath() != null) {
+                bc.setTableAlias(resolveTableAlias(bc.getPath()));
+                bc.setColumnName(resolveColumnName(bc.getPath()));
+            } else if (bc.getTableAlias() == null) {
+                bc.setTableAlias(statement.getRootTableAlias());
+                if (rootMetadata != null) {
+                    ColumnMetadata cm = rootMetadata.getColumnByProperty(bc.getColumnName());
+                    if (cm != null) {
+                        bc.setColumnName(cm.getColumnName());
+                    } else if (config != null && config.getNameConversion() != null) {
+                        bc.setColumnName(config.getNameConversion().convert(bc.getColumnName()));
+                    }
+                }
+            }
+            if (bc.getValues() != null) {
+                for (int i = 0; i < bc.getValues().length; i++) {
+                    if (bc.getValues()[i] instanceof SqlExpression) {
+                        resolveExpression((SqlExpression) bc.getValues()[i]);
+                    }
+                }
+            }
+        } else if (cond instanceof ExpressionCondition) {
+            ExpressionCondition ec = (ExpressionCondition) cond;
+            resolveExpression(ec.getExpression());
+            if (ec.getValues() != null) {
+                for (int i = 0; i < ec.getValues().length; i++) {
+                    if (ec.getValues()[i] instanceof SqlExpression) {
+                        resolveExpression((SqlExpression) ec.getValues()[i]);
+                    }
+                }
+            }
+        } else if (cond instanceof GroupCondition) {
+            for (Condition child : ((GroupCondition) cond).getChildren()) {
+                resolveCondition(child);
             }
         }
     }

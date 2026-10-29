@@ -38,7 +38,8 @@ public class JavaOrmFullFeatureTest {
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "teacher_name TEXT, " +
                     "age INTEGER, " +
-                    "title TEXT);");
+                    "title TEXT, " +
+                    "school_id INTEGER);");
 
             stmt.execute("CREATE TABLE t_student (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +

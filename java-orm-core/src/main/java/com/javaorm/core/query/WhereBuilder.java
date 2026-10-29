@@ -557,4 +557,9 @@ public class WhereBuilder<T> {
         }
         return this;
     }
+
+    @SuppressWarnings("unchecked")
+    public Query<T> toQuery() {
+        return (Query<T>) rootQuery;
+    }
 }
