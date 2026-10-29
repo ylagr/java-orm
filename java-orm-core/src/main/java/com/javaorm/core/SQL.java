@@ -117,6 +117,14 @@ public class SQL {
         return new FunctionExpression<>(BuiltinSqlFunction.COUNT, toExpression(prop));
     }
 
+    public static <T> FunctionExpression<Long> countx() {
+        return new FunctionExpression<>(BuiltinSqlFunction.COUNT, toExpression("*"));
+    }
+
+    public static <T> FunctionExpression<Long> count1() {
+        return new FunctionExpression<>(BuiltinSqlFunction.COUNT, new RawSqlExpression<Long>("1"));
+    }
+
     public static <T> FunctionExpression<Long> countDistinct(SqlExpression<T> expr) {
         return new FunctionExpression<Long>(BuiltinSqlFunction.COUNT, expr).distinct();
     }
