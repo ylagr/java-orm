@@ -19,8 +19,19 @@ public class InsertStatement implements Statement {
         values.add(value);
     }
 
-    public Class<?> getEntityClass() { return entityClass; }
-    public String getTableName() { return tableName; }
-    public List<String> getColumns() { return columns; }
-    public List<Object> getValues() { return values; }
+    public Class<?> getEntityClass() {
+        return entityClass;
+    }
+
+    public String getTableName() {
+        return tableName;
+    }
+
+    public List<String> getColumns() {
+        return columns;
+    }
+
+    public List<Object> getValues() {
+        return values;
+    }
 }

@@ -5,15 +5,12 @@ import com.javaorm.core.annotation.*;
 import com.javaorm.core.ast.DateUnit;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.*;
+import com.javaorm.core.function.BuiltinSqlFunction;
+import com.javaorm.core.function.SqlFunction;
 import com.javaorm.core.metadata.EntityMetadata;
 import com.javaorm.core.metadata.EntityMetadataManager;
-import com.javaorm.core.function.BuiltinSqlFunction;
-import com.javaorm.core.function.SimpleSqlFunction;
-import com.javaorm.core.function.SqlFunction;
-import com.javaorm.core.operator.BuiltinSqlOperator;
-import com.javaorm.core.operator.SimpleSqlOperator;
 import com.javaorm.core.operator.SqlOperator;
-import com.javaorm.core.query.Query;
+import com.javaorm.core.query.SelectBuilder;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.Before;
 import org.junit.Test;
@@ -53,16 +50,45 @@ public class CrossDatabaseSqlFunctionsTest {
         @JoAutoFill(fillType = AutoFillType.INSERT)
         private String createBy;
 
-        public Long getId() { return id; }
-        public void setId(Long id) { this.id = id; }
-        public String getTitle() { return title; }
-        public void setTitle(String title) { this.title = title; }
-        public Integer getIsDeleted() { return isDeleted; }
-        public void setIsDeleted(Integer isDeleted) { this.isDeleted = isDeleted; }
-        public String getTenantCode() { return tenantCode; }
-        public void setTenantCode(String tenantCode) { this.tenantCode = tenantCode; }
-        public String getCreateBy() { return createBy; }
-        public void setCreateBy(String createBy) { this.createBy = createBy; }
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public void setTitle(String title) {
+            this.title = title;
+        }
+
+        public Integer getIsDeleted() {
+            return isDeleted;
+        }
+
+        public void setIsDeleted(Integer isDeleted) {
+            this.isDeleted = isDeleted;
+        }
+
+        public String getTenantCode() {
+            return tenantCode;
+        }
+
+        public void setTenantCode(String tenantCode) {
+            this.tenantCode = tenantCode;
+        }
+
+        public String getCreateBy() {
+            return createBy;
+        }
+
+        public void setCreateBy(String createBy) {
+            this.createBy = createBy;
+        }
     }
 
     @JoTable("t_cross_record")
@@ -77,18 +103,53 @@ public class CrossDatabaseSqlFunctionsTest {
         @JoLogicDelete(normalValue = "0", deletedValue = "1")
         private Integer isDeleted;
 
-        public Long getId() { return id; }
-        public void setId(Long id) { this.id = id; }
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
-        public Integer getAge() { return age; }
-        public void setAge(Integer age) { this.age = age; }
-        public Double getScore() { return score; }
-        public void setScore(Double score) { this.score = score; }
-        public LocalDateTime getCreateTime() { return createTime; }
-        public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
-        public Integer getIsDeleted() { return isDeleted; }
-        public void setIsDeleted(Integer isDeleted) { this.isDeleted = isDeleted; }
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public Integer getAge() {
+            return age;
+        }
+
+        public void setAge(Integer age) {
+            this.age = age;
+        }
+
+        public Double getScore() {
+            return score;
+        }
+
+        public void setScore(Double score) {
+            this.score = score;
+        }
+
+        public LocalDateTime getCreateTime() {
+            return createTime;
+        }
+
+        public void setCreateTime(LocalDateTime createTime) {
+            this.createTime = createTime;
+        }
+
+        public Integer getIsDeleted() {
+            return isDeleted;
+        }
+
+        public void setIsDeleted(Integer isDeleted) {
+            this.isDeleted = isDeleted;
+        }
     }
 
     @Before
@@ -144,8 +205,8 @@ public class CrossDatabaseSqlFunctionsTest {
         CrossRecord s = proxy(CrossRecord.class);
 
         // 1. 标准 Java 格式 "yyyy-MM-dd HH:mm:ss"
-        Query<CrossRecord> q1 = orm.select(CrossRecord.class).select(dateFormat(s.getCreateTime(), "yyyy-MM-dd HH:mm:ss"));
-        
+        SelectBuilder<CrossRecord> q1 = orm.select(CrossRecord.class).select(dateFormat(s.getCreateTime(), "yyyy-MM-dd HH:mm:ss"));
+
         q1.setDialect(new MySQLDialect());
         assertTrue(q1.toSql().contains("DATE_FORMAT(t0.`create_time`, '%Y-%m-%d %H:%i:%s')"));
 
@@ -162,7 +223,7 @@ public class CrossDatabaseSqlFunctionsTest {
         assertTrue(q1.toSql().contains("FORMATDATETIME(t0.\"create_time\", 'yyyy-MM-dd HH:mm:ss')"));
 
         // 2. POSIX 格式 "%Y-%m-%d"
-        Query<CrossRecord> q2 = orm.select(CrossRecord.class).select(dateFormat(s.getCreateTime(), "%Y-%m-%d"));
+        SelectBuilder<CrossRecord> q2 = orm.select(CrossRecord.class).select(dateFormat(s.getCreateTime(), "%Y-%m-%d"));
         q2.setDialect(new MySQLDialect());
         assertTrue(q2.toSql().contains("DATE_FORMAT(t0.`create_time`, '%Y-%m-%d')"));
 
@@ -173,7 +234,7 @@ public class CrossDatabaseSqlFunctionsTest {
         assertTrue(q2.toSql().contains("strftime('%Y-%m-%d', t0.\"create_time\")"));
 
         // 3. Oracle 风格格式 "YYYY-MM-DD"
-        Query<CrossRecord> q3 = orm.select(CrossRecord.class).select(dateFormat(s.getCreateTime(), "YYYY-MM-DD"));
+        SelectBuilder<CrossRecord> q3 = orm.select(CrossRecord.class).select(dateFormat(s.getCreateTime(), "YYYY-MM-DD"));
         q3.setDialect(new MySQLDialect());
         assertTrue(q3.toSql().contains("DATE_FORMAT(t0.`create_time`, '%Y-%m-%d')"));
 
@@ -187,7 +248,7 @@ public class CrossDatabaseSqlFunctionsTest {
     @Test
     public void testStrToDateCrossDatabaseTranslation() {
         CrossRecord s = proxy(CrossRecord.class);
-        Query<CrossRecord> q = orm.select(CrossRecord.class).select(strToDate(s.getName(), "yyyy-MM-dd"));
+        SelectBuilder<CrossRecord> q = orm.select(CrossRecord.class).select(strToDate(s.getName(), "yyyy-MM-dd"));
 
         q.setDialect(new MySQLDialect());
         assertTrue(q.toSql().contains("STR_TO_DATE(t0.`name`, '%Y-%m-%d')"));
@@ -210,7 +271,7 @@ public class CrossDatabaseSqlFunctionsTest {
         CrossRecord s = proxy(CrossRecord.class);
 
         // DateAdd
-        Query<CrossRecord> qAdd = orm.select(CrossRecord.class).select(dateAdd(s.getCreateTime(), 1, DateUnit.DAY));
+        SelectBuilder<CrossRecord> qAdd = orm.select(CrossRecord.class).select(dateAdd(s.getCreateTime(), 1, DateUnit.DAY));
         qAdd.setDialect(new MySQLDialect());
         assertTrue(qAdd.toSql().contains("DATE_ADD(t0.`create_time`, INTERVAL 1 DAY)"));
 
@@ -227,7 +288,7 @@ public class CrossDatabaseSqlFunctionsTest {
         assertTrue(qAdd.toSql().contains("DATEADD('DAY', 1, t0.\"create_time\")"));
 
         // DateDiff
-        Query<CrossRecord> qDiff = orm.select(CrossRecord.class).select(dateDiff(s.getCreateTime(), now()));
+        SelectBuilder<CrossRecord> qDiff = orm.select(CrossRecord.class).select(dateDiff(s.getCreateTime(), now()));
         qDiff.setDialect(new MySQLDialect());
         assertTrue(qDiff.toSql().contains("DATEDIFF(t0.`create_time`, NOW())"));
 
@@ -249,7 +310,7 @@ public class CrossDatabaseSqlFunctionsTest {
         CrossRecord s = proxy(CrossRecord.class);
 
         // ConcatWs
-        Query<CrossRecord> qWs = orm.select(CrossRecord.class).select(concatWs("-", s.getName(), s.getAge()));
+        SelectBuilder<CrossRecord> qWs = orm.select(CrossRecord.class).select(concatWs("-", s.getName(), s.getAge()));
         qWs.setDialect(new MySQLDialect());
         assertTrue(qWs.toSql().contains("CONCAT_WS(?, t0.`name`, t0.`age`)"));
 
@@ -263,7 +324,7 @@ public class CrossDatabaseSqlFunctionsTest {
         assertTrue(qWs.toSql().contains("t0.\"name\" || ? || t0.\"age\""));
 
         // GroupConcat
-        Query<CrossRecord> qGc = orm.select(CrossRecord.class).select(groupConcat(s.getName(), ", "));
+        SelectBuilder<CrossRecord> qGc = orm.select(CrossRecord.class).select(groupConcat(s.getName(), ", "));
         qGc.setDialect(new MySQLDialect());
         assertTrue(qGc.toSql().contains("GROUP_CONCAT(t0.`name` SEPARATOR ', ')"));
 
@@ -283,7 +344,7 @@ public class CrossDatabaseSqlFunctionsTest {
     @Test
     public void testDistinctAggregatesCrossDatabase() {
         CrossRecord s = proxy(CrossRecord.class);
-        Query<CrossRecord> q = orm.select(CrossRecord.class)
+        SelectBuilder<CrossRecord> q = orm.select(CrossRecord.class)
                 .select(countDistinct(s.getName()), sumDistinct(s.getScore()), avgDistinct(s.getScore()));
 
         q.setDialect(new MySQLDialect());
@@ -302,7 +363,7 @@ public class CrossDatabaseSqlFunctionsTest {
     @Test
     public void testSeamlessDialectSwitchingOnSameQuery() {
         CrossRecord s = proxy(CrossRecord.class);
-        Query<CrossRecord> query = orm.select(CrossRecord.class)
+        SelectBuilder<CrossRecord> query = orm.select(CrossRecord.class)
                 .select(
                         col(s.getId()).as("sid"),
                         dateFormat(s.getCreateTime(), "yyyy-MM-dd").as("fmt_date"),
@@ -354,7 +415,7 @@ public class CrossDatabaseSqlFunctionsTest {
     @Test
     public void testDateSubAndLastDayCrossDatabase() {
         CrossRecord s = proxy(CrossRecord.class);
-        Query<CrossRecord> query = orm.select(CrossRecord.class)
+        SelectBuilder<CrossRecord> query = orm.select(CrossRecord.class)
                 .select(
                         dateSub(s.getCreateTime(), 3, DateUnit.DAY).as("sub_days"),
                         lastDay(s.getCreateTime()).as("month_end")
@@ -388,7 +449,7 @@ public class CrossDatabaseSqlFunctionsTest {
     @Test
     public void testGreatestLeastRepeatCeilingCrossDatabase() {
         CrossRecord s = proxy(CrossRecord.class);
-        Query<CrossRecord> query = orm.select(CrossRecord.class)
+        SelectBuilder<CrossRecord> query = orm.select(CrossRecord.class)
                 .select(
                         greatest(s.getAge(), 18, 25).as("max_val"),
                         least(s.getAge(), 18, 25).as("min_val"),
@@ -431,7 +492,7 @@ public class CrossDatabaseSqlFunctionsTest {
     @Test
     public void testLocateIifAndCastCrossDatabase() {
         CrossRecord s = proxy(CrossRecord.class);
-        Query<CrossRecord> query = orm.select(CrossRecord.class)
+        SelectBuilder<CrossRecord> query = orm.select(CrossRecord.class)
                 .select(
                         locate("lic", s.getName()).as("loc_idx"),
                         iif(s.getAge(), s.getScore(), 0.0).as("cond_val"),
@@ -537,9 +598,15 @@ public class CrossDatabaseSqlFunctionsTest {
         REGEX("~");
 
         private final String sql;
-        CustomOperator(String sql) { this.sql = sql; }
+
+        CustomOperator(String sql) {
+            this.sql = sql;
+        }
+
         @Override
-        public String getSql() { return sql; }
+        public String getSql() {
+            return sql;
+        }
     }
 
     @Test
@@ -574,7 +641,7 @@ public class CrossDatabaseSqlFunctionsTest {
         });
 
         CrossRecord s = $(CrossRecord.class);
-        Query<CrossRecord> query = orm.select(CrossRecord.class)
+        SelectBuilder<CrossRecord> query = orm.select(CrossRecord.class)
                 .select(func(CustomGeoFunction.ST_DISTANCE, s.getScore(), 100.0).as("dist"));
 
         SqlAndParams mySqlAndParams = mysql.buildSelect(query.getStatement());
@@ -598,7 +665,7 @@ public class CrossDatabaseSqlFunctionsTest {
         });
 
         CrossRecord s = $(CrossRecord.class);
-        Query<CrossRecord> query = orm.select(CrossRecord.class)
+        SelectBuilder<CrossRecord> query = orm.select(CrossRecord.class)
                 .select(dateFormat(s.getCreateTime()).as("formatted_time"));
 
         SqlAndParams res = mysql.buildSelect(query.getStatement());
@@ -616,7 +683,7 @@ public class CrossDatabaseSqlFunctionsTest {
         pg.registerOperator(CustomOperator.REGEX, (op, d) -> "~");
 
         CrossRecord s = $(CrossRecord.class);
-        Query<CrossRecord> query = orm.select(CrossRecord.class)
+        SelectBuilder<CrossRecord> query = orm.select(CrossRecord.class)
                 .where(s.getName(), CustomOperator.REGEX, "^Ali.*");
 
         SqlAndParams mySqlAndParams = mysql.buildSelect(query.getStatement());
@@ -646,7 +713,7 @@ public class CrossDatabaseSqlFunctionsTest {
 
         DamengDialect dm = new DamengDialect();
         CrossRecord s = $(CrossRecord.class);
-        Query<CrossRecord> query = orm.select(CrossRecord.class)
+        SelectBuilder<CrossRecord> query = orm.select(CrossRecord.class)
                 .select(ifNull(s.getName(), "Anonymous").as("safe_name"));
 
         SqlAndParams dmSql = dm.buildSelect(query.getStatement());
@@ -658,12 +725,12 @@ public class CrossDatabaseSqlFunctionsTest {
         CrossRecord s = $(CrossRecord.class);
 
         // 1. 验证 count("*") 返回 FunctionExpression<Long>，强类型断言匹配 Long 或 Number
-        Query<CrossRecord> q1 = orm.select(CrossRecord.class)
+        SelectBuilder<CrossRecord> q1 = orm.select(CrossRecord.class)
                 .where(w -> w.and(count("*")).gt(1L)
-                             .and(count("*")).ge(2) // 支持 Number 隐式匹配
-                             .and(s.getAge()).gt(18) // Student/CrossRecord 的 Integer 属性
-                             .and(s.getName()).eq("Alice") // String 属性
-                             .and(s.getScore()).gt(90.5) // Double 属性
+                        .and(count("*")).ge(2) // 支持 Number 隐式匹配
+                        .and(s.getAge()).gt(18) // Student/CrossRecord 的 Integer 属性
+                        .and(s.getName()).eq("Alice") // String 属性
+                        .and(s.getScore()).gt(90.5) // Double 属性
                 );
         String sql = q1.toSql();
         assertTrue(sql.contains("COUNT(*) > ?"));
@@ -673,10 +740,10 @@ public class CrossDatabaseSqlFunctionsTest {
         assertTrue(sql.contains("\"score\" > ?"));
 
         // 2. HAVING 中聚合函数的泛型强类型断言
-        Query<CrossRecord> q2 = orm.select(CrossRecord.class)
+        SelectBuilder<CrossRecord> q2 = orm.select(CrossRecord.class)
                 .groupBy(s.getName())
                 .having(h -> h.and(count(s.getId())).ge(5L)
-                              .and(avg(s.getScore())).gt(80.0)
+                        .and(avg(s.getScore())).gt(80.0)
                 );
         String havingSql = q2.toSql();
         assertTrue(havingSql.contains("HAVING COUNT(t0.\"id\") >= ? AND AVG(t0.\"score\") > ?"));

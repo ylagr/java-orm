@@ -7,6 +7,7 @@ import com.javaorm.core.dialect.MySQLDialect;
 import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.metadata.EntityMetadata;
 import com.javaorm.core.metadata.EntityMetadataManager;
+import com.javaorm.core.query.SelectBuilder;
 import com.javaorm.core.query.WhereBuilder;
 import com.javaorm.core.tenant.TenantContext;
 import com.javaorm.core.test.entity.School;
@@ -21,7 +22,6 @@ import org.junit.Test;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -318,7 +318,7 @@ public class ReviewIssuesRegressionTest {
         }
 
         // 测试包含 teacher（ManyToOne 分片批量装配）
-        com.javaorm.core.query.Query<Student> query = orm.select(Student.class)
+        SelectBuilder<Student> query = orm.select(Student.class)
                 .include(Student::getTeacher);
 
         try (Connection conn = dataSource.getConnection()) {

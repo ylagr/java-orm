@@ -3,6 +3,7 @@ package com.javaorm.core.test.easyquery;
 import com.javaorm.core.JavaOrm;
 import com.javaorm.core.dialect.MySQLDialect;
 import com.javaorm.core.dialect.PostgreSQLDialect;
+import com.javaorm.core.query.SelectBuilder;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -45,7 +46,7 @@ public class EasyQueryDmlParityTest {
 
     @After
     public void tearDown() {
-        com.javaorm.core.query.Query.resetAliasSeq();
+        SelectBuilder.resetAliasSeq();
     }
 
     @Test

@@ -5,7 +5,6 @@ import com.javaorm.core.ast.SelectStatement;
 import com.javaorm.core.ast.SqlExpression;
 import com.javaorm.core.ast.TableJoin;
 import com.javaorm.core.dialect.SqlAndParams;
-import com.javaorm.core.hydration.EntityHydrator;
 import com.javaorm.core.metadata.ColumnMetadata;
 import com.javaorm.core.metadata.EntityMetadata;
 import com.javaorm.core.metadata.EntityMetadataManager;
@@ -13,10 +12,9 @@ import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.RecordingContext;
 import com.javaorm.core.query.Cte;
 import com.javaorm.core.query.Query;
-import com.javaorm.core.query.TQuery;
+import com.javaorm.core.query.SelectBuilder;
 import com.javaorm.core.query.WhereBuilder;
 
-import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +26,7 @@ import java.util.function.Consumer;
  *
  * @param <T> 查询结果类型强类型约束
  */
-public class SqlSelectStream<T> implements TQuery<T> {
+public class SqlSelectStream<T> implements Query<T> {
 
     private final SqlEnv env;
     private final Class<T> targetClass;
@@ -38,7 +36,7 @@ public class SqlSelectStream<T> implements TQuery<T> {
     private Object candidateRootTable;
     private boolean isFullEntitySelect = false;
 
-    private Query<?> query;
+    private SelectBuilder<?> query;
     private WhereBuilder<T> activeWhereBuilder;
 
     public SqlSelectStream(SqlEnv env, Class<T> targetClass, Object[] expressions) {
@@ -60,7 +58,8 @@ public class SqlSelectStream<T> implements TQuery<T> {
             if (info == null && first instanceof Class<?>) {
                 try {
                     info = env.resolveTable(first);
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
             if (info != null) {
                 this.candidateRootTable = first;
@@ -95,7 +94,7 @@ public class SqlSelectStream<T> implements TQuery<T> {
         }
     }
 
-    public Query<?> getQuery() {
+    public SelectBuilder<?> getQuery() {
         ensureQuery();
         return query;
     }
@@ -117,9 +116,9 @@ public class SqlSelectStream<T> implements TQuery<T> {
     public SqlSelectStream<T> from(Object rootTable) {
         SqlTableInfo info = env.resolveTable(rootTable);
         if (info.isCte()) {
-            this.query = new Query<>(env, info.getCte());
+            this.query = new SelectBuilder<>(env, info.getCte());
         } else {
-            this.query = new Query<>(env, info.getEntityClass(), info.getAlias());
+            this.query = new SelectBuilder<>(env, info.getEntityClass(), info.getAlias());
         }
 
         if (!isFullEntitySelect && !projectExpressions.isEmpty()) {
@@ -363,7 +362,7 @@ public class SqlSelectStream<T> implements TQuery<T> {
         }
         throw new IllegalStateException(
                 "Cannot call toList() on a multi-table or untyped projection query without specifying target class. " +
-                "Please specify target type via .toList(YourDto.class) or e.select(YourDto.class, ...), or use .listMaps() instead."
+                        "Please specify target type via .toList(YourDto.class) or e.select(YourDto.class, ...), or use .listMaps() instead."
         );
     }
 

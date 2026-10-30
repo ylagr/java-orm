@@ -8,7 +8,6 @@ import com.javaorm.core.operator.PropertyOperator;
 import com.javaorm.core.proxy.RecordingContext;
 import com.javaorm.core.query.WhereBuilder;
 import com.javaorm.core.test.entity.Student;
-import com.javaorm.core.test.entity.Teacher;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.After;
 import org.junit.Before;
@@ -18,7 +17,6 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.Arrays;
-import java.util.Collections;
 
 import static com.javaorm.core.SQL.min;
 import static org.junit.Assert.*;
@@ -67,10 +65,10 @@ public class WhereConditionAndFlatApiTest {
 
         SqlAndParams sp = orm.select(Student.class)
                 .where()
-                    .eq(s.getAge(), 20)
-                    .gt(min(s.getAge()), 10)
-                    .eq("age", 22)
-                    .eq(Student::getStudentName, "Tom")
+                .eq(s.getAge(), 20)
+                .gt(min(s.getAge()), 10)
+                .eq("age", 22)
+                .eq(Student::getStudentName, "Tom")
                 .toSqlAndParams();
 
         String sql = sp.getSql();
@@ -92,11 +90,11 @@ public class WhereConditionAndFlatApiTest {
         // condition = false 时，不应该生成任何 SQL，且 ThreadLocal 必须保持干净
         SqlAndParams sp = orm.select(Student.class)
                 .where()
-                    .eq(false, s.getAge(), 1)
-                    .gt(false, min(s.getAge()), 10)
-                    .eq(false, "age", 1)
-                    .eq(false, Student::getStudentName, "Tom")
-                    .eq(true, s.getAge(), 99)
+                .eq(false, s.getAge(), 1)
+                .gt(false, min(s.getAge()), 10)
+                .eq(false, "age", 1)
+                .eq(false, Student::getStudentName, "Tom")
+                .eq(true, s.getAge(), 99)
                 .toSqlAndParams();
 
         String sql = sp.getSql();
@@ -120,11 +118,11 @@ public class WhereConditionAndFlatApiTest {
         // 3.1 两阶段 API 在 eq(condition, ...) / gt(condition, ...) 上阻断
         SqlAndParams sp1 = orm.select(Student.class)
                 .where()
-                    .and(s.getAge()).eq(false, 18)
-                    .and("studentName").eq(false, "Jack")
-                    .and(Student::getAge).gt(false, 20)
-                    .and(min(s.getAge())).gt(false, 10)
-                    .and(s.getAge()).eq(true, 30)
+                .and(s.getAge()).eq(false, 18)
+                .and("studentName").eq(false, "Jack")
+                .and(Student::getAge).gt(false, 20)
+                .and(min(s.getAge())).gt(false, 10)
+                .and(s.getAge()).eq(true, 30)
                 .toSqlAndParams();
 
         String sql1 = sp1.getSql();
@@ -138,11 +136,11 @@ public class WhereConditionAndFlatApiTest {
         // 3.2 验证 condition 为 false 阻断，为 true 正常生效
         SqlAndParams sp2 = orm.select(Student.class)
                 .where()
-                    .and(s.getAge()).eq(false, 18)
-                    .and(s.getAge()).eq(false, 19)
-                    .and(s.getAge()).gt(false, 20)
-                    .and(s.getAge()).gt(false, 21)
-                    .and(s.getAge()).eq(true, 35)
+                .and(s.getAge()).eq(false, 18)
+                .and(s.getAge()).eq(false, 19)
+                .and(s.getAge()).gt(false, 20)
+                .and(s.getAge()).gt(false, 21)
+                .and(s.getAge()).eq(true, 35)
                 .toSqlAndParams();
 
         String sql2 = sp2.getSql();
@@ -157,8 +155,8 @@ public class WhereConditionAndFlatApiTest {
         // 3.3 两阶段 API 字段与字段比较以及 condition 阻断
         SqlAndParams sp3 = orm.select(Student.class)
                 .where()
-                    .and(s.getAge()).eq(false, s.getId())
-                    .and(s.getAge()).eq(true, s.getTeacherId())
+                .and(s.getAge()).eq(false, s.getId())
+                .and(s.getAge()).eq(true, s.getTeacherId())
                 .toSqlAndParams();
 
         String sql3 = sp3.getSql();
@@ -195,7 +193,7 @@ public class WhereConditionAndFlatApiTest {
 
         SqlAndParams sp = orm.select(Student.class)
                 .where()
-                    .eq(s.getTeacher().getTeacherName(), "张老师")
+                .eq(s.getTeacher().getTeacherName(), "张老师")
                 .toSqlAndParams();
 
         String sql = sp.getSql();
@@ -214,21 +212,21 @@ public class WhereConditionAndFlatApiTest {
 
         SqlAndParams sp = orm.select(Student.class)
                 .where()
-                    .ne(s.getAge(), 1)
-                    .gt(s.getAge(), 2)
-                    .ge(s.getAge(), 3)
-                    .lt(s.getAge(), 4)
-                    .le(s.getAge(), 5)
-                    .like(s.getStudentName(), "A%")
-                    .likeLeft(s.getStudentName(), "B")
-                    .likeRight(s.getStudentName(), "C")
-                    .likeAll(s.getStudentName(), "D")
-                    .notLike(s.getStudentName(), "E%")
-                    .isNull(s.getTeacherId())
-                    .isNotNull(s.getCreateTime())
-                    .in(s.getAge(), 10, 20, 30)
-                    .notIn(s.getAge(), Arrays.asList(40, 50))
-                    .between(s.getAge(), 15, 25)
+                .ne(s.getAge(), 1)
+                .gt(s.getAge(), 2)
+                .ge(s.getAge(), 3)
+                .lt(s.getAge(), 4)
+                .le(s.getAge(), 5)
+                .like(s.getStudentName(), "A%")
+                .likeLeft(s.getStudentName(), "B")
+                .likeRight(s.getStudentName(), "C")
+                .likeAll(s.getStudentName(), "D")
+                .notLike(s.getStudentName(), "E%")
+                .isNull(s.getTeacherId())
+                .isNotNull(s.getCreateTime())
+                .in(s.getAge(), 10, 20, 30)
+                .notIn(s.getAge(), Arrays.asList(40, 50))
+                .between(s.getAge(), 15, 25)
                 .toSqlAndParams();
 
         String sql = sp.getSql();
@@ -256,8 +254,8 @@ public class WhereConditionAndFlatApiTest {
 
         SqlAndParams sp = orm.select(Student.class)
                 .where()
-                    .eq(s.getAge(), 18)
-                    .or().gt(s.getAge(), 60)
+                .eq(s.getAge(), 18)
+                .or().gt(s.getAge(), 60)
                 .toSqlAndParams();
 
         String sql = sp.getSql();

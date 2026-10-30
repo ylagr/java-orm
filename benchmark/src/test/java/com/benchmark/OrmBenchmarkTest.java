@@ -58,8 +58,8 @@ public class OrmBenchmarkTest {
         // 2. Condition list query
         List<com.benchmark.entity.javaorm.Student> joList = javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                 .where()
-                    .and(s -> s.getAge()).ge(22)
-                    .and(s -> s.getStudentName()).like("王%")
+                .and(s -> s.getAge()).ge(22)
+                .and(s -> s.getStudentName()).like("王%")
                 .list();
 
         List<com.benchmark.entity.easyquery.Student> eqList = easyQuery.queryable(com.benchmark.entity.easyquery.Student.class)
@@ -75,7 +75,7 @@ public class OrmBenchmarkTest {
         // 3. Join navigation query
         List<com.benchmark.entity.javaorm.Student> joJoin = javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                 .where()
-                    .and(s -> s.getTeacher().getAge()).gt(35)
+                .and(s -> s.getTeacher().getAge()).gt(35)
                 .list();
 
         List<com.benchmark.entity.easyquery.Student> eqJoin = easyQuery.queryable(com.benchmark.entity.easyquery.Student.class)

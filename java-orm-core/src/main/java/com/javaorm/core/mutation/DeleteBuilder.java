@@ -3,29 +3,23 @@ package com.javaorm.core.mutation;
 import com.javaorm.core.ast.BinaryCondition;
 import com.javaorm.core.ast.Condition;
 import com.javaorm.core.ast.DeleteStatement;
-import com.javaorm.core.ast.LogicalOperator;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.Dialect;
 import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.metadata.ColumnMetadata;
 import com.javaorm.core.metadata.EntityMetadata;
 import com.javaorm.core.metadata.EntityMetadataManager;
-import com.javaorm.core.operator.PropertyOperator;
 import com.javaorm.core.operator.SqlOperator;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.ProxyFactory;
 import com.javaorm.core.proxy.RecordingContext;
+import com.javaorm.core.query.SelectBuilder;
+import com.javaorm.core.query.WhereBuilder;
+import com.javaorm.core.sql.SqlEnv;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.javaorm.core.query.Query;
-import com.javaorm.core.query.WhereBuilder;
-import com.javaorm.core.sql.SqlEnv;
-
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -40,14 +34,14 @@ public class DeleteBuilder<T> {
     private Boolean printSqlOverride = null;
     private final DeleteStatement statement;
     private boolean logicDeleteDisabled = false;
-    private final Query<T> queryHelper;
+    private final SelectBuilder<T> queryHelper;
 
     public DeleteBuilder(SqlEnv env, Class<T> entityClass) {
         this.env = env != null ? env : new SqlEnv(null, null, null);
         this.entityClass = entityClass;
         this.metadata = EntityMetadataManager.get(entityClass, this.env.getConfig());
         this.statement = new DeleteStatement(entityClass, metadata != null ? metadata.getTableName() : null);
-        this.queryHelper = new Query<>(this.env, entityClass, false);
+        this.queryHelper = new SelectBuilder<>(this.env, entityClass, false);
         if (metadata != null) {
             RecordingContext.registerAlias(entityClass, metadata.getTableName());
         }
@@ -266,7 +260,7 @@ public class DeleteBuilder<T> {
 
             return env.executeDelete(statement);
         } finally {
-            Query.resetAliasSeq();
+            SelectBuilder.resetAliasSeq();
         }
     }
 
@@ -316,7 +310,7 @@ public class DeleteBuilder<T> {
     public static class DeleteWhereBuilder<T> extends WhereBuilder<T> {
         private final DeleteBuilder<T> deleteBuilder;
 
-        public DeleteWhereBuilder(Class<T> entityClass, Query<?> rootQuery, Consumer<Condition> receiver, DeleteBuilder<T> deleteBuilder) {
+        public DeleteWhereBuilder(Class<T> entityClass, SelectBuilder<?> rootQuery, Consumer<Condition> receiver, DeleteBuilder<T> deleteBuilder) {
             super(entityClass, rootQuery, null, receiver);
             this.deleteBuilder = deleteBuilder;
         }

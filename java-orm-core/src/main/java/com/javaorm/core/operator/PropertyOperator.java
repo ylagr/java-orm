@@ -4,7 +4,7 @@ import com.javaorm.core.ast.ColumnExpression;
 import com.javaorm.core.ast.SqlExpression;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.RecordingContext;
-import com.javaorm.core.query.Query;
+import com.javaorm.core.query.SelectBuilder;
 import com.javaorm.core.query.WhereBuilder;
 
 import java.util.Collection;
@@ -97,14 +97,14 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
-    public TQuery eq(boolean condition, Query<?> subQuery, Object... dummy) {
+    public TQuery eq(boolean condition, SelectBuilder<?> subQuery, Object... dummy) {
         if (!checkCondition(condition)) {
             return query;
         }
         return eq(subQuery, dummy);
     }
 
-    public TQuery eq(Query<?> subQuery, Object... dummy) {
+    public TQuery eq(SelectBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.EQ, subQuery);
         return query;
     }
@@ -165,14 +165,14 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
-    public TQuery ne(boolean condition, Query<?> subQuery, Object... dummy) {
+    public TQuery ne(boolean condition, SelectBuilder<?> subQuery, Object... dummy) {
         if (!checkCondition(condition)) {
             return query;
         }
         return ne(subQuery, dummy);
     }
 
-    public TQuery ne(Query<?> subQuery, Object... dummy) {
+    public TQuery ne(SelectBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.NE, subQuery);
         return query;
     }
@@ -233,14 +233,14 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
-    public TQuery gt(boolean condition, Query<?> subQuery, Object... dummy) {
+    public TQuery gt(boolean condition, SelectBuilder<?> subQuery, Object... dummy) {
         if (!checkCondition(condition)) {
             return query;
         }
         return gt(subQuery, dummy);
     }
 
-    public TQuery gt(Query<?> subQuery, Object... dummy) {
+    public TQuery gt(SelectBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.GT, subQuery);
         return query;
     }
@@ -301,14 +301,14 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
-    public TQuery ge(boolean condition, Query<?> subQuery, Object... dummy) {
+    public TQuery ge(boolean condition, SelectBuilder<?> subQuery, Object... dummy) {
         if (!checkCondition(condition)) {
             return query;
         }
         return ge(subQuery, dummy);
     }
 
-    public TQuery ge(Query<?> subQuery, Object... dummy) {
+    public TQuery ge(SelectBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.GE, subQuery);
         return query;
     }
@@ -369,14 +369,14 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
-    public TQuery lt(boolean condition, Query<?> subQuery, Object... dummy) {
+    public TQuery lt(boolean condition, SelectBuilder<?> subQuery, Object... dummy) {
         if (!checkCondition(condition)) {
             return query;
         }
         return lt(subQuery, dummy);
     }
 
-    public TQuery lt(Query<?> subQuery, Object... dummy) {
+    public TQuery lt(SelectBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.LT, subQuery);
         return query;
     }
@@ -437,14 +437,14 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
-    public TQuery le(boolean condition, Query<?> subQuery, Object... dummy) {
+    public TQuery le(boolean condition, SelectBuilder<?> subQuery, Object... dummy) {
         if (!checkCondition(condition)) {
             return query;
         }
         return le(subQuery, dummy);
     }
 
-    public TQuery le(Query<?> subQuery, Object... dummy) {
+    public TQuery le(SelectBuilder<?> subQuery, Object... dummy) {
         appender.append(SqlOperator.LE, subQuery);
         return query;
     }
@@ -786,14 +786,14 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
-    public TQuery in(boolean condition, Query<?> subQuery) {
+    public TQuery in(boolean condition, SelectBuilder<?> subQuery) {
         if (!checkCondition(condition)) {
             return query;
         }
         return in(subQuery);
     }
 
-    public TQuery in(Query<?> subQuery) {
+    public TQuery in(SelectBuilder<?> subQuery) {
         appender.append(SqlOperator.IN, subQuery);
         return query;
     }
@@ -851,14 +851,14 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
-    public TQuery notIn(boolean condition, Query<?> subQuery) {
+    public TQuery notIn(boolean condition, SelectBuilder<?> subQuery) {
         if (!checkCondition(condition)) {
             return query;
         }
         return notIn(subQuery);
     }
 
-    public TQuery notIn(Query<?> subQuery) {
+    public TQuery notIn(SelectBuilder<?> subQuery) {
         appender.append(SqlOperator.NOT_IN, subQuery);
         return query;
     }

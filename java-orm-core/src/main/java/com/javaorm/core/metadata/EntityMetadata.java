@@ -1,6 +1,8 @@
 package com.javaorm.core.metadata;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class EntityMetadata {
     private Class<?> entityClass;
@@ -59,21 +61,51 @@ public class EntityMetadata {
     }
 
     // Getters and Setters
-    public Class<?> getEntityClass() { return entityClass; }
-    public void setEntityClass(Class<?> entityClass) { this.entityClass = entityClass; }
+    public Class<?> getEntityClass() {
+        return entityClass;
+    }
 
-    public String getTableName() { return tableName; }
-    public void setTableName(String tableName) { this.tableName = tableName; }
+    public void setEntityClass(Class<?> entityClass) {
+        this.entityClass = entityClass;
+    }
 
-    public String getSchema() { return schema; }
-    public void setSchema(String schema) { this.schema = schema; }
+    public String getTableName() {
+        return tableName;
+    }
 
-    public ColumnMetadata getIdColumn() { return idColumn; }
-    public void setIdColumn(ColumnMetadata idColumn) { this.idColumn = idColumn; }
+    public void setTableName(String tableName) {
+        this.tableName = tableName;
+    }
 
-    public boolean hasLogicDelete() { return logicDeleteColumn != null; }
-    public ColumnMetadata getLogicDeleteColumn() { return logicDeleteColumn; }
+    public String getSchema() {
+        return schema;
+    }
 
-    public boolean hasTenant() { return tenantColumn != null; }
-    public ColumnMetadata getTenantColumn() { return tenantColumn; }
+    public void setSchema(String schema) {
+        this.schema = schema;
+    }
+
+    public ColumnMetadata getIdColumn() {
+        return idColumn;
+    }
+
+    public void setIdColumn(ColumnMetadata idColumn) {
+        this.idColumn = idColumn;
+    }
+
+    public boolean hasLogicDelete() {
+        return logicDeleteColumn != null;
+    }
+
+    public ColumnMetadata getLogicDeleteColumn() {
+        return logicDeleteColumn;
+    }
+
+    public boolean hasTenant() {
+        return tenantColumn != null;
+    }
+
+    public ColumnMetadata getTenantColumn() {
+        return tenantColumn;
+    }
 }

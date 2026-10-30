@@ -2,7 +2,6 @@ package com.javaorm.core.mutation;
 
 import com.javaorm.core.ast.BinaryCondition;
 import com.javaorm.core.ast.Condition;
-import com.javaorm.core.ast.LogicalOperator;
 import com.javaorm.core.ast.SqlExpression;
 import com.javaorm.core.ast.UpdateStatement;
 import com.javaorm.core.config.OrmConfig;
@@ -11,22 +10,17 @@ import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.metadata.ColumnMetadata;
 import com.javaorm.core.metadata.EntityMetadata;
 import com.javaorm.core.metadata.EntityMetadataManager;
-import com.javaorm.core.operator.PropertyOperator;
 import com.javaorm.core.operator.SqlOperator;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.ProxyFactory;
 import com.javaorm.core.proxy.RecordingContext;
+import com.javaorm.core.query.SelectBuilder;
+import com.javaorm.core.query.WhereBuilder;
+import com.javaorm.core.sql.SqlEnv;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.javaorm.core.connection.ConnectionUtils;
-import com.javaorm.core.query.Query;
-import com.javaorm.core.query.WhereBuilder;
-import com.javaorm.core.sql.SqlEnv;
-
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -39,14 +33,14 @@ public class UpdateBuilder<T> {
     private final EntityMetadata metadata;
     private Boolean printSqlOverride = null;
     private final UpdateStatement statement;
-    private final Query<T> queryHelper;
+    private final SelectBuilder<T> queryHelper;
 
     public UpdateBuilder(SqlEnv env, Class<T> entityClass) {
         this.env = env != null ? env : new SqlEnv(null, null, null);
         this.entityClass = entityClass;
         this.metadata = EntityMetadataManager.get(entityClass, this.env.getConfig());
         this.statement = new UpdateStatement(entityClass, metadata != null ? metadata.getTableName() : null);
-        this.queryHelper = new Query<>(this.env, entityClass, false);
+        this.queryHelper = new SelectBuilder<>(this.env, entityClass, false);
         if (metadata != null) {
             RecordingContext.registerAlias(entityClass, metadata.getTableName());
         }
@@ -381,7 +375,7 @@ public class UpdateBuilder<T> {
     public static class UpdateWhereBuilder<T> extends WhereBuilder<T> {
         private final UpdateBuilder<T> updateBuilder;
 
-        public UpdateWhereBuilder(Class<T> entityClass, Query<?> rootQuery, Consumer<Condition> receiver, UpdateBuilder<T> updateBuilder) {
+        public UpdateWhereBuilder(Class<T> entityClass, SelectBuilder<?> rootQuery, Consumer<Condition> receiver, UpdateBuilder<T> updateBuilder) {
             super(entityClass, rootQuery, null, receiver);
             this.updateBuilder = updateBuilder;
         }

@@ -4,7 +4,7 @@ import com.javaorm.core.JavaOrm;
 import com.javaorm.core.ast.OrderDirection;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.H2Dialect;
-import com.javaorm.core.query.Query;
+import com.javaorm.core.query.SelectBuilder;
 import com.javaorm.core.test.entity.Student;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.Before;
@@ -12,12 +12,9 @@ import org.junit.Test;
 
 import java.sql.Connection;
 import java.sql.Statement;
-import java.time.LocalDateTime;
 import java.util.List;
 
-import static com.javaorm.core.SQL.$;
-import static com.javaorm.core.SQL.count;
-import static com.javaorm.core.SQL.rowNumber;
+import static com.javaorm.core.SQL.*;
 import static org.junit.Assert.*;
 
 /**
@@ -207,7 +204,7 @@ public class DynamicOrderByTest {
         assertTrue(hSql.contains("HAVING COUNT(t0.\"id\") > ? ORDER BY t0.\"teacher_id\" DESC"));
 
         // 开窗函数动态排序
-        Query<Student> winQuery = orm.select(
+        SelectBuilder<Student> winQuery = orm.select(
                 s.getId(),
                 rowNumber().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc(false).as("rn")
         ).from(Student.class);

@@ -10,18 +10,43 @@ public class TopicDto {
     private LocalDateTime createTime;
     private Long blogCount;
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public String getId() {
+        return id;
+    }
 
-    public Integer getStars() { return stars; }
-    public void setStars(Integer stars) { this.stars = stars; }
+    public void setId(String id) {
+        this.id = id;
+    }
 
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
+    public Integer getStars() {
+        return stars;
+    }
 
-    public LocalDateTime getCreateTime() { return createTime; }
-    public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
+    public void setStars(Integer stars) {
+        this.stars = stars;
+    }
 
-    public Long getBlogCount() { return blogCount; }
-    public void setBlogCount(Long blogCount) { this.blogCount = blogCount; }
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public LocalDateTime getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(LocalDateTime createTime) {
+        this.createTime = createTime;
+    }
+
+    public Long getBlogCount() {
+        return blogCount;
+    }
+
+    public void setBlogCount(Long blogCount) {
+        this.blogCount = blogCount;
+    }
 }

@@ -17,10 +17,20 @@ public class ExistsCondition implements Condition {
     }
 
     @Override
-    public LogicalOperator getLogicalOperator() { return logicalOperator; }
-    @Override
-    public void setLogicalOperator(LogicalOperator logicalOperator) { this.logicalOperator = logicalOperator; }
+    public LogicalOperator getLogicalOperator() {
+        return logicalOperator;
+    }
 
-    public boolean isNotExists() { return notExists; }
-    public Object getSubQuery() { return subQuery; }
+    @Override
+    public void setLogicalOperator(LogicalOperator logicalOperator) {
+        this.logicalOperator = logicalOperator;
+    }
+
+    public boolean isNotExists() {
+        return notExists;
+    }
+
+    public Object getSubQuery() {
+        return subQuery;
+    }
 }

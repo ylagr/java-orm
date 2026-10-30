@@ -26,22 +26,52 @@ public class BinaryCondition implements Condition {
     }
 
     @Override
-    public LogicalOperator getLogicalOperator() { return logicalOperator; }
+    public LogicalOperator getLogicalOperator() {
+        return logicalOperator;
+    }
+
     @Override
-    public void setLogicalOperator(LogicalOperator logicalOperator) { this.logicalOperator = logicalOperator; }
+    public void setLogicalOperator(LogicalOperator logicalOperator) {
+        this.logicalOperator = logicalOperator;
+    }
 
-    public String getTableAlias() { return tableAlias; }
-    public void setTableAlias(String tableAlias) { this.tableAlias = tableAlias; }
+    public String getTableAlias() {
+        return tableAlias;
+    }
 
-    public String getColumnName() { return columnName; }
-    public void setColumnName(String columnName) { this.columnName = columnName; }
+    public void setTableAlias(String tableAlias) {
+        this.tableAlias = tableAlias;
+    }
 
-    public SqlOperator getOperator() { return operator; }
-    public void setOperator(SqlOperator operator) { this.operator = operator; }
+    public String getColumnName() {
+        return columnName;
+    }
 
-    public Object[] getValues() { return values; }
-    public void setValues(Object[] values) { this.values = values; }
+    public void setColumnName(String columnName) {
+        this.columnName = columnName;
+    }
 
-    public PropertyPath getPath() { return path; }
-    public void setPath(PropertyPath path) { this.path = path; }
+    public SqlOperator getOperator() {
+        return operator;
+    }
+
+    public void setOperator(SqlOperator operator) {
+        this.operator = operator;
+    }
+
+    public Object[] getValues() {
+        return values;
+    }
+
+    public void setValues(Object[] values) {
+        this.values = values;
+    }
+
+    public PropertyPath getPath() {
+        return path;
+    }
+
+    public void setPath(PropertyPath path) {
+        this.path = path;
+    }
 }

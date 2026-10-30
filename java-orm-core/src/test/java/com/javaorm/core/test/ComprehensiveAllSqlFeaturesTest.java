@@ -2,11 +2,10 @@ package com.javaorm.core.test;
 
 import com.javaorm.core.JavaOrm;
 import com.javaorm.core.SQL;
-import com.javaorm.core.ast.SqlExpression;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.*;
 import com.javaorm.core.operator.SqlOperator;
-import com.javaorm.core.query.Query;
+import com.javaorm.core.query.SelectBuilder;
 import com.javaorm.core.test.entity.School;
 import com.javaorm.core.test.entity.Student;
 import com.javaorm.core.test.entity.Teacher;
@@ -16,8 +15,6 @@ import org.junit.Test;
 
 import java.sql.Connection;
 import java.sql.Statement;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -104,9 +101,9 @@ public class ComprehensiveAllSqlFeaturesTest {
         // 从 Student 查起，两层 ManyToOne: Student -> Teacher -> School
         // 筛选：Teacher 年龄 >= 35，School 城市为 '北京'
         List<Student> students = orm.select(Student.class)
-                .include(s.getTeacher(), (Query<Teacher> tQuery, Teacher t) -> {
+                .include(s.getTeacher(), (SelectBuilder<Teacher> tQuery, Teacher t) -> {
                     tQuery.where().and(t.getAge()).ge(35);
-                    tQuery.include(t.getSchool(), (Query<School> schQuery, School sch) -> {
+                    tQuery.include(t.getSchool(), (SelectBuilder<School> schQuery, School sch) -> {
                         schQuery.where().and(sch.getCity()).eq("北京");
                     });
                 })
@@ -141,10 +138,10 @@ public class ComprehensiveAllSqlFeaturesTest {
         // 从 School 查起，两层 OneToMany: School -> Teachers -> Students
         // 筛选：Teacher 年龄 >= 30, Student 年龄 >= 20
         List<School> schools = orm.select(School.class)
-                .include(sch.getTeachers(), (Query<Teacher> tQuery, Teacher t) -> {
+                .include(sch.getTeachers(), (SelectBuilder<Teacher> tQuery, Teacher t) -> {
                     tQuery.where().and(t.getAge()).ge(30);
                     tQuery.orderBy(t.getAge()).desc();
-                    tQuery.include(t.getStudents(), (Query<Student> stQuery, Student st) -> {
+                    tQuery.include(t.getStudents(), (SelectBuilder<Student> stQuery, Student st) -> {
                         stQuery.where().and(st.getAge()).ge(20);
                         stQuery.orderBy(st.getAge()).asc();
                     });
@@ -196,7 +193,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         Student s = orm.proxy(Student.class);
 
         // 1. 聚合函数: count, sum, avg, max, min, stddev, variance
-        Query<Student> aggQ = orm.select(Student.class)
+        SelectBuilder<Student> aggQ = orm.select(Student.class)
                 .select(
                         count(),
                         count(s.getId()).as("cnt_id"),
@@ -217,7 +214,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         // 排名：rowNumber, rank, denseRank, percentRank, cumeDist, ntile
         // 取值：lead, lag, firstValue, lastValue, nthValue
         // 聚合开窗：sum().over()
-        Query<Student> winQ = orm.select(Student.class)
+        SelectBuilder<Student> winQ = orm.select(Student.class)
                 .select(
                         s.getId(),
                         rowNumber().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rn"),
@@ -243,7 +240,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         assertEquals(2, ((Number) winList.get(1).get("rn")).intValue());
 
         // 3. 字符串函数: length, lower, upper, trim, ltrim, rtrim, concat, subString, replace, left, right, instr
-        Query<Student> strQ = orm.select(Student.class)
+        SelectBuilder<Student> strQ = orm.select(Student.class)
                 .select(
                         length(s.getStudentName()).as("str_len"),
                         lower(s.getStudentName()).as("str_low"),
@@ -264,7 +261,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         assertEquals("大明", strList.get(0).get("str_rep"));
 
         // 4. 数值函数: abs, round, ceil, floor, mod, sqrt, power, sign
-        Query<Student> mathQ = orm.select(Student.class)
+        SelectBuilder<Student> mathQ = orm.select(Student.class)
                 .select(
                         abs(s.getAge()).as("m_abs"),
                         round(s.getAge(), 1).as("m_rnd"),
@@ -281,7 +278,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         assertEquals(8, ((Number) mathList.get(0).get("m_mod")).intValue()); // 18 % 10 = 8
 
         // 5. 日期时间函数: year, month, day, hour, minute, second, now, curDate
-        Query<Student> dateQ = orm.select(Student.class)
+        SelectBuilder<Student> dateQ = orm.select(Student.class)
                 .select(
                         year(s.getCreateTime()).as("d_yr"),
                         month(s.getCreateTime()).as("d_mo"),
@@ -300,7 +297,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         assertEquals(10, ((Number) dateList.get(0).get("d_dy")).intValue());
 
         // 6. 空值控制 & CASE WHEN: ifNull, coalesce, nullIf, caseWhen
-        Query<Student> caseQ = orm.select(Student.class)
+        SelectBuilder<Student> caseQ = orm.select(Student.class)
                 .select(
                         s.getId(),
                         ifNull(s.getTeacherId(), 0L).as("if_nl"),
@@ -329,10 +326,10 @@ public class ComprehensiveAllSqlFeaturesTest {
         Teacher t = orm.proxy(Teacher.class);
 
         // 1. SELECT 标量子查询
-        Query<Teacher> maxAgeSubQuery = orm.select(Teacher.class)
+        SelectBuilder<Teacher> maxAgeSubQuery = orm.select(Teacher.class)
                 .select(SQL.max(t.getAge()));
 
-        Query<Student> selectSubQ = orm.select(Student.class)
+        SelectBuilder<Student> selectSubQ = orm.select(Student.class)
                 .select(s.getId(), s.getStudentName(), subQuery(maxAgeSubQuery).as("max_teacher_age"))
                 .where(w -> w.and(s.getId()).eq(1L));
 
@@ -341,7 +338,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         assertEquals(50, ((Number) res1.get(0).get("max_teacher_age")).intValue());
 
         // 2. WHERE IN 子查询
-        Query<Teacher> beijingTeacherQuery = orm.select(Teacher.class)
+        SelectBuilder<Teacher> beijingTeacherQuery = orm.select(Teacher.class)
                 .select(t.getId())
                 .where(w -> w.and(t.getSchoolId()).eq(1L));
 
@@ -357,7 +354,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         assertEquals(1, notInList.size()); // student 5 has teacherId 3
 
         // 4. WHERE EXISTS / NOT EXISTS 子查询
-        Query<Teacher> existsSubQ = orm.select(Teacher.class)
+        SelectBuilder<Teacher> existsSubQ = orm.select(Teacher.class)
                 .where(w -> w.and(t.getId()).eq(col("t0.teacher_id"))
                         .and(t.getAge()).gt(40));
 
@@ -372,7 +369,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         assertEquals(2, notExistsList.size()); // Students under Teacher 2 (age 32)
 
         // 5. WHERE 比较运算符子查询 (例如 age > (SELECT AVG(age) FROM ...))
-        Query<Student> avgAgeSubQ = orm.select(Student.class).select(SQL.avg(s.getAge()));
+        SelectBuilder<Student> avgAgeSubQ = orm.select(Student.class).select(SQL.avg(s.getAge()));
         List<Student> gtAvgList = orm.select(Student.class)
                 .where(w -> w.and(s.getAge()).gt(avgAgeSubQ))
                 .list();
@@ -380,7 +377,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         assertEquals(2, gtAvgList.size());
 
         // 6. UPDATE SET 子查询
-        Query<Teacher> minTeacherAgeQ = orm.select(Teacher.class).select(SQL.min(t.getAge()));
+        SelectBuilder<Teacher> minTeacherAgeQ = orm.select(Teacher.class).select(SQL.min(t.getAge()));
         int updated = orm.update(Student.class)
                 .set(s.getAge(), subQuery(minTeacherAgeQ))
                 .where(w -> w.and(s.getId()).eq(1L))
@@ -393,11 +390,11 @@ public class ComprehensiveAllSqlFeaturesTest {
         // 7. 三层嵌套相关子查询 (3-Level Correlated SubQuery)
         // 查出所有拥有属于北京市学校的老师的学生
         School sch = orm.proxy(School.class);
-        Query<School> schoolSubQ = orm.select(School.class)
+        SelectBuilder<School> schoolSubQ = orm.select(School.class)
                 .where(w -> w.and(sch.getId()).eq(col("t1.school_id"))
                         .and(sch.getCity()).eq("北京"));
 
-        Query<Teacher> teacherSubQ = orm.select(Teacher.class)
+        SelectBuilder<Teacher> teacherSubQ = orm.select(Teacher.class)
                 .as("t1")
                 .where(w -> w.and(col("t1.id")).eq(col("t0.teacher_id"))
                         .andExists(schoolSubQ));
@@ -417,7 +414,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         Student s = orm.proxy(Student.class);
 
         // 构造一个包含聚合、开窗函数、字符串函数、日期函数、数学函数、空值函数、CASE WHEN、关联JOIN与子查询的复杂 Java SQL AST
-        Query<Student> query = orm.select(Student.class)
+        SelectBuilder<Student> query = orm.select(Student.class)
                 .select(
                         s.getId(),
                         s.getStudentName(),

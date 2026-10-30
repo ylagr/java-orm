@@ -1,8 +1,8 @@
 package com.javaorm.core.test.easyquery;
 
 import com.javaorm.core.JavaOrm;
-import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.pagination.PageResult;
+import com.javaorm.core.query.SelectBuilder;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -65,7 +65,7 @@ public class EasyQuerySyntaxParityTest {
 
     @After
     public void tearDown() {
-        com.javaorm.core.query.Query.resetAliasSeq();
+        SelectBuilder.resetAliasSeq();
     }
 
     @Test

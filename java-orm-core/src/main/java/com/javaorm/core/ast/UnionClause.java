@@ -14,6 +14,11 @@ public class UnionClause {
         this.query = query;
     }
 
-    public boolean isUnionAll() { return unionAll; }
-    public Object getQuery() { return query; }
+    public boolean isUnionAll() {
+        return unionAll;
+    }
+
+    public Object getQuery() {
+        return query;
+    }
 }

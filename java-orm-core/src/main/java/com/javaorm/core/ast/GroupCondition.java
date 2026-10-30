@@ -20,7 +20,12 @@ public class GroupCondition implements Condition {
     }
 
     @Override
-    public LogicalOperator getLogicalOperator() { return logicalOperator; }
+    public LogicalOperator getLogicalOperator() {
+        return logicalOperator;
+    }
+
     @Override
-    public void setLogicalOperator(LogicalOperator logicalOperator) { this.logicalOperator = logicalOperator; }
+    public void setLogicalOperator(LogicalOperator logicalOperator) {
+        this.logicalOperator = logicalOperator;
+    }
 }

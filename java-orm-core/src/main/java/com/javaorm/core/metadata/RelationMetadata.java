@@ -51,27 +51,67 @@ public class RelationMetadata {
         }
     }
 
-    public String getPropertyName() { return propertyName; }
-    public void setPropertyName(String propertyName) { this.propertyName = propertyName; }
+    public String getPropertyName() {
+        return propertyName;
+    }
 
-    public RelationType getRelationType() { return relationType; }
-    public void setRelationType(RelationType relationType) { this.relationType = relationType; }
+    public void setPropertyName(String propertyName) {
+        this.propertyName = propertyName;
+    }
 
-    public Class<?> getTargetEntityClass() { return targetEntityClass; }
-    public void setTargetEntityClass(Class<?> targetEntityClass) { this.targetEntityClass = targetEntityClass; }
+    public RelationType getRelationType() {
+        return relationType;
+    }
 
-    public String getSelfProperty() { return selfProperty; }
-    public void setSelfProperty(String selfProperty) { this.selfProperty = selfProperty; }
+    public void setRelationType(RelationType relationType) {
+        this.relationType = relationType;
+    }
 
-    public String getTargetProperty() { return targetProperty; }
-    public void setTargetProperty(String targetProperty) { this.targetProperty = targetProperty; }
+    public Class<?> getTargetEntityClass() {
+        return targetEntityClass;
+    }
 
-    public Field getField() { return field; }
-    public void setField(Field field) { this.field = field; }
+    public void setTargetEntityClass(Class<?> targetEntityClass) {
+        this.targetEntityClass = targetEntityClass;
+    }
 
-    public Method getGetter() { return getter; }
-    public void setGetter(Method getter) { this.getter = getter; }
+    public String getSelfProperty() {
+        return selfProperty;
+    }
 
-    public Method getSetter() { return setter; }
-    public void setSetter(Method setter) { this.setter = setter; }
+    public void setSelfProperty(String selfProperty) {
+        this.selfProperty = selfProperty;
+    }
+
+    public String getTargetProperty() {
+        return targetProperty;
+    }
+
+    public void setTargetProperty(String targetProperty) {
+        this.targetProperty = targetProperty;
+    }
+
+    public Field getField() {
+        return field;
+    }
+
+    public void setField(Field field) {
+        this.field = field;
+    }
+
+    public Method getGetter() {
+        return getter;
+    }
+
+    public void setGetter(Method getter) {
+        this.getter = getter;
+    }
+
+    public Method getSetter() {
+        return setter;
+    }
+
+    public void setSetter(Method setter) {
+        this.setter = setter;
+    }
 }

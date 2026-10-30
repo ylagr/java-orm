@@ -14,7 +14,6 @@ import com.javaorm.core.proxy.ProxyFactory;
 import com.javaorm.core.query.WhereBuilder;
 import org.sqlite.SQLiteDataSource;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 

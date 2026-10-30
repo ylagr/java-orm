@@ -19,6 +19,7 @@ import com.javaorm.core.proxy.RecordingContext;
 import com.javaorm.core.query.Cte;
 import com.javaorm.core.query.IncludeSpec;
 import com.javaorm.core.query.Query;
+import com.javaorm.core.query.SelectBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -239,22 +240,22 @@ public class SqlEnv {
         return stream;
     }
 
-    public <T> Query<T> select(Class<T> entityClass) {
+    public <T> SelectBuilder<T> select(Class<T> entityClass) {
         return createQuery(entityClass);
     }
 
-    public <T> Query<T> select(Cte<T> cte) {
+    public <T> SelectBuilder<T> select(Cte<T> cte) {
         return createQuery(cte);
     }
 
-    public <T> Query<T> createQuery(Class<T> entityClass) {
-        Query<T> q = new Query<>(this, entityClass);
+    public <T> SelectBuilder<T> createQuery(Class<T> entityClass) {
+        SelectBuilder<T> q = new SelectBuilder<>(this, entityClass);
         this.currentOperation = q;
         return q;
     }
 
-    public <T> Query<T> createQuery(Cte<T> cte) {
-        Query<T> q = new Query<>(this, cte);
+    public <T> SelectBuilder<T> createQuery(Cte<T> cte) {
+        SelectBuilder<T> q = new SelectBuilder<>(this, cte);
         this.currentOperation = q;
         return q;
     }
@@ -324,9 +325,9 @@ public class SqlEnv {
         Class<?> detected = null;
         if (currentOperation instanceof SqlSelectStream) {
             detected = ((SqlSelectStream) currentOperation).getResultClass();
-        } else if (currentOperation instanceof Query<?>) {
-            detected = ((Query<?>) currentOperation).getRootMetadata() != null
-                    ? ((Query<?>) currentOperation).getRootMetadata().getEntityClass() : null;
+        } else if (currentOperation instanceof SelectBuilder<?>) {
+            detected = ((SelectBuilder<?>) currentOperation).getRootMetadata() != null
+                    ? ((SelectBuilder<?>) currentOperation).getRootMetadata().getEntityClass() : null;
         }
         return new SqlExecution<>(this, currentOperation, (Class<T>) detected);
     }
@@ -364,13 +365,13 @@ public class SqlEnv {
                 }
                 return new SqlExecution<>(this, currentOperation, (Class<T>) detected);
             }
-            com.javaorm.core.query.Query<?> q = wb.getRootQuery();
+            SelectBuilder<?> q = wb.getRootQuery();
             Object op = q != null ? q : wb;
             Class<?> detected = wb.getEntityClass();
             return new SqlExecution<>(this, op, (Class<T>) detected);
         }
-        if (returned instanceof com.javaorm.core.query.TQuery) {
-            com.javaorm.core.query.TQuery<T> tq = (com.javaorm.core.query.TQuery<T>) returned;
+        if (returned instanceof Query) {
+            Query<T> tq = (Query<T>) returned;
             this.currentOperation = tq;
             return new SqlExecution<>(this, tq, tq.getResultClass());
         }
@@ -379,8 +380,8 @@ public class SqlEnv {
             this.currentOperation = selectStream;
             return new SqlExecution<>(this, selectStream, (Class<T>) selectStream.getResultClass());
         }
-        if (returned instanceof com.javaorm.core.query.Query) {
-            com.javaorm.core.query.Query<?> q = (com.javaorm.core.query.Query<?>) returned;
+        if (returned instanceof SelectBuilder) {
+            SelectBuilder<?> q = (SelectBuilder<?>) returned;
             this.currentOperation = q;
             Class<?> detected = q.getRootEntityClass();
             return new SqlExecution<>(this, q, (Class<T>) detected);
@@ -441,7 +442,7 @@ public class SqlEnv {
                 ConnectionUtils.closeConnection(conn);
             }
             RecordingContext.clearRecording();
-            Query.resetAliasSeq();
+            SelectBuilder.resetAliasSeq();
         }
     }
 

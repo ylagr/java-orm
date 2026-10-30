@@ -1,9 +1,8 @@
 package com.javaorm.core.test.easyquery;
 
 import com.javaorm.core.JavaOrm;
-import com.javaorm.core.SQL;
 import com.javaorm.core.query.Cte;
-import com.javaorm.core.query.Query;
+import com.javaorm.core.query.SelectBuilder;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -15,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.javaorm.core.SQL.*;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class EasyQueryFunctionsAndAggregationsTest {
 
@@ -62,7 +61,7 @@ public class EasyQueryFunctionsAndAggregationsTest {
 
     @After
     public void tearDown() {
-        Query.resetAliasSeq();
+        SelectBuilder.resetAliasSeq();
     }
 
     @Test
@@ -80,9 +79,9 @@ public class EasyQueryFunctionsAndAggregationsTest {
 
         // 2. nullOrDefault: COALESCE(title, 'Default Title')
         List<Map<String, Object>> nullList = orm.select(
-                proxy.getId(),
-                nullOrDefault(proxy.getTitle(), "Default Title").as("safe_title")
-        ).from(Topic.class)
+                        proxy.getId(),
+                        nullOrDefault(proxy.getTitle(), "Default Title").as("safe_title")
+                ).from(Topic.class)
                 .where().and(proxy.getId()).eq("4")
                 .maps();
 
@@ -96,13 +95,13 @@ public class EasyQueryFunctionsAndAggregationsTest {
 
         // 1. Aggregate functions
         List<Map<String, Object>> stats = orm.select(
-                blog.getTopicId(),
-                count().as("total_blogs"),
-                sum(blog.getStar()).as("total_stars"),
-                avg(blog.getStar()).as("avg_stars"),
-                min(blog.getStar()).as("min_star"),
-                max(blog.getStar()).as("max_star")
-        ).from(Blog.class)
+                        blog.getTopicId(),
+                        count().as("total_blogs"),
+                        sum(blog.getStar()).as("total_stars"),
+                        avg(blog.getStar()).as("avg_stars"),
+                        min(blog.getStar()).as("min_star"),
+                        max(blog.getStar()).as("max_star")
+                ).from(Blog.class)
                 .groupBy(blog.getTopicId())
                 .having(w -> w.and(count()).ge(2))
                 .maps();
@@ -119,13 +118,13 @@ public class EasyQueryFunctionsAndAggregationsTest {
         Topic proxy = orm.proxy(Topic.class);
 
         List<Map<String, Object>> windowList = orm.select(
-                proxy.getId(),
-                proxy.getStars(),
-                rowNumber().over().orderBy(proxy.getStars()).desc().as("rn"),
-                rank().over().orderBy(proxy.getStars()).desc().as("rk"),
-                denseRank().over().orderBy(proxy.getStars()).desc().as("drk"),
-                ntile(2).over().orderBy(proxy.getStars()).desc().as("nt")
-        ).from(Topic.class)
+                        proxy.getId(),
+                        proxy.getStars(),
+                        rowNumber().over().orderBy(proxy.getStars()).desc().as("rn"),
+                        rank().over().orderBy(proxy.getStars()).desc().as("rk"),
+                        denseRank().over().orderBy(proxy.getStars()).desc().as("drk"),
+                        ntile(2).over().orderBy(proxy.getStars()).desc().as("nt")
+                ).from(Topic.class)
                 .orderByDesc(proxy.getStars())
                 .maps();
 
@@ -142,10 +141,10 @@ public class EasyQueryFunctionsAndAggregationsTest {
 
         // 1. Left Join
         List<Map<String, Object>> leftJoinList = orm.select(
-                topic.getId(),
-                topic.getTitle(),
-                col(blog.getTitle()).as("blog_title")
-        ).from(Topic.class)
+                        topic.getId(),
+                        topic.getTitle(),
+                        col(blog.getTitle()).as("blog_title")
+                ).from(Topic.class)
                 .leftJoin(Blog.class, (w, t, b) -> w.and(b.getTopicId()).eq(t.getId()))
                 .where().and(topic.getId()).eq("1")
                 .maps();
@@ -153,7 +152,7 @@ public class EasyQueryFunctionsAndAggregationsTest {
         assertEquals(2, leftJoinList.size());
 
         // 2. EXISTS Subquery in WHERE
-        Query<Blog> existsSubQuery = orm.queryable(Blog.class)
+        SelectBuilder<Blog> existsSubQuery = orm.queryable(Blog.class)
                 .where(w -> w.and(blog.getTopicId()).eq(topic.getId()));
 
         List<Topic> existsList = orm.queryable(Topic.class)
@@ -162,7 +161,7 @@ public class EasyQueryFunctionsAndAggregationsTest {
         assertEquals(2, existsList.size()); // topics 1 and 2 have blogs
 
         // 3. IN Subquery in WHERE
-        Query<Blog> topicIdSubQuery = orm.queryable(Blog.class)
+        SelectBuilder<Blog> topicIdSubQuery = orm.queryable(Blog.class)
                 .select(blog.getTopicId());
 
         List<Topic> inSubQueryList = orm.queryable(Topic.class)
@@ -177,11 +176,11 @@ public class EasyQueryFunctionsAndAggregationsTest {
 
         // 1. DTO Projection
         List<TopicDto> dtoList = orm.select(TopicDto.class,
-                topic.getId(),
-                topic.getTitle(),
-                topic.getStars(),
-                topic.getCreateTime()
-        ).from(Topic.class)
+                        topic.getId(),
+                        topic.getTitle(),
+                        topic.getStars(),
+                        topic.getCreateTime()
+                ).from(Topic.class)
                 .where(w -> w.and(topic.getStars()).gt(15))
                 .orderByAsc(topic.getStars())
                 .toList();

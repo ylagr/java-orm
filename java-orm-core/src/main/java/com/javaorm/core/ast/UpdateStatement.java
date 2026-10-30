@@ -17,13 +17,35 @@ public class UpdateStatement implements Statement {
         this.tableName = tableName;
     }
 
-    public void addSet(String column, Object value) { setValues.put(column, value); }
-    public void addSystemCondition(Condition condition) { systemConditions.add(condition); }
-    public void addWhereCondition(Condition condition) { whereConditions.add(condition); }
+    public void addSet(String column, Object value) {
+        setValues.put(column, value);
+    }
 
-    public Class<?> getEntityClass() { return entityClass; }
-    public String getTableName() { return tableName; }
-    public Map<String, Object> getSetValues() { return setValues; }
-    public List<Condition> getSystemConditions() { return systemConditions; }
-    public List<Condition> getWhereConditions() { return whereConditions; }
+    public void addSystemCondition(Condition condition) {
+        systemConditions.add(condition);
+    }
+
+    public void addWhereCondition(Condition condition) {
+        whereConditions.add(condition);
+    }
+
+    public Class<?> getEntityClass() {
+        return entityClass;
+    }
+
+    public String getTableName() {
+        return tableName;
+    }
+
+    public Map<String, Object> getSetValues() {
+        return setValues;
+    }
+
+    public List<Condition> getSystemConditions() {
+        return systemConditions;
+    }
+
+    public List<Condition> getWhereConditions() {
+        return whereConditions;
+    }
 }

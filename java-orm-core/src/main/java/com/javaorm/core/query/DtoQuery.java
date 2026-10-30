@@ -3,13 +3,11 @@ package com.javaorm.core.query;
 import com.javaorm.core.ast.SelectStatement;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.Dialect;
-import com.javaorm.core.hydration.EntityHydrator;
 import com.javaorm.core.proxy.ProxyFactory;
 
 import com.javaorm.core.sql.SqlEnv;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -28,7 +26,7 @@ public class DtoQuery<DTO, T> {
     private final SqlEnv env;
     private final Class<DTO> dtoClass;
     private final Class<T> entityClass;
-    private final Query<T> underlyingQuery;
+    private final SelectBuilder<T> underlyingQuery;
 
     public DtoQuery(SqlEnv env, Class<DTO> dtoClass, Class<T> entityClass) {
         this(env, dtoClass, entityClass, null);
@@ -38,7 +36,7 @@ public class DtoQuery<DTO, T> {
         this.env = env != null ? env : new SqlEnv(null, null, null);
         this.dtoClass = dtoClass;
         this.entityClass = entityClass;
-        this.underlyingQuery = new Query<>(this.env, entityClass, rootAlias);
+        this.underlyingQuery = new SelectBuilder<>(this.env, entityClass, rootAlias);
     }
 
     public DtoQuery(SqlEnv env, Class<DTO> dtoClass, Cte<T> cte) {
@@ -48,7 +46,7 @@ public class DtoQuery<DTO, T> {
         this.env = env != null ? env : new SqlEnv(null, null, null);
         this.dtoClass = dtoClass;
         this.entityClass = cte.getEntityClass();
-        this.underlyingQuery = new Query<>(this.env, cte);
+        this.underlyingQuery = new SelectBuilder<>(this.env, cte);
     }
 
     public DtoQuery(Class<DTO> dtoClass, Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
@@ -392,7 +390,7 @@ public class DtoQuery<DTO, T> {
         return underlyingQuery.getStatement();
     }
 
-    public Query<T> getUnderlyingQuery() {
+    public SelectBuilder<T> getUnderlyingQuery() {
         return underlyingQuery;
     }
 }

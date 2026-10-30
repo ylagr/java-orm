@@ -1,14 +1,15 @@
 package com.javaorm.core.test;
 
 import com.javaorm.core.JavaOrm;
-import com.javaorm.core.SQL;
 import com.javaorm.core.annotation.JoId;
 import com.javaorm.core.annotation.JoTable;
 import com.javaorm.core.config.OrmConfig;
-import com.javaorm.core.dialect.*;
+import com.javaorm.core.dialect.H2Dialect;
+import com.javaorm.core.dialect.MySQLDialect;
+import com.javaorm.core.dialect.OracleDialect;
 import com.javaorm.core.proxy.RecordingContext;
 import com.javaorm.core.query.Cte;
-import com.javaorm.core.query.Query;
+import com.javaorm.core.query.SelectBuilder;
 import com.javaorm.core.test.entity.Student;
 import com.javaorm.core.test.entity.Teacher;
 import org.h2.jdbcx.JdbcDataSource;
@@ -18,10 +19,7 @@ import org.junit.Test;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.Statement;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.Assert.*;
@@ -41,19 +39,38 @@ public class CteStrongTypedQueryTest {
         private Long parentId;
         private String name;
 
-        public Department() {}
+        public Department() {
+        }
+
         public Department(Long id, Long parentId, String name) {
             this.id = id;
             this.parentId = parentId;
             this.name = name;
         }
 
-        public Long getId() { return id; }
-        public void setId(Long id) { this.id = id; }
-        public Long getParentId() { return parentId; }
-        public void setParentId(Long parentId) { this.parentId = parentId; }
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public Long getParentId() {
+            return parentId;
+        }
+
+        public void setParentId(Long parentId) {
+            this.parentId = parentId;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
     }
 
     public static class StudentDto {
@@ -61,12 +78,29 @@ public class CteStrongTypedQueryTest {
         private String studentName;
         private Integer age;
 
-        public Long getId() { return id; }
-        public void setId(Long id) { this.id = id; }
-        public String getStudentName() { return studentName; }
-        public void setStudentName(String studentName) { this.studentName = studentName; }
-        public Integer getAge() { return age; }
-        public void setAge(Integer age) { this.age = age; }
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public String getStudentName() {
+            return studentName;
+        }
+
+        public void setStudentName(String studentName) {
+            this.studentName = studentName;
+        }
+
+        public Integer getAge() {
+            return age;
+        }
+
+        public void setAge(Integer age) {
+            this.age = age;
+        }
     }
 
     @Before
@@ -125,7 +159,7 @@ public class CteStrongTypedQueryTest {
 
         // 2. 强类型查询 CTE
         Student cteProxy = adultCte.proxy();
-        Query<Student> mainQuery = orm.select(adultCte);
+        SelectBuilder<Student> mainQuery = orm.select(adultCte);
         mainQuery.where().and(cteProxy.getAge()).lt(25);
 
         String sql = mainQuery.toSql();
@@ -172,7 +206,7 @@ public class CteStrongTypedQueryTest {
                 .asCte("dto_cte");
 
         StudentDto dtoProxy = cte.proxy();
-        Query<StudentDto> q = orm.select(cte);
+        SelectBuilder<StudentDto> q = orm.select(cte);
         q.where().and(dtoProxy.getAge()).lt(25);
         List<StudentDto> result = q.toList();
 
@@ -196,7 +230,7 @@ public class CteStrongTypedQueryTest {
         Cte<Student> cte2 = orm.cte("c2", orm.select(cte1).where().and(s1.getAge()).le(22));
 
         // 主查询查询 cte2
-        Query<Student> mainQuery = orm.select(cte2);
+        SelectBuilder<Student> mainQuery = orm.select(cte2);
         String sql = mainQuery.toSql();
 
         // 验证拓扑依赖顺序：c1 在前，c2 在后，且 c2 内部不重复声明 WITH
@@ -217,7 +251,7 @@ public class CteStrongTypedQueryTest {
                 orm.select(Student.class).where().and(s.getAge()).ge(22));
 
         // 主查询查 Teacher，LEFT JOIN adultCte
-        Query<Teacher> query = orm.select(Teacher.class)
+        SelectBuilder<Teacher> query = orm.select(Teacher.class)
                 .with(adultCte)
                 .leftJoin(adultCte, (on, teacher, student) -> on.eq(student.getTeacherId(), teacher.getId()));
 
@@ -239,7 +273,7 @@ public class CteStrongTypedQueryTest {
         Cte<Student> adultCte = orm.cte("adults",
                 orm.select(Student.class).where().and(s.getAge()).ge(25));
 
-        Query<Teacher> query = orm.select(Teacher.class)
+        SelectBuilder<Teacher> query = orm.select(Teacher.class)
                 .innerJoin(adultCte).on((on, teacher, student) -> on.eq(student.getTeacherId(), teacher.getId()));
 
         String sql = query.toSql();
@@ -261,7 +295,7 @@ public class CteStrongTypedQueryTest {
                 orm.select(Student.class).where().and(s.getAge()).gt(18));
 
         Student cteProxy = cte.proxy();
-        Query<Student> q = orm.with(cte).select(cte);
+        SelectBuilder<Student> q = orm.with(cte).select(cte);
         q.where().and(cteProxy.getAge()).eq(20);
         List<Student> list = q.toList();
 
@@ -279,17 +313,17 @@ public class CteStrongTypedQueryTest {
         // 使用递归函数式定义树形查询
         Cte<Department> deptTreeCte = orm.cteRecursive("dept_tree", Department.class, self -> {
             // 锚点查询：根节点 parentId 为空
-            Query<Department> anchor = orm.select(Department.class);
+            SelectBuilder<Department> anchor = orm.select(Department.class);
             anchor.where().and(d.getParentId()).isNull();
 
             // 递归迭代查询：当前部门的 parentId 等于上一级部门的 id
-            Query<Department> recursive = orm.select(Department.class)
+            SelectBuilder<Department> recursive = orm.select(Department.class)
                     .innerJoin(self, (on, cur, prev) -> on.eq(cur.getParentId(), prev.getId()));
 
             return anchor.unionAll(recursive);
         }).columns("id", "parent_id", "name");
 
-        Query<Department> query = orm.select(deptTreeCte);
+        SelectBuilder<Department> query = orm.select(deptTreeCte);
 
         // 验证各数据库方言的渲染：H2/MySQL/PG/SQLite 包含 RECURSIVE
         H2Dialect h2 = new H2Dialect();
@@ -319,10 +353,10 @@ public class CteStrongTypedQueryTest {
     public void testCteExplicitColumnNames() {
         Student s = orm.proxy(Student.class);
         Cte<Student> cte = orm.cte("custom_cols",
-                orm.select(Student.class).where().and(s.getAge()).ge(20))
+                        orm.select(Student.class).where().and(s.getAge()).ge(20))
                 .columns("c_id", "c_name", "c_age");
 
-        Query<Student> query = orm.select(cte);
+        SelectBuilder<Student> query = orm.select(cte);
         String sql = query.toSql();
         assertTrue("SQL should define column names in CTE",
                 sql.contains("WITH \"custom_cols\" (\"c_id\", \"c_name\", \"c_age\") AS"));

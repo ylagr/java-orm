@@ -6,7 +6,7 @@ import com.javaorm.core.dialect.Oracle11Dialect;
 import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.proxy.RecordingContext;
 import com.javaorm.core.query.DtoQuery;
-import com.javaorm.core.query.Query;
+import com.javaorm.core.query.SelectBuilder;
 import com.javaorm.core.query.WhereBuilder;
 import com.javaorm.core.test.dto.StudentWindowDto;
 import com.javaorm.core.test.entity.Student;
@@ -22,7 +22,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-import static com.javaorm.core.SQL.*;
+import static com.javaorm.core.SQL.col;
+import static com.javaorm.core.SQL.count;
 import static org.junit.Assert.*;
 
 /**
@@ -98,7 +99,7 @@ public class Oracle11AndDynamicFeaturesTest {
     @Test
     public void testOracle11RownumPagination() {
         // 1. 第一页：offset = 0, limit = 2 -> 经典 2 层嵌套 ROWNUM <= ?
-        Query<Student> page1Query = orm.select(Student.class).page(1, 2);
+        SelectBuilder<Student> page1Query = orm.select(Student.class).page(1, 2);
         String sql1 = page1Query.toSql();
         SqlAndParams sp1 = page1Query.toSqlAndParams();
         System.out.println("Page 1 SQL: " + sql1);
@@ -115,7 +116,7 @@ public class Oracle11AndDynamicFeaturesTest {
         assertEquals("Bob", page1.get(1).getStudentName());
 
         // 2. 第二页：offset = 2, limit = 2 -> 经典 3 层嵌套 ROWNUM <= ? WHERE "row_num" > ?
-        Query<Student> page2Query = orm.select(Student.class).page(2, 2);
+        SelectBuilder<Student> page2Query = orm.select(Student.class).page(2, 2);
         String sql2 = page2Query.toSql();
         SqlAndParams sp2 = page2Query.toSqlAndParams();
         System.out.println("Page 2 SQL: " + sql2);
@@ -135,7 +136,7 @@ public class Oracle11AndDynamicFeaturesTest {
         assertEquals("David", page2.get(1).getStudentName());
 
         // 3. 仅 offset: offset = 3, limit = null
-        Query<Student> offsetQuery = orm.select(Student.class).offset(3);
+        SelectBuilder<Student> offsetQuery = orm.select(Student.class).offset(3);
         String sql3 = offsetQuery.toSql();
         System.out.println("Offset Only SQL: " + sql3);
         assertTrue(sql3.contains("ROWNUM AS \"row_num\""));
@@ -262,7 +263,7 @@ public class Oracle11AndDynamicFeaturesTest {
     @Test
     public void testToSqlAndParamsAtAnyStage() {
         // Query 阶段
-        Query<Student> q = orm.select(Student.class);
+        SelectBuilder<Student> q = orm.select(Student.class);
         String sql1 = q.toSql();
         assertNotNull(sql1);
         assertTrue(sql1.contains("FROM \"t_student\""));
@@ -315,22 +316,22 @@ public class Oracle11AndDynamicFeaturesTest {
     public void testChainedPrintSql() {
         // 1. 全局配置为 false，但链式指定 printSql(true)，强制打印
         assertFalse(config.isPrintSql());
-        Query<Student> q1 = orm.select(Student.class).printSql(true);
+        SelectBuilder<Student> q1 = orm.select(Student.class).printSql(true);
         assertTrue(q1.getEffectiveConfig().isPrintSql());
         List<Student> list1 = q1.where().and("age").gt(18).list();
         assertEquals(5, list1.size());
 
         // 2. 链式指定 printSql(false)，强制不打印
-        Query<Student> q2 = orm.select(Student.class).printSql(false);
+        SelectBuilder<Student> q2 = orm.select(Student.class).printSql(false);
         assertFalse(q2.getEffectiveConfig().isPrintSql());
 
         // 3. 链式指定 printSql()，遵从当前全局配置（当前配置为 false）
-        Query<Student> q3 = orm.select(Student.class).printSql();
+        SelectBuilder<Student> q3 = orm.select(Student.class).printSql();
         assertFalse(q3.getEffectiveConfig().isPrintSql());
 
         // 4. 将全局配置改为 true
         config.setPrintSql(true);
-        Query<Student> q4 = orm.select(Student.class).printSql();
+        SelectBuilder<Student> q4 = orm.select(Student.class).printSql();
         assertTrue(q4.getEffectiveConfig().isPrintSql());
 
         // 5. 在 WhereBuilder 上链式调用 printSql(false)
@@ -396,11 +397,11 @@ public class Oracle11AndDynamicFeaturesTest {
 
         // 4. Update 和 Delete 之后，新查询同样从 t0 开始
         orm.update(Student.class).set(s.getAge(), 20).where().and(s.getId()).eq(1).execute();
-        Query<Student> afterUpdate = orm.select(Student.class);
+        SelectBuilder<Student> afterUpdate = orm.select(Student.class);
         assertEquals("t0", afterUpdate.getStatement().getRootTableAlias());
 
         orm.delete(Student.class).where().and(s.getId()).eq(99999).execute();
-        Query<Student> afterDelete = orm.select(Student.class);
+        SelectBuilder<Student> afterDelete = orm.select(Student.class);
         assertEquals("t0", afterDelete.getStatement().getRootTableAlias());
     }
 
@@ -414,12 +415,12 @@ public class Oracle11AndDynamicFeaturesTest {
 
         // 场景 1: 不同实体的两个查询错位交替书写（包含主表条件与 JOIN 级联关联）
         // 1.1 第一个查询 q1 开始写
-        Query<Student> q1 = orm.select(Student.class);
+        SelectBuilder<Student> q1 = orm.select(Student.class);
         WhereBuilder<Student> w1 = q1.where();
         w1.and(s.getAge()).gt(18);
 
         // 1.2 第二个查询 q2 在 q1 未完成时开始写
-        Query<Teacher> q2 = orm.select(Teacher.class);
+        SelectBuilder<Teacher> q2 = orm.select(Teacher.class);
         WhereBuilder<Teacher> w2 = q2.where();
         w2.and(t.getAge()).gt(30);
 
@@ -454,10 +455,10 @@ public class Oracle11AndDynamicFeaturesTest {
         assertTrue("q2 should have t0.teacher_name LIKE ?", sql2.contains("t0.\"teacher_name\" LIKE ?"));
 
         // 场景 2: 相同实体的两个查询错位交替书写
-        Query<Student> qA = orm.select(Student.class);
+        SelectBuilder<Student> qA = orm.select(Student.class);
         WhereBuilder<Student> wA = qA.where().and(s.getAge()).gt(20);
 
-        Query<Student> qB = orm.select(Student.class);
+        SelectBuilder<Student> qB = orm.select(Student.class);
         WhereBuilder<Student> wB = qB.where().and(s.getAge()).lt(25);
 
         wA.and(s.getTeacher().getTeacherName()).eq("TeacherA");
@@ -477,7 +478,7 @@ public class Oracle11AndDynamicFeaturesTest {
         assertTrue(sqlB.contains("t0.\"student_name\" = ?"));
 
         // 场景 3: 书写中间调用 toSql() 或执行查询，不破坏正在编写的其他查询状态
-        Query<Student> qX = orm.select(Student.class);
+        SelectBuilder<Student> qX = orm.select(Student.class);
         WhereBuilder<Student> wX = qX.where().and(s.getAge()).gt(18);
         String sqlXPart = qX.toSql();
         assertTrue(sqlXPart.contains("FROM \"t_student\" t0"));
@@ -494,11 +495,11 @@ public class Oracle11AndDynamicFeaturesTest {
         assertTrue(sqlXFull.contains("LEFT JOIN \"t_teacher\" t1"));
 
         // 场景 4: 错位书写中包含关联子查询
-        Query<Student> qOuter = orm.select(Student.class);
+        SelectBuilder<Student> qOuter = orm.select(Student.class);
         WhereBuilder<Student> wOuter = qOuter.where().and(s.getAge()).gt(18);
 
         // 中途插入独立查询
-        Query<Teacher> qUnrelated = orm.select(Teacher.class);
+        SelectBuilder<Teacher> qUnrelated = orm.select(Teacher.class);
         qUnrelated.where().and(t.getAge()).gt(40);
 
         // 为 qOuter 增加关联子查询

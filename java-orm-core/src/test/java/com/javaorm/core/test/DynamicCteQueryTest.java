@@ -34,10 +34,21 @@ public class DynamicCteQueryTest {
         private Integer age;
         private Long cnt;
 
-        public Integer getAge() { return age; }
-        public void setAge(Integer age) { this.age = age; }
-        public Long getCnt() { return cnt; }
-        public void setCnt(Long cnt) { this.cnt = cnt; }
+        public Integer getAge() {
+            return age;
+        }
+
+        public void setAge(Integer age) {
+            this.age = age;
+        }
+
+        public Long getCnt() {
+            return cnt;
+        }
+
+        public void setCnt(Long cnt) {
+            this.cnt = cnt;
+        }
     }
 
     @Before

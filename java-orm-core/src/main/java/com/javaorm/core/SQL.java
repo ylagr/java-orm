@@ -6,6 +6,7 @@ import com.javaorm.core.function.SqlFunction;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.ProxyFactory;
 import com.javaorm.core.proxy.RecordingContext;
+import com.javaorm.core.query.SelectBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -90,6 +91,7 @@ public class SQL {
     }
 
     // ==================== 通用/自定义函数调用入口 ====================
+
     /**
      * 自定义或内置 SQL 函数调用（支持传入 SqlFunction 接口实现或内置 BuiltinSqlFunction 枚举）。
      */
@@ -1070,7 +1072,7 @@ public class SQL {
     }
 
     // ==================== 子查询与原生片段 ====================
-    public static <T> SubQueryExpression<T> subQuery(com.javaorm.core.query.Query<T> query) {
+    public static <T> SubQueryExpression<T> subQuery(SelectBuilder<T> query) {
         return new SubQueryExpression<>(query);
     }
 
@@ -1091,7 +1093,7 @@ public class SQL {
     }
 
     // ==================== 通用表表达式（CTE） ====================
-    public static <T> com.javaorm.core.query.Cte<T> cte(String name, com.javaorm.core.query.Query<T> query) {
+    public static <T> com.javaorm.core.query.Cte<T> cte(String name, SelectBuilder<T> query) {
         return new com.javaorm.core.query.Cte<>(name, query.getRootEntityClass(), query, false);
     }
 
@@ -1119,7 +1121,7 @@ public class SQL {
         return new com.javaorm.core.query.Cte<>(name, null, query, recursive, columnNames);
     }
 
-    public static <T> com.javaorm.core.query.Cte<T> cteRecursive(String name, com.javaorm.core.query.Query<T> query) {
+    public static <T> com.javaorm.core.query.Cte<T> cteRecursive(String name, SelectBuilder<T> query) {
         return new com.javaorm.core.query.Cte<>(name, query.getRootEntityClass(), query, true);
     }
 

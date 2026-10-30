@@ -29,12 +29,27 @@ public class ColumnExpression<T> implements SqlExpression<T> {
         return this;
     }
 
-    public PropertyPath getPath() { return path; }
-    public void setPath(PropertyPath path) { this.path = path; }
+    public PropertyPath getPath() {
+        return path;
+    }
 
-    public String getTableAlias() { return tableAlias; }
-    public void setTableAlias(String tableAlias) { this.tableAlias = tableAlias; }
+    public void setPath(PropertyPath path) {
+        this.path = path;
+    }
 
-    public String getColumnName() { return columnName; }
-    public void setColumnName(String columnName) { this.columnName = columnName; }
+    public String getTableAlias() {
+        return tableAlias;
+    }
+
+    public void setTableAlias(String tableAlias) {
+        this.tableAlias = tableAlias;
+    }
+
+    public String getColumnName() {
+        return columnName;
+    }
+
+    public void setColumnName(String columnName) {
+        this.columnName = columnName;
+    }
 }

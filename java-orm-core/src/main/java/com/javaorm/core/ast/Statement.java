@@ -35,10 +35,12 @@ public interface Statement {
     /**
      * 添加系统条件
      */
-    default void addSystemCondition(Condition condition) {}
+    default void addSystemCondition(Condition condition) {
+    }
 
     /**
      * 添加业务 WHERE 条件
      */
-    default void addWhereCondition(Condition condition) {}
+    default void addWhereCondition(Condition condition) {
+    }
 }

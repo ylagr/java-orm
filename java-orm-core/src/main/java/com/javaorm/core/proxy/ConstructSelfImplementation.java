@@ -15,10 +15,10 @@ import net.bytebuddy.matcher.ElementMatchers;
 /**
  * 专用于在被代理类的方法中生成直接 new 当前生成类自身实例并返回的字节码实现。
  * 字节码对应:
- *   NEW CurrentClass
- *   DUP
- *   INVOKESPECIAL CurrentClass.<init>()V
- *   ARETURN
+ * NEW CurrentClass
+ * DUP
+ * INVOKESPECIAL CurrentClass.<init>()V
+ * ARETURN
  */
 public class ConstructSelfImplementation implements Implementation {
 

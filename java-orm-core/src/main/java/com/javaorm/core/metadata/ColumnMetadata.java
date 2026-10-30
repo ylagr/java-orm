@@ -162,51 +162,131 @@ public class ColumnMetadata {
     }
 
     // Getters and Setters
-    public String getPropertyName() { return propertyName; }
-    public void setPropertyName(String propertyName) { this.propertyName = propertyName; }
+    public String getPropertyName() {
+        return propertyName;
+    }
 
-    public String getColumnName() { return columnName; }
-    public void setColumnName(String columnName) { this.columnName = columnName; }
+    public void setPropertyName(String propertyName) {
+        this.propertyName = propertyName;
+    }
 
-    public Class<?> getPropertyType() { return propertyType; }
-    public void setPropertyType(Class<?> propertyType) { this.propertyType = propertyType; }
+    public String getColumnName() {
+        return columnName;
+    }
 
-    public boolean isPrimaryKey() { return primaryKey; }
-    public void setPrimaryKey(boolean primaryKey) { this.primaryKey = primaryKey; }
+    public void setColumnName(String columnName) {
+        this.columnName = columnName;
+    }
 
-    public boolean isGenerated() { return generated; }
-    public void setGenerated(boolean generated) { this.generated = generated; }
+    public Class<?> getPropertyType() {
+        return propertyType;
+    }
 
-    public GenerationType getGenerationType() { return generationType; }
-    public void setGenerationType(GenerationType generationType) { this.generationType = generationType; }
+    public void setPropertyType(Class<?> propertyType) {
+        this.propertyType = propertyType;
+    }
 
-    public boolean isLogicDelete() { return logicDelete; }
-    public void setLogicDelete(boolean logicDelete) { this.logicDelete = logicDelete; }
+    public boolean isPrimaryKey() {
+        return primaryKey;
+    }
 
-    public Object getLogicDeleteNormalValue() { return logicDeleteNormalValue; }
-    public void setLogicDeleteNormalValue(Object logicDeleteNormalValue) { this.logicDeleteNormalValue = logicDeleteNormalValue; }
+    public void setPrimaryKey(boolean primaryKey) {
+        this.primaryKey = primaryKey;
+    }
 
-    public Object getLogicDeleteDeletedValue() { return logicDeleteDeletedValue; }
-    public void setLogicDeleteDeletedValue(Object logicDeleteDeletedValue) { this.logicDeleteDeletedValue = logicDeleteDeletedValue; }
+    public boolean isGenerated() {
+        return generated;
+    }
 
-    public boolean isTenant() { return tenant; }
-    public void setTenant(boolean tenant) { this.tenant = tenant; }
+    public void setGenerated(boolean generated) {
+        this.generated = generated;
+    }
 
-    public boolean isAutoFill() { return autoFill; }
-    public void setAutoFill(boolean autoFill) { this.autoFill = autoFill; }
+    public GenerationType getGenerationType() {
+        return generationType;
+    }
 
-    public com.javaorm.core.annotation.AutoFillType getAutoFillType() { return autoFillType; }
-    public void setAutoFillType(com.javaorm.core.annotation.AutoFillType autoFillType) { this.autoFillType = autoFillType; }
+    public void setGenerationType(GenerationType generationType) {
+        this.generationType = generationType;
+    }
 
-    public boolean isIgnored() { return ignored; }
-    public void setIgnored(boolean ignored) { this.ignored = ignored; }
+    public boolean isLogicDelete() {
+        return logicDelete;
+    }
 
-    public Field getField() { return field; }
-    public void setField(Field field) { this.field = field; }
+    public void setLogicDelete(boolean logicDelete) {
+        this.logicDelete = logicDelete;
+    }
 
-    public Method getGetter() { return getter; }
-    public void setGetter(Method getter) { this.getter = getter; }
+    public Object getLogicDeleteNormalValue() {
+        return logicDeleteNormalValue;
+    }
 
-    public Method getSetter() { return setter; }
-    public void setSetter(Method setter) { this.setter = setter; }
+    public void setLogicDeleteNormalValue(Object logicDeleteNormalValue) {
+        this.logicDeleteNormalValue = logicDeleteNormalValue;
+    }
+
+    public Object getLogicDeleteDeletedValue() {
+        return logicDeleteDeletedValue;
+    }
+
+    public void setLogicDeleteDeletedValue(Object logicDeleteDeletedValue) {
+        this.logicDeleteDeletedValue = logicDeleteDeletedValue;
+    }
+
+    public boolean isTenant() {
+        return tenant;
+    }
+
+    public void setTenant(boolean tenant) {
+        this.tenant = tenant;
+    }
+
+    public boolean isAutoFill() {
+        return autoFill;
+    }
+
+    public void setAutoFill(boolean autoFill) {
+        this.autoFill = autoFill;
+    }
+
+    public com.javaorm.core.annotation.AutoFillType getAutoFillType() {
+        return autoFillType;
+    }
+
+    public void setAutoFillType(com.javaorm.core.annotation.AutoFillType autoFillType) {
+        this.autoFillType = autoFillType;
+    }
+
+    public boolean isIgnored() {
+        return ignored;
+    }
+
+    public void setIgnored(boolean ignored) {
+        this.ignored = ignored;
+    }
+
+    public Field getField() {
+        return field;
+    }
+
+    public void setField(Field field) {
+        this.field = field;
+    }
+
+    public Method getGetter() {
+        return getter;
+    }
+
+    public void setGetter(Method getter) {
+        this.getter = getter;
+    }
+
+    public Method getSetter() {
+        return setter;
+    }
+
+    public void setSetter(Method setter) {
+        this.setter = setter;
+    }
 }

@@ -16,7 +16,7 @@ import java.util.function.Consumer;
  */
 public class JoinBuilder<TRoot, TJoin> {
 
-    private final Query<TRoot> rootQuery;
+    private final SelectBuilder<TRoot> rootQuery;
     private final TableJoin.JoinType joinType;
     private final String tableName;
     private final Class<TJoin> joinClass;
@@ -24,12 +24,12 @@ public class JoinBuilder<TRoot, TJoin> {
     private final Cte<TJoin> cte;
     private final Runnable onComplete;
 
-    public JoinBuilder(Query<TRoot> rootQuery, TableJoin.JoinType joinType, String tableName,
+    public JoinBuilder(SelectBuilder<TRoot> rootQuery, TableJoin.JoinType joinType, String tableName,
                        Class<TJoin> joinClass, String joinAlias, Cte<TJoin> cte) {
         this(rootQuery, joinType, tableName, joinClass, joinAlias, cte, null);
     }
 
-    public JoinBuilder(Query<TRoot> rootQuery, TableJoin.JoinType joinType, String tableName,
+    public JoinBuilder(SelectBuilder<TRoot> rootQuery, TableJoin.JoinType joinType, String tableName,
                        Class<TJoin> joinClass, String joinAlias, Cte<TJoin> cte, Runnable onComplete) {
         this.rootQuery = rootQuery;
         this.joinType = joinType;
@@ -41,7 +41,7 @@ public class JoinBuilder<TRoot, TJoin> {
     }
 
     @SuppressWarnings("unchecked")
-    public Query<TRoot> on(TriConsumer<WhereBuilder<TJoin>, TRoot, TJoin> onConsumer) {
+    public SelectBuilder<TRoot> on(TriConsumer<WhereBuilder<TJoin>, TRoot, TJoin> onConsumer) {
         TableJoin join = new TableJoin(joinType, tableName, joinAlias);
         rootQuery.getStatement().addJoin(join);
 
@@ -103,7 +103,7 @@ public class JoinBuilder<TRoot, TJoin> {
         return rootQuery;
     }
 
-    public Query<TRoot> on(BiConsumer<WhereBuilder<TJoin>, TJoin> onConsumer) {
+    public SelectBuilder<TRoot> on(BiConsumer<WhereBuilder<TJoin>, TJoin> onConsumer) {
         return on((on, root, join) -> {
             if (onConsumer != null) {
                 onConsumer.accept(on, join);
@@ -111,7 +111,7 @@ public class JoinBuilder<TRoot, TJoin> {
         });
     }
 
-    public Query<TRoot> on(Consumer<WhereBuilder<TJoin>> onConsumer) {
+    public SelectBuilder<TRoot> on(Consumer<WhereBuilder<TJoin>> onConsumer) {
         return on((on, root, join) -> {
             if (onConsumer != null) {
                 onConsumer.accept(on);

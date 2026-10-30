@@ -5,7 +5,7 @@ import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.H2Dialect;
 import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.proxy.RecordingContext;
-import com.javaorm.core.query.Query;
+import com.javaorm.core.query.SelectBuilder;
 import com.javaorm.core.test.entity.Student;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.After;
@@ -18,7 +18,7 @@ import java.sql.Statement;
 import java.util.Arrays;
 
 import static com.javaorm.core.SQL.*;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertTrue;
 
 public class WhereBuilderGenericConstraintsTest {
 
@@ -68,13 +68,13 @@ public class WhereBuilderGenericConstraintsTest {
         // 1. 测试 eq/ne 的泛型约束与 cross-number 支持（例如 Long 属性与 int 字面量）
         SqlAndParams sp = orm.select(Student.class)
                 .where()
-                    .eq(s.getId(), 1L)              // R=Long, val=Long
-                    .eq(s.getId(), 1)               // Long 与 int 交叉数字匹配
-                    .ne(s.getAge(), 18)             // R=Integer, val=Integer
-                    .gt(s.getAge(), 19)             // Comparable<? super Integer>
-                    .ge(s.getAge(), 20)
-                    .lt(s.getId(), 100)             // Long 与 int 交叉数字比较
-                    .le(s.getId(), 100L)
+                .eq(s.getId(), 1L)              // R=Long, val=Long
+                .eq(s.getId(), 1)               // Long 与 int 交叉数字匹配
+                .ne(s.getAge(), 18)             // R=Integer, val=Integer
+                .gt(s.getAge(), 19)             // Comparable<? super Integer>
+                .ge(s.getAge(), 20)
+                .lt(s.getId(), 100)             // Long 与 int 交叉数字比较
+                .le(s.getId(), 100L)
                 .toSqlAndParams();
 
         String sql = sp.getSql();
@@ -93,13 +93,13 @@ public class WhereBuilderGenericConstraintsTest {
         // 2. 测试 between 与 like 系列的强类型限制
         SqlAndParams sp = orm.select(Student.class)
                 .where()
-                    .between(s.getAge(), 18, 30)                // Comparable R
-                    .between(s.getId(), 1, 100)                 // Number cross-type
-                    .like(s.getStudentName(), "A%")             // CharSequence
-                    .likeLeft(s.getStudentName(), "lice")       // CharSequence
-                    .likeRight(s.getStudentName(), "Ali")       // CharSequence
-                    .likeAll(s.getStudentName(), "lic")         // CharSequence
-                    .notLike(s.getStudentName(), "Z%")          // CharSequence
+                .between(s.getAge(), 18, 30)                // Comparable R
+                .between(s.getId(), 1, 100)                 // Number cross-type
+                .like(s.getStudentName(), "A%")             // CharSequence
+                .likeLeft(s.getStudentName(), "lice")       // CharSequence
+                .likeRight(s.getStudentName(), "Ali")       // CharSequence
+                .likeAll(s.getStudentName(), "lic")         // CharSequence
+                .notLike(s.getStudentName(), "Z%")          // CharSequence
                 .toSqlAndParams();
 
         String sql = sp.getSql();
@@ -113,15 +113,15 @@ public class WhereBuilderGenericConstraintsTest {
     public void testTypedInAndSubQueryConstraints() {
         Student s = orm.proxy(Student.class);
 
-        Query<Student> sub = orm.select(Student.class).where().eq(s.getAge(), 20).toQuery();
+        SelectBuilder<Student> sub = orm.select(Student.class).where().eq(s.getAge(), 20).toQuery();
 
         SqlAndParams sp = orm.select(Student.class)
                 .where()
-                    .in(s.getAge(), 18, 20, 22)                         // varargs R...
-                    .in(s.getAge(), Arrays.asList(25, 30))              // Collection<? extends R>
-                    .notIn(s.getStudentName(), "Tom", "Jerry")          // String varargs
-                    .in(s.getId(), sub)                                 // subQuery
-                    .andExists(sub)                                     // andExists with Query
+                .in(s.getAge(), 18, 20, 22)                         // varargs R...
+                .in(s.getAge(), Arrays.asList(25, 30))              // Collection<? extends R>
+                .notIn(s.getStudentName(), "Tom", "Jerry")          // String varargs
+                .in(s.getId(), sub)                                 // subQuery
+                .andExists(sub)                                     // andExists with Query
                 .toSqlAndParams();
 
         String sql = sp.getSql();
@@ -137,9 +137,9 @@ public class WhereBuilderGenericConstraintsTest {
 
         SqlAndParams sp = orm.select(Student.class)
                 .where()
-                    .eq(upper(s.getStudentName()), "ALICE")
-                    .gt(count("*"), 0L)
-                    .between(abs(s.getAge()), 10, 50)
+                .eq(upper(s.getStudentName()), "ALICE")
+                .gt(count("*"), 0L)
+                .between(abs(s.getAge()), 10, 50)
                 .toSqlAndParams();
 
         String sql = sp.getSql();

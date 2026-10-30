@@ -78,7 +78,8 @@ public class JavaOrm {
             } catch (Throwable t) {
                 try {
                     conn.rollback();
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
                 if (t instanceof RuntimeException) {
                     throw (RuntimeException) t;
                 }
@@ -87,7 +88,8 @@ public class JavaOrm {
                 com.javaorm.core.connection.TransactionContext.clear();
                 try {
                     conn.setAutoCommit(autoCommit);
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         } catch (RuntimeException e) {
             throw e;
@@ -121,28 +123,28 @@ public class JavaOrm {
     /**
      * 开启流式查询：orm.select(Student.class).where().and(s -> s.getAge()).gt(18)...
      */
-    public <T> Query<T> select(Class<T> entityClass) {
+    public <T> SelectBuilder<T> select(Class<T> entityClass) {
         return env().createQuery(entityClass);
     }
 
     /**
      * 开启流式查询别名（等价于 select(entityClass)）
      */
-    public <T> Query<T> queryable(Class<T> entityClass) {
+    public <T> SelectBuilder<T> queryable(Class<T> entityClass) {
         return select(entityClass);
     }
 
     /**
      * 开启 CTE 强类型流式查询：orm.select(cte).where()...
      */
-    public <T> Query<T> select(Cte<T> cte) {
+    public <T> SelectBuilder<T> select(Cte<T> cte) {
         return env().createQuery(cte);
     }
 
     /**
      * 定义强类型或动态 CTE
      */
-    public <T> Cte<T> cte(String name, Query<T> query) {
+    public <T> Cte<T> cte(String name, SelectBuilder<T> query) {
         return new Cte<>(name, query.getRootEntityClass(), query, false);
     }
 
@@ -170,7 +172,7 @@ public class JavaOrm {
         return new Cte<>(name, null, query, recursive, columnNames);
     }
 
-    public <T> Cte<T> cteRecursive(String name, Query<T> query) {
+    public <T> Cte<T> cteRecursive(String name, SelectBuilder<T> query) {
         return new Cte<>(name, query.getRootEntityClass(), query, true);
     }
 
@@ -257,7 +259,7 @@ public class JavaOrm {
         try {
             return env().createInsert(entity).execute();
         } finally {
-            com.javaorm.core.query.Query.resetAliasSeq();
+            SelectBuilder.resetAliasSeq();
         }
     }
 
@@ -287,7 +289,7 @@ public class JavaOrm {
         try {
             return UpdateBuilder.updateEntity(entity, env(), true);
         } finally {
-            com.javaorm.core.query.Query.resetAliasSeq();
+            SelectBuilder.resetAliasSeq();
         }
     }
 
@@ -310,7 +312,7 @@ public class JavaOrm {
         try {
             return UpdateBuilder.updateEntity(entity, env(), false);
         } finally {
-            com.javaorm.core.query.Query.resetAliasSeq();
+            SelectBuilder.resetAliasSeq();
         }
     }
 
@@ -353,7 +355,7 @@ public class JavaOrm {
         try {
             return DeleteBuilder.deleteEntity(entity, env());
         } finally {
-            com.javaorm.core.query.Query.resetAliasSeq();
+            SelectBuilder.resetAliasSeq();
         }
     }
 
@@ -364,7 +366,7 @@ public class JavaOrm {
         try {
             return DeleteBuilder.deleteById(entityClass, id, env());
         } finally {
-            com.javaorm.core.query.Query.resetAliasSeq();
+            SelectBuilder.resetAliasSeq();
         }
     }
 
@@ -424,9 +426,17 @@ public class JavaOrm {
         return deletable(entities).execute();
     }
 
-    public DataSource getDataSource() { return dataSource; }
-    public Dialect getDialect() { return dialect; }
-    public OrmConfig getConfig() { return config; }
+    public DataSource getDataSource() {
+        return dataSource;
+    }
+
+    public Dialect getDialect() {
+        return dialect;
+    }
+
+    public OrmConfig getConfig() {
+        return config;
+    }
 
     /**
      * 声明式 SQL 执行环境统一入口（SqlEnv DSL）：
@@ -453,7 +463,7 @@ public class JavaOrm {
         } finally {
             com.javaorm.core.proxy.RecordingContext.clearRecording();
             com.javaorm.core.proxy.RecordingContext.clearAliases();
-            com.javaorm.core.query.Query.resetAliasSeq();
+            SelectBuilder.resetAliasSeq();
         }
     }
 
@@ -468,7 +478,7 @@ public class JavaOrm {
         } finally {
             com.javaorm.core.proxy.RecordingContext.clearRecording();
             com.javaorm.core.proxy.RecordingContext.clearAliases();
-            com.javaorm.core.query.Query.resetAliasSeq();
+            SelectBuilder.resetAliasSeq();
         }
     }
 
@@ -483,18 +493,18 @@ public class JavaOrm {
      * }).toList();
      * </pre>
      */
-    public <T> SqlExecution<T> sql(Function<SqlEnv, ? extends TQuery<T>> envFunction) {
+    public <T> SqlExecution<T> sql(Function<SqlEnv, ? extends Query<T>> envFunction) {
         if (envFunction == null) {
             throw new IllegalArgumentException("SqlEnv function must not be null");
         }
         SqlEnv env = env();
         try {
-            TQuery<T> returned = envFunction.apply(env);
+            Query<T> returned = envFunction.apply(env);
             return env.toExecutionFromReturn(returned);
         } finally {
             com.javaorm.core.proxy.RecordingContext.clearRecording();
             com.javaorm.core.proxy.RecordingContext.clearAliases();
-            com.javaorm.core.query.Query.resetAliasSeq();
+            SelectBuilder.resetAliasSeq();
         }
     }
 

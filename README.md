@@ -399,7 +399,7 @@ orm.delete(Student.class)
 ### 9. 随时获取当前 SQL 与链式 SQL 打印 (toSql & printSql)
 
 #### 随时获取当前 SQL (`toSql()`, `toSqlAndParams()`)
-在流式链调用的任何阶段（`Query`, `WhereBuilder`, `UpdateBuilder`, `DeleteBuilder`, `DtoQuery` 等），均可无损输出当前装配的 SQL 和参数，亦可直接调用 `toString()` 查看：
+在流式链调用的任何阶段（`SelectBuilder`, `WhereBuilder`, `UpdateBuilder`, `DeleteBuilder`, `DtoQuery` 等），均可无损输出当前装配的 SQL 和参数，亦可直接调用 `toString()` 查看：
 
 ```java
 // 任意链式阶段直接获取当前 SQL 和参数

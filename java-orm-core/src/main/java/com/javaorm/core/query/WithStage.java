@@ -68,16 +68,16 @@ public class WithStage {
         return this;
     }
 
-    public <T> Query<T> select(Class<T> entityClass) {
-        Query<T> query = new Query<>(env, entityClass);
+    public <T> SelectBuilder<T> select(Class<T> entityClass) {
+        SelectBuilder<T> query = new SelectBuilder<>(env, entityClass);
         for (CteClause c : ctes) {
             query.getStatement().addCte(c);
         }
         return query;
     }
 
-    public <T> Query<T> select(Cte<T> cte) {
-        Query<T> query = new Query<>(env, cte);
+    public <T> SelectBuilder<T> select(Cte<T> cte) {
+        SelectBuilder<T> query = new SelectBuilder<>(env, cte);
         for (CteClause c : ctes) {
             boolean exists = false;
             for (CteClause existing : query.getStatement().getCtes()) {
@@ -101,8 +101,8 @@ public class WithStage {
         }
         return new FromStageQuery(env, all) {
             @Override
-            public <T> Query<T> from(Class<T> entityClass) {
-                Query<T> q = super.from(entityClass);
+            public <T> SelectBuilder<T> from(Class<T> entityClass) {
+                SelectBuilder<T> q = super.from(entityClass);
                 for (CteClause c : ctes) {
                     q.getStatement().addCte(c);
                 }
@@ -110,8 +110,8 @@ public class WithStage {
             }
 
             @Override
-            public <T> Query<T> from(Cte<T> cte) {
-                Query<T> q = super.from(cte);
+            public <T> SelectBuilder<T> from(Cte<T> cte) {
+                SelectBuilder<T> q = super.from(cte);
                 for (CteClause c : ctes) {
                     boolean exists = false;
                     for (CteClause existing : q.getStatement().getCtes()) {

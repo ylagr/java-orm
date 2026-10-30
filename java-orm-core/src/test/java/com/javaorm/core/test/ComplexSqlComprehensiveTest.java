@@ -7,7 +7,7 @@ import com.javaorm.core.dialect.OracleDialect;
 import com.javaorm.core.dialect.SQLiteDialect;
 import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.proxy.RecordingContext;
-import com.javaorm.core.query.Query;
+import com.javaorm.core.query.SelectBuilder;
 import com.javaorm.core.query.WhereBuilder;
 import com.javaorm.core.test.dto.StatDto;
 import com.javaorm.core.test.entity.Student;
@@ -20,7 +20,10 @@ import org.junit.Test;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 import static com.javaorm.core.SQL.*;
 import static org.junit.Assert.*;
@@ -147,15 +150,15 @@ public class ComplexSqlComprehensiveTest {
     /**
      * 1. 超复杂全语法融合查询（Kitchen Sink Query）
      * 涵盖：SELECT 投影别名、字符串函数 UPPER/CONCAT、窗口函数 ROW_NUMBER、聚合函数 COUNT/AVG、
-     *       LEFT JOIN、复杂嵌套 WHERE 逻辑组、IN 子查询、EXISTS/NOT EXISTS 关联子查询、BETWEEN、IS NOT NULL、
-     *       GROUP BY 多列、HAVING 复合过滤、多列 ORDER BY、LIMIT / OFFSET 分页。
+     * LEFT JOIN、复杂嵌套 WHERE 逻辑组、IN 子查询、EXISTS/NOT EXISTS 关联子查询、BETWEEN、IS NOT NULL、
+     * GROUP BY 多列、HAVING 复合过滤、多列 ORDER BY、LIMIT / OFFSET 分页。
      */
     @Test
     public void testKitchenSinkComplexQuery() {
         Student s = orm.proxy(Student.class);
         Teacher t = orm.proxy(Teacher.class);
 
-        Query<Student> query = orm.select(
+        SelectBuilder<Student> query = orm.select(
                 s.getId(),
                 upper(s.getStudentName()).as("upper_name"),
                 concat(s.getStudentName(), "_", s.getTeacher().getTitle()).as("full_title"),
@@ -175,33 +178,33 @@ public class ComplexSqlComprehensiveTest {
                 )
                 .and(s.getTeacherId()).in(
                         orm.select(t.getId())
-                           .from(Teacher.class)
-                           .where()
-                               .and(t.getAge()).ge(30)
+                                .from(Teacher.class)
+                                .where()
+                                .and(t.getAge()).ge(30)
                 )
                 .andExists(
                         orm.select(t.getId())
-                           .from(Teacher.class)
-                           .where()
-                               .and(t.getId()).eq(s.getTeacherId())
-                               .and(t.getTitle()).in("教授", "副教授")
+                                .from(Teacher.class)
+                                .where()
+                                .and(t.getId()).eq(s.getTeacherId())
+                                .and(t.getTitle()).in("教授", "副教授")
                 )
                 .andNotExists(
                         orm.select(t.getId())
-                           .from(Teacher.class)
-                           .where()
-                               .and(t.getId()).eq(s.getTeacherId())
-                               .and(t.getTitle()).eq("助教")
+                                .from(Teacher.class)
+                                .where()
+                                .and(t.getId()).eq(s.getTeacherId())
+                                .and(t.getTitle()).eq("助教")
                 )
                 .and(length(s.getStudentName())).ge(3)
                 .and(s.getTeacherId()).isNotNull();
 
         query.groupBy(s.getId(), s.getStudentName(), s.getAge(), s.getTeacherId(), s.getTeacher().getTitle())
-             .having()
-                 .and(count(s.getId())).ge(1)
-                 .or(avg(s.getAge())).gt(18)
-             .orderBy(s.getAge()).desc()
-             .orderBy(s.getId()).asc();
+                .having()
+                .and(count(s.getId())).ge(1)
+                .or(avg(s.getAge())).gt(18)
+                .orderBy(s.getAge()).desc()
+                .orderBy(s.getId()).asc();
 
         query.limit(3).offset(0);
 
@@ -249,16 +252,16 @@ public class ComplexSqlComprehensiveTest {
                 .where()
                 .andExists(
                         orm.select(t1.getId())
-                           .from(Teacher.class)
-                           .where()
-                               .and(t1.getId()).eq(s0.getTeacherId())
-                               .andExists(
-                                       orm.select(s2.getId())
-                                          .from(Student.class)
-                                          .where()
-                                              .and(s2.getTeacherId()).eq(t1.getId())
-                                              .and(s2.getAge()).ge(24)
-                               )
+                                .from(Teacher.class)
+                                .where()
+                                .and(t1.getId()).eq(s0.getTeacherId())
+                                .andExists(
+                                        orm.select(s2.getId())
+                                                .from(Student.class)
+                                                .where()
+                                                .and(s2.getTeacherId()).eq(t1.getId())
+                                                .and(s2.getAge()).ge(24)
+                                )
                 )
                 .orderBy(s0.getId()).asc();
 
@@ -284,7 +287,7 @@ public class ComplexSqlComprehensiveTest {
         Student s = orm.proxy(Student.class);
 
         // q1: 资深教师组（年龄>=35），按教师统计学生人数及平均年龄，要求学生数 >= 2
-        Query<Student> q1 = orm.select(
+        SelectBuilder<Student> q1 = orm.select(
                 s.getTeacherId(),
                 count(s.getId()).as("total"),
                 avg(s.getAge()).as("mean_age")
@@ -293,10 +296,10 @@ public class ComplexSqlComprehensiveTest {
                 .and(s.getTeacherId()).isNotNull()
                 .and(s.getTeacher().getAge()).ge(35);
         q1.groupBy(s.getTeacherId())
-          .having().and(count(s.getId())).ge(2);
+                .having().and(count(s.getId())).ge(2);
 
         // q2: 年轻教师组（年龄<35），按教师统计学生人数，要求学生数 >= 1
-        Query<Student> q2 = orm.select(
+        SelectBuilder<Student> q2 = orm.select(
                 s.getTeacherId(),
                 count(s.getId()).as("total"),
                 avg(s.getAge()).as("mean_age")
@@ -305,7 +308,7 @@ public class ComplexSqlComprehensiveTest {
                 .and(s.getTeacherId()).isNotNull()
                 .and(s.getTeacher().getAge()).lt(35);
         q2.groupBy(s.getTeacherId())
-          .having().and(count(s.getId())).ge(1);
+                .having().and(count(s.getId())).ge(1);
 
         // 联合查询
         List<Map<String, Object>> unionResult = q1.unionAll(q2).listMaps();
@@ -402,14 +405,14 @@ public class ComplexSqlComprehensiveTest {
                 .set(s.getAge(), increment(5))
                 .set(s.getStudentName(), concat(s.getStudentName(), "_VIP"))
                 .where()
-                    .and(s.getAge()).le(22)
-                    .andExists(
-                            orm.select(t.getId())
-                               .from(Teacher.class)
-                               .where()
-                                   .and(t.getId()).eq(s.getTeacherId())
-                                   .and(t.getTitle()).eq("教授")
-                    )
+                .and(s.getAge()).le(22)
+                .andExists(
+                        orm.select(t.getId())
+                                .from(Teacher.class)
+                                .where()
+                                .and(t.getId()).eq(s.getTeacherId())
+                                .and(t.getTitle()).eq("教授")
+                )
                 .execute();
 
         // 学生A(原20) 和 学生B(原22) 属于张教授(教授)，因此更新 2 条
@@ -446,9 +449,9 @@ public class ComplexSqlComprehensiveTest {
                         )
                         .andNotExists(
                                 orm.select(t.getId())
-                                   .from(Teacher.class)
-                                   .where()
-                                       .and(t.getId()).eq(stu.getTeacherId())
+                                        .from(Teacher.class)
+                                        .where()
+                                        .and(t.getId()).eq(stu.getTeacherId())
                         )
                 ).execute();
 
@@ -471,25 +474,25 @@ public class ComplexSqlComprehensiveTest {
         Student s = orm.proxy(Student.class);
 
         List<Map<String, Object>> rows = orm.select(
-                s.getId(),
-                s.getStudentName(),
-                s.getAge(),
-                rowNumber().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rn"),
-                rank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rk"),
-                denseRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("drk"),
-                ntile(2).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("nt"),
-                percentRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("pr"),
-                cumeDist().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("cd"),
-                sum(s.getAge()).over().partitionBy(s.getTeacherId()).as("sum_age"),
-                avg(s.getAge()).over().partitionBy(s.getTeacherId()).as("avg_age"),
-                lead(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("next_age"),
-                lag(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("prev_age"),
-                firstValue(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("first_age")
-        ).from(Student.class)
-         .where()
-             .and(s.getTeacherId()).eq(1L)
-         .orderBy(s.getAge()).asc()
-         .listMaps();
+                        s.getId(),
+                        s.getStudentName(),
+                        s.getAge(),
+                        rowNumber().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rn"),
+                        rank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rk"),
+                        denseRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("drk"),
+                        ntile(2).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("nt"),
+                        percentRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("pr"),
+                        cumeDist().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("cd"),
+                        sum(s.getAge()).over().partitionBy(s.getTeacherId()).as("sum_age"),
+                        avg(s.getAge()).over().partitionBy(s.getTeacherId()).as("avg_age"),
+                        lead(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("next_age"),
+                        lag(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("prev_age"),
+                        firstValue(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("first_age")
+                ).from(Student.class)
+                .where()
+                .and(s.getTeacherId()).eq(1L)
+                .orderBy(s.getAge()).asc()
+                .listMaps();
 
         // Teacher 1 组共 3 名未删除学生: 学生A(20), 学生B(22), 学生C(24)
         assertEquals(3, rows.size());
@@ -518,16 +521,16 @@ public class ComplexSqlComprehensiveTest {
         Student s = orm.proxy(Student.class);
 
         List<StatDto> dtoList = orm.select(
-                StatDto.class,
-                s.getTeacherId(),
-                count(s.getId()).as("total"),
-                avg(s.getAge()).as("avgAge")
-        ).from(Student.class)
-         .where(w -> w.and(s.getTeacher().getTitle()).isNotNull())
-         .groupBy(s.getTeacherId())
-         .having(h -> h.and(count(s.getId())).ge(2))
-         .orderBy(s.getTeacherId()).asc()
-         .list();
+                        StatDto.class,
+                        s.getTeacherId(),
+                        count(s.getId()).as("total"),
+                        avg(s.getAge()).as("avgAge")
+                ).from(Student.class)
+                .where(w -> w.and(s.getTeacher().getTitle()).isNotNull())
+                .groupBy(s.getTeacherId())
+                .having(h -> h.and(count(s.getId())).ge(2))
+                .orderBy(s.getTeacherId()).asc()
+                .list();
 
         assertEquals(2, dtoList.size());
 
@@ -551,20 +554,20 @@ public class ComplexSqlComprehensiveTest {
         Teacher t = orm.proxy(Teacher.class);
 
         List<Map<String, Object>> rows = orm.select(
-                s.getId(),
-                s.getStudentName(),
-                subQuery(
-                        orm.select(t.getTeacherName())
-                           .from(Teacher.class)
-                           .where()
-                               .and(t.getId()).eq(s.getTeacherId())
-                ).as("mentor_name")
-        ).from(Student.class)
-         .where()
-             .and(s.getTeacherId()).isNotNull()
-             .and(s.getAge()).le(20)
-         .orderBy(s.getId()).asc()
-         .listMaps();
+                        s.getId(),
+                        s.getStudentName(),
+                        subQuery(
+                                orm.select(t.getTeacherName())
+                                        .from(Teacher.class)
+                                        .where()
+                                        .and(t.getId()).eq(s.getTeacherId())
+                        ).as("mentor_name")
+                ).from(Student.class)
+                .where()
+                .and(s.getTeacherId()).isNotNull()
+                .and(s.getAge()).le(20)
+                .orderBy(s.getId()).asc()
+                .listMaps();
 
         // 年龄 <= 20 且有导师的学生: 学生A(20岁, 导师张教授) 和 学生D(19岁, 导师李副教授)
         assertEquals(2, rows.size());
@@ -586,15 +589,15 @@ public class ComplexSqlComprehensiveTest {
         Student s = orm.proxy(Student.class);
 
         // 构建基准复杂查询
-        Query<Student> query = orm.select(Student.class);
+        SelectBuilder<Student> query = orm.select(Student.class);
         query.where()
                 .and(s.getAge()).gt(18)
                 .andGroup((g, stu) -> g
                         .and(stu.getStudentName()).like("学生%")
                         .or(stu.getTeacher().getAge()).ge(30)
                 )
-             .orderBy(s.getAge()).desc()
-             .orderBy(s.getId()).asc();
+                .orderBy(s.getAge()).desc()
+                .orderBy(s.getId()).asc();
 
         // 统一分页参数：第 2 页，每页 3 条（offset = 3, limit = 3）
         query.page(2, 3);
@@ -634,14 +637,14 @@ public class ComplexSqlComprehensiveTest {
         // 单元素 IN 与 NOT IN
         List<Student> inList = orm.select(Student.class)
                 .where()
-                    .and(s.getId()).in(Collections.singletonList(1L))
+                .and(s.getId()).in(Collections.singletonList(1L))
                 .list();
         assertEquals(1, inList.size());
         assertEquals("学生A", inList.get(0).getStudentName());
 
         List<Student> notInList = orm.select(Student.class)
                 .where()
-                    .and(s.getId()).notIn(Arrays.asList(1L, 2L, 3L, 4L, 5L, 6L))
+                .and(s.getId()).notIn(Arrays.asList(1L, 2L, 3L, 4L, 5L, 6L))
                 .list();
         assertEquals(1, notInList.size());
         assertEquals("学生G", notInList.get(0).getStudentName()); // 仅学生G未被排除
@@ -677,16 +680,16 @@ public class ComplexSqlComprehensiveTest {
 
         List<Student> list = orm.select(Student.class)
                 .where()
-                    .andGroup(g1 -> g1
-                            .and(s.getAge()).ge(18)
-                            .andGroup(g2 -> g2
-                                    .or(s.getStudentName()).eq("学生A")
-                                    .orGroup(g3 -> g3
-                                            .and(s.getAge()).eq(22)
-                                            .and(s.getStudentName()).like("学生%")
-                                    )
-                            )
-                    )
+                .andGroup(g1 -> g1
+                        .and(s.getAge()).ge(18)
+                        .andGroup(g2 -> g2
+                                .or(s.getStudentName()).eq("学生A")
+                                .orGroup(g3 -> g3
+                                        .and(s.getAge()).eq(22)
+                                        .and(s.getStudentName()).like("学生%")
+                                )
+                        )
+                )
                 .orderBy(s.getId()).asc()
                 .list();
 
@@ -706,11 +709,11 @@ public class ComplexSqlComprehensiveTest {
         List<Student> list = orm.select(Student.class)
                 .whereRelation(stu -> stu.getTeacher(), t -> t
                         .where()
-                            .and(Teacher::getAge).ge(35)
-                            .and(Teacher::getTitle).eq("教授")
+                        .and(Teacher::getAge).ge(35)
+                        .and(Teacher::getTitle).eq("教授")
                 )
                 .where()
-                    .and(s.getAge()).le(22)
+                .and(s.getAge()).le(22)
                 .orderBy(s.getId()).asc()
                 .list();
 

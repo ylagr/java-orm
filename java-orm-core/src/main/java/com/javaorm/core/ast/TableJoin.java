@@ -10,8 +10,14 @@ public class TableJoin {
         RIGHT_JOIN("RIGHT JOIN");
 
         private final String sql;
-        JoinType(String sql) { this.sql = sql; }
-        public String getSql() { return sql; }
+
+        JoinType(String sql) {
+            this.sql = sql;
+        }
+
+        public String getSql() {
+            return sql;
+        }
     }
 
     private JoinType joinType = JoinType.LEFT_JOIN;
@@ -29,8 +35,19 @@ public class TableJoin {
         onConditions.add(condition);
     }
 
-    public JoinType getJoinType() { return joinType; }
-    public String getTableName() { return tableName; }
-    public String getTableAlias() { return tableAlias; }
-    public List<Condition> getOnConditions() { return onConditions; }
+    public JoinType getJoinType() {
+        return joinType;
+    }
+
+    public String getTableName() {
+        return tableName;
+    }
+
+    public String getTableAlias() {
+        return tableAlias;
+    }
+
+    public List<Condition> getOnConditions() {
+        return onConditions;
+    }
 }

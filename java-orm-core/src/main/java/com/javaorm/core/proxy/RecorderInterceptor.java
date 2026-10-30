@@ -1,6 +1,5 @@
 package com.javaorm.core.proxy;
 
-import com.javaorm.core.metadata.EntityMetadata;
 import com.javaorm.core.metadata.EntityMetadataManager;
 import com.javaorm.core.metadata.RelationMetadata;
 import net.bytebuddy.implementation.bind.annotation.AllArguments;

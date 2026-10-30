@@ -37,15 +37,33 @@ public class DateFormatPatternConverter {
         StringBuilder sb = new StringBuilder();
         for (TokenPart part : parts) {
             switch (part.token) {
-                case YEAR4: sb.append("%Y"); break;
-                case YEAR2: sb.append("%y"); break;
-                case MONTH: sb.append("%m"); break;
-                case DAY: sb.append("%d"); break;
-                case HOUR24: sb.append("%H"); break;
-                case HOUR12: sb.append("%h"); break;
-                case MINUTE: sb.append("%i"); break;
-                case SECOND: sb.append("%s"); break;
-                case LITERAL: sb.append(part.text); break;
+                case YEAR4:
+                    sb.append("%Y");
+                    break;
+                case YEAR2:
+                    sb.append("%y");
+                    break;
+                case MONTH:
+                    sb.append("%m");
+                    break;
+                case DAY:
+                    sb.append("%d");
+                    break;
+                case HOUR24:
+                    sb.append("%H");
+                    break;
+                case HOUR12:
+                    sb.append("%h");
+                    break;
+                case MINUTE:
+                    sb.append("%i");
+                    break;
+                case SECOND:
+                    sb.append("%s");
+                    break;
+                case LITERAL:
+                    sb.append(part.text);
+                    break;
             }
         }
         return sb.toString();
@@ -56,15 +74,33 @@ public class DateFormatPatternConverter {
         StringBuilder sb = new StringBuilder();
         for (TokenPart part : parts) {
             switch (part.token) {
-                case YEAR4: sb.append("YYYY"); break;
-                case YEAR2: sb.append("YY"); break;
-                case MONTH: sb.append("MM"); break;
-                case DAY: sb.append("DD"); break;
-                case HOUR24: sb.append("HH24"); break;
-                case HOUR12: sb.append("HH12"); break;
-                case MINUTE: sb.append("MI"); break;
-                case SECOND: sb.append("SS"); break;
-                case LITERAL: sb.append(part.text); break;
+                case YEAR4:
+                    sb.append("YYYY");
+                    break;
+                case YEAR2:
+                    sb.append("YY");
+                    break;
+                case MONTH:
+                    sb.append("MM");
+                    break;
+                case DAY:
+                    sb.append("DD");
+                    break;
+                case HOUR24:
+                    sb.append("HH24");
+                    break;
+                case HOUR12:
+                    sb.append("HH12");
+                    break;
+                case MINUTE:
+                    sb.append("MI");
+                    break;
+                case SECOND:
+                    sb.append("SS");
+                    break;
+                case LITERAL:
+                    sb.append(part.text);
+                    break;
             }
         }
         return sb.toString();
@@ -79,15 +115,33 @@ public class DateFormatPatternConverter {
         StringBuilder sb = new StringBuilder();
         for (TokenPart part : parts) {
             switch (part.token) {
-                case YEAR4: sb.append("%Y"); break;
-                case YEAR2: sb.append("%y"); break;
-                case MONTH: sb.append("%m"); break;
-                case DAY: sb.append("%d"); break;
-                case HOUR24: sb.append("%H"); break;
-                case HOUR12: sb.append("%I"); break;
-                case MINUTE: sb.append("%M"); break;
-                case SECOND: sb.append("%S"); break;
-                case LITERAL: sb.append(part.text); break;
+                case YEAR4:
+                    sb.append("%Y");
+                    break;
+                case YEAR2:
+                    sb.append("%y");
+                    break;
+                case MONTH:
+                    sb.append("%m");
+                    break;
+                case DAY:
+                    sb.append("%d");
+                    break;
+                case HOUR24:
+                    sb.append("%H");
+                    break;
+                case HOUR12:
+                    sb.append("%I");
+                    break;
+                case MINUTE:
+                    sb.append("%M");
+                    break;
+                case SECOND:
+                    sb.append("%S");
+                    break;
+                case LITERAL:
+                    sb.append(part.text);
+                    break;
             }
         }
         return sb.toString();
@@ -98,15 +152,33 @@ public class DateFormatPatternConverter {
         StringBuilder sb = new StringBuilder();
         for (TokenPart part : parts) {
             switch (part.token) {
-                case YEAR4: sb.append("yyyy"); break;
-                case YEAR2: sb.append("yy"); break;
-                case MONTH: sb.append("MM"); break;
-                case DAY: sb.append("dd"); break;
-                case HOUR24: sb.append("HH"); break;
-                case HOUR12: sb.append("hh"); break;
-                case MINUTE: sb.append("mm"); break;
-                case SECOND: sb.append("ss"); break;
-                case LITERAL: sb.append(part.text); break;
+                case YEAR4:
+                    sb.append("yyyy");
+                    break;
+                case YEAR2:
+                    sb.append("yy");
+                    break;
+                case MONTH:
+                    sb.append("MM");
+                    break;
+                case DAY:
+                    sb.append("dd");
+                    break;
+                case HOUR24:
+                    sb.append("HH");
+                    break;
+                case HOUR12:
+                    sb.append("hh");
+                    break;
+                case MINUTE:
+                    sb.append("mm");
+                    break;
+                case SECOND:
+                    sb.append("ss");
+                    break;
+                case LITERAL:
+                    sb.append(part.text);
+                    break;
             }
         }
         return sb.toString();

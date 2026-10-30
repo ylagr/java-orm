@@ -81,8 +81,8 @@ public class OrmJmhBenchmark {
     public Object javaOrm_02_QueryBuild() {
         return javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                 .where()
-                    .and(s -> s.getAge()).ge(18)
-                    .and(s -> s.getStudentName()).like("王%")
+                .and(s -> s.getAge()).ge(18)
+                .and(s -> s.getStudentName()).like("王%")
                 .orderBy(s -> s.getAge()).desc()
                 .toSql();
     }
@@ -105,7 +105,7 @@ public class OrmJmhBenchmark {
         long id = (idCounter.getAndIncrement() % 400) + 1;
         return javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                 .where()
-                    .and(s -> s.getId()).eq(id)
+                .and(s -> s.getId()).eq(id)
                 .single();
     }
 
@@ -123,7 +123,7 @@ public class OrmJmhBenchmark {
     public List<?> javaOrm_04_ListQuery() {
         return javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                 .where()
-                    .and(s -> s.getAge()).ge(22)
+                .and(s -> s.getAge()).ge(22)
                 .list();
     }
 
@@ -140,7 +140,7 @@ public class OrmJmhBenchmark {
     public List<?> javaOrm_05_JoinQuery() {
         return javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                 .where()
-                    .and(s -> s.getTeacher().getAge()).gt(35)
+                .and(s -> s.getTeacher().getAge()).gt(35)
                 .list();
     }
 

@@ -219,8 +219,8 @@ public class OrderByBuilder<TQuery> {
 
     public com.javaorm.core.dialect.SqlAndParams toSqlAndParams() {
         asc();
-        if (query instanceof Query) {
-            return ((Query<?>) query).toSqlAndParams();
+        if (query instanceof SelectBuilder) {
+            return ((SelectBuilder<?>) query).toSqlAndParams();
         } else if (query instanceof WhereBuilder) {
             return ((WhereBuilder<?>) query).toSqlAndParams();
         } else if (query instanceof DtoQuery) {

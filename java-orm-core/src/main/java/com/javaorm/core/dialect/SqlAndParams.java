@@ -12,8 +12,13 @@ public class SqlAndParams {
         this.params = params != null ? params : Collections.emptyList();
     }
 
-    public String getSql() { return sql; }
-    public List<Object> getParams() { return params; }
+    public String getSql() {
+        return sql;
+    }
+
+    public List<Object> getParams() {
+        return params;
+    }
 
     @Override
     public String toString() {

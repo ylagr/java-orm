@@ -19,17 +19,36 @@ public class ColumnEqualityCondition implements Condition {
     }
 
     @Override
-    public LogicalOperator getLogicalOperator() { return logicalOperator; }
+    public LogicalOperator getLogicalOperator() {
+        return logicalOperator;
+    }
+
     @Override
-    public void setLogicalOperator(LogicalOperator logicalOperator) { this.logicalOperator = logicalOperator; }
+    public void setLogicalOperator(LogicalOperator logicalOperator) {
+        this.logicalOperator = logicalOperator;
+    }
 
-    public String getLeftTableAlias() { return leftTableAlias; }
-    public void setLeftTableAlias(String leftTableAlias) { this.leftTableAlias = leftTableAlias; }
+    public String getLeftTableAlias() {
+        return leftTableAlias;
+    }
 
-    public String getLeftColumn() { return leftColumn; }
+    public void setLeftTableAlias(String leftTableAlias) {
+        this.leftTableAlias = leftTableAlias;
+    }
 
-    public String getRightTableAlias() { return rightTableAlias; }
-    public void setRightTableAlias(String rightTableAlias) { this.rightTableAlias = rightTableAlias; }
+    public String getLeftColumn() {
+        return leftColumn;
+    }
 
-    public String getRightColumn() { return rightColumn; }
+    public String getRightTableAlias() {
+        return rightTableAlias;
+    }
+
+    public void setRightTableAlias(String rightTableAlias) {
+        this.rightTableAlias = rightTableAlias;
+    }
+
+    public String getRightColumn() {
+        return rightColumn;
+    }
 }

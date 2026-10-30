@@ -19,7 +19,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.javaorm.core.SQL.*;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 /**
  * Oracle 方言与全量开窗函数测试套件。
@@ -111,20 +112,20 @@ public class OracleAndWindowFunctionsTest {
         Student s = proxy(Student.class);
 
         List<Map<String, Object>> list = orm.select(Student.class).select(
-                s.getId(),
-                s.getStudentName(),
-                s.getAge(),
-                s.getTeacherId(),
-                rowNumber().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rn"),
-                rank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rk"),
-                denseRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("drk"),
-                ntile(2).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("nt"),
-                percentRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("pr"),
-                cumeDist().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("cd")
-        ).where(w -> w.and(s.getTeacherId()).eq(1L))
-         .orderBy(s.getAge()).asc()
-         .orderBy(s.getId()).asc()
-         .maps();
+                        s.getId(),
+                        s.getStudentName(),
+                        s.getAge(),
+                        s.getTeacherId(),
+                        rowNumber().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rn"),
+                        rank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rk"),
+                        denseRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("drk"),
+                        ntile(2).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("nt"),
+                        percentRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("pr"),
+                        cumeDist().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("cd")
+                ).where(w -> w.and(s.getTeacherId()).eq(1L))
+                .orderBy(s.getAge()).asc()
+                .orderBy(s.getId()).asc()
+                .maps();
 
         assertEquals(4, list.size());
 
@@ -170,16 +171,16 @@ public class OracleAndWindowFunctionsTest {
         Student s = proxy(Student.class);
 
         List<Map<String, Object>> list = orm.select(Student.class).select(
-                s.getId(),
-                s.getStudentName(),
-                s.getAge(),
-                lead(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().orderBy(s.getId()).asc().as("next_age"),
-                lag(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().orderBy(s.getId()).asc().as("prev_age"),
-                firstValue(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().orderBy(s.getId()).asc().as("first_age")
-        ).where(w -> w.and(s.getTeacherId()).eq(1L))
-         .orderBy(s.getAge()).asc()
-         .orderBy(s.getId()).asc()
-         .maps();
+                        s.getId(),
+                        s.getStudentName(),
+                        s.getAge(),
+                        lead(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().orderBy(s.getId()).asc().as("next_age"),
+                        lag(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().orderBy(s.getId()).asc().as("prev_age"),
+                        firstValue(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().orderBy(s.getId()).asc().as("first_age")
+                ).where(w -> w.and(s.getTeacherId()).eq(1L))
+                .orderBy(s.getAge()).asc()
+                .orderBy(s.getId()).asc()
+                .maps();
 
         assertEquals(4, list.size());
 
@@ -205,21 +206,21 @@ public class OracleAndWindowFunctionsTest {
         Student s = proxy(Student.class);
 
         List<Map<String, Object>> list = orm.select(Student.class).select(
-                s.getId(),
-                s.getStudentName(),
-                s.getAge(),
-                sum(s.getAge()).over().partitionBy(s.getTeacherId()).as("dept_sum"),
-                avg(s.getAge()).over().partitionBy(s.getTeacherId()).as("dept_avg"),
-                min(s.getAge()).over().partitionBy(s.getTeacherId()).as("dept_min"),
-                max(s.getAge()).over().partitionBy(s.getTeacherId()).as("dept_max"),
-                // 累计求和滑动窗口: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-                sum(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().rowsUnboundedPreceding().as("running_sum"),
-                // 全表无 PARTITION 开窗统计
-                count().over().as("grand_count")
-        ).where(w -> w.and(s.getTeacherId()).eq(1L))
-         .orderBy(s.getAge()).asc()
-         .orderBy(s.getId()).asc()
-         .maps();
+                        s.getId(),
+                        s.getStudentName(),
+                        s.getAge(),
+                        sum(s.getAge()).over().partitionBy(s.getTeacherId()).as("dept_sum"),
+                        avg(s.getAge()).over().partitionBy(s.getTeacherId()).as("dept_avg"),
+                        min(s.getAge()).over().partitionBy(s.getTeacherId()).as("dept_min"),
+                        max(s.getAge()).over().partitionBy(s.getTeacherId()).as("dept_max"),
+                        // 累计求和滑动窗口: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                        sum(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().rowsUnboundedPreceding().as("running_sum"),
+                        // 全表无 PARTITION 开窗统计
+                        count().over().as("grand_count")
+                ).where(w -> w.and(s.getTeacherId()).eq(1L))
+                .orderBy(s.getAge()).asc()
+                .orderBy(s.getId()).asc()
+                .maps();
 
         assertEquals(4, list.size());
 
@@ -266,12 +267,12 @@ public class OracleAndWindowFunctionsTest {
 
         // 函数测试: ifNull (NVL), now (SYSDATE), concat (||)
         List<Map<String, Object>> funcList = orm.select(Student.class).select(
-                s.getId(),
-                ifNull(s.getStudentName(), "NONAME").as("safe_name"),
-                concat(s.getStudentName(), raw("' ('"), s.getAge(), raw("')'")).as("display_info"),
-                now().as("cur_time")
-        ).where(w -> w.and(s.getId()).eq(page1.get(0).getId()))
-         .maps();
+                        s.getId(),
+                        ifNull(s.getStudentName(), "NONAME").as("safe_name"),
+                        concat(s.getStudentName(), raw("' ('"), s.getAge(), raw("')'")).as("display_info"),
+                        now().as("cur_time")
+                ).where(w -> w.and(s.getId()).eq(page1.get(0).getId()))
+                .maps();
 
         assertEquals(1, funcList.size());
         assertEquals("Alice", funcList.get(0).get("safe_name"));
@@ -288,18 +289,18 @@ public class OracleAndWindowFunctionsTest {
         Student s = proxy(Student.class);
 
         List<StudentWindowDto> dtoList = orm.select(StudentWindowDto.class).from(Student.class).select(
-                s.getId(),
-                s.getStudentName(),
-                s.getAge(),
-                s.getTeacherId(),
-                rowNumber().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rowNum"),
-                rank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rankVal"),
-                denseRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("denseRankVal"),
-                ntile(2).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("ntileVal"),
-                sum(s.getAge()).over().partitionBy(s.getTeacherId()).as("sumAge")
-        ).where(w -> w.and(s.getTeacherId()).eq(1L))
-         .orderBy(s.getId()).asc()
-         .list();
+                        s.getId(),
+                        s.getStudentName(),
+                        s.getAge(),
+                        s.getTeacherId(),
+                        rowNumber().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rowNum"),
+                        rank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rankVal"),
+                        denseRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("denseRankVal"),
+                        ntile(2).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("ntileVal"),
+                        sum(s.getAge()).over().partitionBy(s.getTeacherId()).as("sumAge")
+                ).where(w -> w.and(s.getTeacherId()).eq(1L))
+                .orderBy(s.getId()).asc()
+                .list();
 
         assertEquals(4, dtoList.size());
 

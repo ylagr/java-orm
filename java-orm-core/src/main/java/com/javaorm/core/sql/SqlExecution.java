@@ -6,7 +6,7 @@ import com.javaorm.core.metadata.ColumnMetadata;
 import com.javaorm.core.mutation.DeleteBuilder;
 import com.javaorm.core.mutation.UpdateBuilder;
 import com.javaorm.core.query.Query;
-import com.javaorm.core.query.TQuery;
+import com.javaorm.core.query.SelectBuilder;
 
 import java.util.List;
 import java.util.Map;
@@ -17,7 +17,7 @@ import java.util.Map;
  *
  * @param <T> 查询结果类型强类型约束
  */
-public class SqlExecution<T> implements TQuery<T> {
+public class SqlExecution<T> implements Query<T> {
 
     private final SqlEnv env;
     private final Object operation;
@@ -49,22 +49,22 @@ public class SqlExecution<T> implements TQuery<T> {
         if (resultClass != null) {
             return resultClass;
         }
-        if (operation instanceof TQuery<?>) {
-            return ((TQuery<T>) operation).getResultClass();
+        if (operation instanceof Query<?>) {
+            return ((Query<T>) operation).getResultClass();
         }
         return null;
     }
 
     @Override
     public SelectStatement getStatement() {
-        if (operation instanceof TQuery<?>) {
-            return ((TQuery<?>) operation).getStatement();
+        if (operation instanceof Query<?>) {
+            return ((Query<?>) operation).getStatement();
         }
         if (operation instanceof SqlSelectStream<?>) {
             return ((SqlSelectStream<?>) operation).getStatement();
         }
-        if (operation instanceof Query<?>) {
-            return ((Query<?>) operation).getStatement();
+        if (operation instanceof SelectBuilder<?>) {
+            return ((SelectBuilder<?>) operation).getStatement();
         }
         return null;
     }
@@ -73,9 +73,9 @@ public class SqlExecution<T> implements TQuery<T> {
      * 获取底层的强类型 TQuery 实例（如果当前操作是查询）
      */
     @SuppressWarnings("unchecked")
-    public <Q> TQuery<Q> asQuery() {
-        if (operation instanceof TQuery) {
-            return (TQuery<Q>) operation;
+    public <Q> Query<Q> asQuery() {
+        if (operation instanceof Query) {
+            return (Query<Q>) operation;
         }
         throw new IllegalStateException("Current operation is not a query: " + operation);
     }
@@ -84,7 +84,7 @@ public class SqlExecution<T> implements TQuery<T> {
      * 别名方法：获取底层的强类型 TQuery 实例
      */
     @SuppressWarnings("unchecked")
-    public <Q> TQuery<Q> getQuery() {
+    public <Q> Query<Q> getQuery() {
         return asQuery();
     }
 
@@ -113,8 +113,8 @@ public class SqlExecution<T> implements TQuery<T> {
             ((SqlUpdateStream) operation).printSql(printSqlOverride);
         } else if (operation instanceof SqlDeleteStream) {
             ((SqlDeleteStream) operation).printSql(printSqlOverride);
-        } else if (operation instanceof Query<?>) {
-            ((Query<?>) operation).printSql(printSqlOverride);
+        } else if (operation instanceof SelectBuilder<?>) {
+            ((SelectBuilder<?>) operation).printSql(printSqlOverride);
         }
     }
 
@@ -144,7 +144,7 @@ public class SqlExecution<T> implements TQuery<T> {
         if (operation instanceof com.javaorm.core.query.WhereBuilder<?>) {
             return ((com.javaorm.core.query.WhereBuilder<?>) operation).execute();
         }
-        if (operation instanceof SqlSelectStream<?> || operation instanceof Query<?>) {
+        if (operation instanceof SqlSelectStream<?> || operation instanceof SelectBuilder<?>) {
             throw new IllegalStateException("Cannot call exec() / execute() on a SELECT query. Please call .toList(), .listMaps(), or .firstOrNull() instead.");
         }
         throw new IllegalStateException("No valid SQL operation configured in SqlEnv. Please call e.select(), e.update(), or e.delete().");
@@ -156,8 +156,8 @@ public class SqlExecution<T> implements TQuery<T> {
     @Override
     @SuppressWarnings("unchecked")
     public <R> List<R> toList() {
-        if (operation instanceof TQuery<?>) {
-            TQuery<?> tq = (TQuery<?>) operation;
+        if (operation instanceof Query<?>) {
+            Query<?> tq = (Query<?>) operation;
             if (resultClass != null && resultClass != tq.getResultClass()) {
                 return (List<R>) tq.toList(resultClass);
             }
@@ -170,8 +170,8 @@ public class SqlExecution<T> implements TQuery<T> {
             }
             return (List<R>) (List) selectStream.toList();
         }
-        if (operation instanceof Query<?>) {
-            Query<?> q = (Query<?>) operation;
+        if (operation instanceof SelectBuilder<?>) {
+            SelectBuilder<?> q = (SelectBuilder<?>) operation;
             if (resultClass != null) {
                 if (resultClass == q.getRootEntityClass()) {
                     return (List<R>) q.toList();
@@ -194,14 +194,14 @@ public class SqlExecution<T> implements TQuery<T> {
      */
     @SuppressWarnings("unchecked")
     public <R> List<R> toList(Class<R> targetClass) {
-        if (operation instanceof TQuery<?>) {
-            return ((TQuery<?>) operation).toList(targetClass);
+        if (operation instanceof Query<?>) {
+            return ((Query<?>) operation).toList(targetClass);
         }
         if (operation instanceof SqlSelectStream<?>) {
             return ((SqlSelectStream<?>) operation).toList(targetClass);
         }
-        if (operation instanceof Query<?>) {
-            Query<?> q = (Query<?>) operation;
+        if (operation instanceof SelectBuilder<?>) {
+            SelectBuilder<?> q = (SelectBuilder<?>) operation;
             if (ColumnMetadata.isScalarType(targetClass)) {
                 return env.executeSelectScalarList(null, q.getStatement(), targetClass);
             }
@@ -218,14 +218,14 @@ public class SqlExecution<T> implements TQuery<T> {
      */
     @Override
     public List<Map<String, Object>> listMaps() {
-        if (operation instanceof TQuery<?>) {
-            return ((TQuery<?>) operation).listMaps();
+        if (operation instanceof Query<?>) {
+            return ((Query<?>) operation).listMaps();
         }
         if (operation instanceof SqlSelectStream<?>) {
             return ((SqlSelectStream<?>) operation).listMaps();
         }
-        if (operation instanceof Query<?>) {
-            return ((Query<?>) operation).listMaps();
+        if (operation instanceof SelectBuilder<?>) {
+            return ((SelectBuilder<?>) operation).listMaps();
         }
         throw new IllegalStateException("Cannot call listMaps() on an UPDATE or DELETE operation. Please call .exec() instead.");
     }
@@ -236,8 +236,8 @@ public class SqlExecution<T> implements TQuery<T> {
     @Override
     @SuppressWarnings("unchecked")
     public <R> R firstOrNull() {
-        if (operation instanceof TQuery<?>) {
-            TQuery<?> tq = (TQuery<?>) operation;
+        if (operation instanceof Query<?>) {
+            Query<?> tq = (Query<?>) operation;
             if (resultClass != null && resultClass != tq.getResultClass()) {
                 return (R) tq.firstOrNull(resultClass);
             }
@@ -250,8 +250,8 @@ public class SqlExecution<T> implements TQuery<T> {
             }
             return (R) (Object) selectStream.firstOrNull();
         }
-        if (operation instanceof Query<?>) {
-            Query<?> q = (Query<?>) operation;
+        if (operation instanceof SelectBuilder<?>) {
+            SelectBuilder<?> q = (SelectBuilder<?>) operation;
             if (resultClass != null) {
                 if (resultClass == q.getRootEntityClass()) {
                     return (R) q.firstOrNull();
@@ -276,14 +276,14 @@ public class SqlExecution<T> implements TQuery<T> {
      */
     @SuppressWarnings("unchecked")
     public <R> R firstOrNull(Class<R> targetClass) {
-        if (operation instanceof TQuery<?>) {
-            return ((TQuery<?>) operation).firstOrNull(targetClass);
+        if (operation instanceof Query<?>) {
+            return ((Query<?>) operation).firstOrNull(targetClass);
         }
         if (operation instanceof SqlSelectStream<?>) {
             return ((SqlSelectStream<?>) operation).firstOrNull(targetClass);
         }
-        if (operation instanceof Query<?>) {
-            Query<?> q = (Query<?>) operation;
+        if (operation instanceof SelectBuilder<?>) {
+            SelectBuilder<?> q = (SelectBuilder<?>) operation;
             if (ColumnMetadata.isScalarType(targetClass)) {
                 return env.executeSelectScalar(null, q.getStatement(), targetClass);
             }
@@ -302,14 +302,14 @@ public class SqlExecution<T> implements TQuery<T> {
      */
     @Override
     public long count() {
-        if (operation instanceof TQuery<?>) {
-            return ((TQuery<?>) operation).count();
+        if (operation instanceof Query<?>) {
+            return ((Query<?>) operation).count();
         }
         if (operation instanceof SqlSelectStream<?>) {
             return ((SqlSelectStream<?>) operation).count();
         }
-        if (operation instanceof Query<?>) {
-            return ((Query<?>) operation).count();
+        if (operation instanceof SelectBuilder<?>) {
+            return ((SelectBuilder<?>) operation).count();
         }
         throw new IllegalStateException("Cannot call count() on an UPDATE or DELETE operation.");
     }
@@ -327,8 +327,8 @@ public class SqlExecution<T> implements TQuery<T> {
      */
     @Override
     public SqlAndParams toSqlAndParams() {
-        if (operation instanceof TQuery<?>) {
-            return ((TQuery<?>) operation).toSqlAndParams();
+        if (operation instanceof Query<?>) {
+            return ((Query<?>) operation).toSqlAndParams();
         }
         if (operation instanceof SqlSelectStream<?>) {
             return ((SqlSelectStream<?>) operation).toSqlAndParams();
@@ -339,8 +339,8 @@ public class SqlExecution<T> implements TQuery<T> {
         if (operation instanceof SqlDeleteStream) {
             return ((SqlDeleteStream) operation).toSqlAndParams();
         }
-        if (operation instanceof Query<?>) {
-            return ((Query<?>) operation).toSqlAndParams();
+        if (operation instanceof SelectBuilder<?>) {
+            return ((SelectBuilder<?>) operation).toSqlAndParams();
         }
         if (operation instanceof UpdateBuilder<?>) {
             return ((UpdateBuilder<?>) operation).toSqlAndParams();

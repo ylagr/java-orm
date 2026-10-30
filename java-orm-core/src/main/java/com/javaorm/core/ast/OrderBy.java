@@ -17,8 +17,19 @@ public class OrderBy {
         this.ascending = ascending;
     }
 
-    public String getTableAlias() { return tableAlias; }
-    public String getColumnName() { return columnName; }
-    public SqlExpression<?> getExpression() { return expression; }
-    public boolean isAscending() { return ascending; }
+    public String getTableAlias() {
+        return tableAlias;
+    }
+
+    public String getColumnName() {
+        return columnName;
+    }
+
+    public SqlExpression<?> getExpression() {
+        return expression;
+    }
+
+    public boolean isAscending() {
+        return ascending;
+    }
 }

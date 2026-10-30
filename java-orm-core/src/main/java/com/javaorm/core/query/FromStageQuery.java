@@ -40,15 +40,15 @@ public class FromStageQuery {
         return env.getConfig();
     }
 
-    public <T> Query<T> from(Class<T> entityClass) {
+    public <T> SelectBuilder<T> from(Class<T> entityClass) {
         String existingAlias = hasSubQuery() ? com.javaorm.core.proxy.RecordingContext.getAlias(entityClass) : null;
-        Query<T> query = new Query<>(env, entityClass, existingAlias);
+        SelectBuilder<T> query = new SelectBuilder<>(env, entityClass, existingAlias);
         query.select(expressions);
         return query;
     }
 
-    public <T> Query<T> from(Cte<T> cte) {
-        Query<T> query = new Query<>(env, cte);
+    public <T> SelectBuilder<T> from(Cte<T> cte) {
+        SelectBuilder<T> query = new SelectBuilder<>(env, cte);
         query.select(expressions);
         return query;
     }

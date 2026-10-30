@@ -95,8 +95,8 @@ public class OracleDialect extends AbstractDialect {
         int off = (offset != null && offset > 0) ? offset : 0;
         if (off > 0) {
             sql.append("SELECT * FROM (SELECT tt.*, ROWNUM AS \"row_num\" FROM (")
-               .append(inner.getSql())
-               .append(") tt");
+                    .append(inner.getSql())
+                    .append(") tt");
             if (limit != null) {
                 sql.append(" WHERE ROWNUM <= ?");
                 params.add(off + limit);
@@ -105,8 +105,8 @@ public class OracleDialect extends AbstractDialect {
             params.add(off);
         } else if (limit != null) {
             sql.append("SELECT * FROM (")
-               .append(inner.getSql())
-               .append(") WHERE ROWNUM <= ?");
+                    .append(inner.getSql())
+                    .append(") WHERE ROWNUM <= ?");
             params.add(limit);
         } else {
             return inner;
@@ -486,8 +486,10 @@ public class OracleDialect extends AbstractDialect {
         registerFunction(BuiltinSqlFunction.CAST, (fn, args, sql, params, d) -> {
             if (args.size() < 2) return;
             String type = String.valueOf(args.get(1)).toUpperCase();
-            if ("CHAR".equals(type) || "VARCHAR".equals(type) || "TEXT".equals(type) || "STRING".equals(type)) type = "VARCHAR2(4000)";
-            else if ("SIGNED".equals(type) || "INT".equals(type) || "INTEGER".equals(type) || "BIGINT".equals(type)) type = "NUMBER";
+            if ("CHAR".equals(type) || "VARCHAR".equals(type) || "TEXT".equals(type) || "STRING".equals(type))
+                type = "VARCHAR2(4000)";
+            else if ("SIGNED".equals(type) || "INT".equals(type) || "INTEGER".equals(type) || "BIGINT".equals(type))
+                type = "NUMBER";
             sql.append("CAST(");
             d.renderArg(args.get(0), sql, params);
             sql.append(" AS ").append(type).append(")");

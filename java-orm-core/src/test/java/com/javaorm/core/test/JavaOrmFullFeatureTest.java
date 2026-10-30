@@ -98,8 +98,8 @@ public class JavaOrmFullFeatureTest {
         // 2. 基础条件查询与排序
         List<Student> adultStudents = orm.select(Student.class)
                 .where()
-                    .and(s -> s.getAge()).ge(18)
-                    .and(s -> s.getStudentName()).like("王%")
+                .and(s -> s.getAge()).ge(18)
+                .and(s -> s.getStudentName()).like("王%")
                 .orderBy(s -> s.getAge()).desc()
                 .list();
 
@@ -109,7 +109,7 @@ public class JavaOrmFullFeatureTest {
         // 3. 级联导航字段过滤（自动隐式 LEFT JOIN）: 查出指导老师年龄 > 35 的学生
         List<Student> studentsWithSeniorTeacher = orm.select(Student.class)
                 .where()
-                    .and(s -> s.getTeacher().getAge()).gt(35)
+                .and(s -> s.getTeacher().getAge()).gt(35)
                 .orderBy(s -> s.getId()).asc()
                 .list();
 
@@ -120,7 +120,7 @@ public class JavaOrmFullFeatureTest {
         // 4. 关联作用域子块（whereRelation）
         List<Student> professorStudents = orm.select(Student.class)
                 .whereRelation(s -> s.getTeacher(), t -> t
-                    .where()
+                        .where()
                         .and(Teacher::getTitle).eq("教授")
                 )
                 .list();
@@ -131,7 +131,7 @@ public class JavaOrmFullFeatureTest {
         List<Student> studentsWithIncludedTeacher = orm.select(Student.class)
                 .include(s -> s.getTeacher())
                 .where()
-                    .and(s -> s.getStudentName()).eq("李小华")
+                .and(s -> s.getStudentName()).eq("李小华")
                 .list();
 
         assertEquals(1, studentsWithIncludedTeacher.size());
@@ -142,7 +142,7 @@ public class JavaOrmFullFeatureTest {
         List<Teacher> teachersWithStudents = orm.select(Teacher.class)
                 .include(t -> t.getStudents())
                 .where()
-                    .and(t -> t.getId()).eq(t1.getId())
+                .and(t -> t.getId()).eq(t1.getId())
                 .list();
 
         assertEquals(1, teachersWithStudents.size());
@@ -154,13 +154,13 @@ public class JavaOrmFullFeatureTest {
         int updated = orm.update(Student.class)
                 .set(s -> s.getAge(), 99)
                 .where()
-                    .and(s -> s.getStudentName()).eq("王大锤")
+                .and(s -> s.getStudentName()).eq("王大锤")
                 .execute();
         assertEquals(1, updated);
 
         Student s2Updated = orm.select(Student.class)
                 .where()
-                    .and(s -> s.getId()).eq(s2.getId())
+                .and(s -> s.getId()).eq(s2.getId())
                 .single();
         assertEquals(Integer.valueOf(99), s2Updated.getAge());
 

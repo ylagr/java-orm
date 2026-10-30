@@ -7,7 +7,7 @@ import com.javaorm.core.annotation.JoTable;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.H2Dialect;
 import com.javaorm.core.query.Cte;
-import com.javaorm.core.query.TQuery;
+import com.javaorm.core.query.Query;
 import com.javaorm.core.test.entity.Student;
 import com.javaorm.core.test.entity.Teacher;
 import org.h2.jdbcx.JdbcDataSource;
@@ -38,19 +38,38 @@ public class SqlEnvDslTest {
         private Long parentId;
         private String name;
 
-        public Department() {}
+        public Department() {
+        }
+
         public Department(Long id, Long parentId, String name) {
             this.id = id;
             this.parentId = parentId;
             this.name = name;
         }
 
-        public Long getId() { return id; }
-        public void setId(Long id) { this.id = id; }
-        public Long getParentId() { return parentId; }
-        public void setParentId(Long parentId) { this.parentId = parentId; }
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public Long getParentId() {
+            return parentId;
+        }
+
+        public void setParentId(Long parentId) {
+            this.parentId = parentId;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
     }
 
     public static class StudentDto {
@@ -58,12 +77,29 @@ public class SqlEnvDslTest {
         private String studentName;
         private Integer age;
 
-        public Long getId() { return id; }
-        public void setId(Long id) { this.id = id; }
-        public String getStudentName() { return studentName; }
-        public void setStudentName(String studentName) { this.studentName = studentName; }
-        public Integer getAge() { return age; }
-        public void setAge(Integer age) { this.age = age; }
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public String getStudentName() {
+            return studentName;
+        }
+
+        public void setStudentName(String studentName) {
+            this.studentName = studentName;
+        }
+
+        public Integer getAge() {
+            return age;
+        }
+
+        public void setAge(Integer age) {
+            this.age = age;
+        }
     }
 
     @Before
@@ -108,8 +144,8 @@ public class SqlEnvDslTest {
         List<Student> list = orm.sql(e -> {
             Student s = e.table(Student.class);
             e.select(s)
-             .where().and(s.getAge()).ge(22)
-             .orderBy(s.getId()).desc();
+                    .where().and(s.getAge()).ge(22)
+                    .orderBy(s.getId()).desc();
         }).toList();
 
         assertEquals(2, list.size()); // David(25), Bob(22)
@@ -127,9 +163,9 @@ public class SqlEnvDslTest {
             Teacher t = e.table(Teacher.class, "t");
 
             e.select(s.getStudentName(), t.getTeacherName())
-             .from(s)
-             .leftJoin(t).on(s.getTeacherId(), t.getId())
-             .where().and(s.getAge()).eq(25);
+                    .from(s)
+                    .leftJoin(t).on(s.getTeacherId(), t.getId())
+                    .where().and(s.getAge()).eq(25);
         }).listMaps();
 
         assertEquals(1, rows.size());
@@ -143,22 +179,22 @@ public class SqlEnvDslTest {
     /**
      * 3. 测试用户给出的经典自连接案例（Self Join）：
      * orm.sql(e -> {
-     *     Department parent = e.table(Department.class, "d_parent");
-     *     Department child  = e.table(Department.class, "d_child");
-     *     e.select(parent.getName(), child.getName()).from(parent).leftJoin(child).where()...
+     * Department parent = e.table(Department.class, "d_parent");
+     * Department child  = e.table(Department.class, "d_child");
+     * e.select(parent.getName(), child.getName()).from(parent).leftJoin(child).where()...
      * })
      */
     @Test
     public void testDepartmentSelfJoin() {
         List<Map<String, Object>> rows = orm.sql(e -> {
             Department parent = e.table(Department.class, "d_parent");
-            Department child  = e.table(Department.class, "d_child");
+            Department child = e.table(Department.class, "d_child");
 
             e.select(parent.getName(), child.getName())
-             .from(parent)
-             .leftJoin(child).on(child.getParentId(), parent.getId())
-             .where().and(parent.getName()).eq("研发部")
-             .orderBy(child.getId()).asc();
+                    .from(parent)
+                    .leftJoin(child).on(child.getParentId(), parent.getId())
+                    .where().and(parent.getName()).eq("研发部")
+                    .orderBy(child.getId()).asc();
         }).listMaps();
 
         assertEquals(1, rows.size());
@@ -175,9 +211,9 @@ public class SqlEnvDslTest {
         List<StudentDto> dtos = orm.sql(e -> {
             Student s = e.table(Student.class);
             e.select(StudentDto.class, s.getId(), s.getStudentName(), s.getAge())
-             .from(s)
-             .where().and(s.getAge()).ge(22)
-             .orderBy(s.getAge()).asc();
+                    .from(s)
+                    .where().and(s.getAge()).ge(22)
+                    .orderBy(s.getAge()).asc();
         }).toList();
 
         assertEquals(2, dtos.size());
@@ -195,8 +231,8 @@ public class SqlEnvDslTest {
         List<Map<String, Object>> rows = orm.sql(e -> {
             Cte<?> temp = e.table(rawCte, "sn");
             e.select(temp.col("name"))
-             .from(temp)
-             .where().and(temp.col("name")).eq("David");
+                    .from(temp)
+                    .where().and(temp.col("name")).eq("David");
         }).listMaps();
 
         assertEquals(1, rows.size());
@@ -212,9 +248,9 @@ public class SqlEnvDslTest {
         int updated = orm.sql(e -> {
             Student s = e.table(Student.class);
             e.update(s)
-             .set(s.getAge(), 35)
-             .set(s.getStudentName(), "Alice_Updated")
-             .where().and(s.getId()).eq(1L);
+                    .set(s.getAge(), 35)
+                    .set(s.getStudentName(), "Alice_Updated")
+                    .where().and(s.getId()).eq(1L);
         }).exec();
 
         assertEquals(1, updated);
@@ -237,9 +273,9 @@ public class SqlEnvDslTest {
         int updated = orm.sql(e -> {
             Student s = e.table(Student.class);
             e.update(s)
-             .set(newAge != null, s.getAge(), newAge)
-             .set(newName != null, s.getStudentName(), newName)
-             .where().and(s.getId()).eq(3L);
+                    .set(newAge != null, s.getAge(), newAge)
+                    .set(newName != null, s.getStudentName(), newName)
+                    .where().and(s.getId()).eq(3L);
         }).exec();
 
         assertEquals(1, updated);
@@ -258,7 +294,7 @@ public class SqlEnvDslTest {
         int deleted = orm.sql(e -> {
             Student s = e.table(Student.class);
             e.delete(s)
-             .where().and(s.getId()).eq(4L);
+                    .where().and(s.getId()).eq(4L);
         }).exec();
 
         assertEquals(1, deleted);
@@ -334,9 +370,9 @@ public class SqlEnvDslTest {
         List<StudentDto> dtoList = orm.sql(StudentDto.class, e -> {
             Student s = e.table(Student.class);
             e.select(s.getId(), s.getStudentName(), s.getAge())
-             .from(s)
-             .where().and(s.getAge()).ge(22)
-             .orderBy(s.getAge()).asc();
+                    .from(s)
+                    .where().and(s.getAge()).ge(22)
+                    .orderBy(s.getAge()).asc();
         }).toList();
         assertEquals(2, dtoList.size());
         assertEquals("Bob", dtoList.get(0).getStudentName());
@@ -346,9 +382,9 @@ public class SqlEnvDslTest {
         List<StudentDto> explicitDtoList = orm.sql(e -> {
             Student s = e.table(Student.class);
             e.select(s.getId(), s.getStudentName(), s.getAge())
-             .from(s)
-             .where().and(s.getAge()).ge(22)
-             .orderBy(s.getAge()).asc();
+                    .from(s)
+                    .where().and(s.getAge()).ge(22)
+                    .orderBy(s.getAge()).asc();
         }).toList(StudentDto.class);
         assertEquals(2, explicitDtoList.size());
         assertEquals("Bob", explicitDtoList.get(0).getStudentName());
@@ -357,9 +393,9 @@ public class SqlEnvDslTest {
         List<Student> studentList = orm.sql(e -> {
             Student s = e.table(Student.class);
             e.select(s.getId(), s.getStudentName(), s.getAge())
-             .from(s)
-             .where().and(s.getAge()).ge(22)
-             .orderBy(s.getAge()).asc();
+                    .from(s)
+                    .where().and(s.getAge()).ge(22)
+                    .orderBy(s.getAge()).asc();
         }).toList(Student.class);
         assertEquals(2, studentList.size());
         assertEquals("Bob", studentList.get(0).getStudentName());
@@ -368,9 +404,9 @@ public class SqlEnvDslTest {
         List<String> names = orm.sql(e -> {
             Student s = e.table(Student.class);
             e.select(s.getStudentName())
-             .from(s)
-             .where().and(s.getAge()).ge(22)
-             .orderBy(s.getAge()).asc();
+                    .from(s)
+                    .where().and(s.getAge()).ge(22)
+                    .orderBy(s.getAge()).asc();
         }).toList(String.class);
         assertEquals(2, names.size());
         assertEquals("Bob", names.get(0));
@@ -380,16 +416,16 @@ public class SqlEnvDslTest {
         String firstName = orm.sql(e -> {
             Student s = e.table(Student.class);
             e.select(s.getStudentName())
-             .from(s)
-             .where().and(s.getId()).eq(2L);
+                    .from(s)
+                    .where().and(s.getId()).eq(2L);
         }).firstOrNull(String.class);
         assertEquals("Bob", firstName);
 
         StudentDto firstDto = orm.sql(StudentDto.class, e -> {
             Student s = e.table(Student.class);
             e.select(s.getId(), s.getStudentName(), s.getAge())
-             .from(s)
-             .where().and(s.getId()).eq(2L);
+                    .from(s)
+                    .where().and(s.getId()).eq(2L);
         }).firstOrNull();
         assertNotNull(firstDto);
         assertEquals("Bob", firstDto.getStudentName());
@@ -406,8 +442,8 @@ public class SqlEnvDslTest {
         List<Student> autoInferred = orm.sql(e -> {
             Student s = e.table(Student.class);
             e.select(s.getStudentName(), s.getAge())
-             .from(s)
-             .where().and(s.getId()).eq(1L);
+                    .from(s)
+                    .where().and(s.getId()).eq(1L);
         }).toList();
         assertEquals(1, autoInferred.size());
         assertEquals("Alice", autoInferred.get(0).getStudentName());
@@ -418,15 +454,14 @@ public class SqlEnvDslTest {
                 Student s = e.table(Student.class, "s");
                 Teacher t = e.table(Teacher.class, "t");
                 e.select(s.getStudentName(), t.getTeacherName())
-                 .from(s)
-                 .leftJoin(t).on(s.getTeacherId(), t.getId());
+                        .from(s)
+                        .leftJoin(t).on(s.getTeacherId(), t.getId());
             }).toList();
             fail("Multi-table projection without target class should throw IllegalStateException");
         } catch (IllegalStateException e) {
             assertTrue(e.getMessage().contains("multi-table or untyped projection query"));
         }
     }
-
 
 
     /**
@@ -494,7 +529,7 @@ public class SqlEnvDslTest {
     @Test
     public void testReturnTQueryTypePerception() {
         // 1. 验证链式返回为强类型 TQuery<Student>（通过统一的 orm.sql 入口感知）
-        TQuery<Student> query = orm.sql(e -> {
+        Query<Student> query = orm.sql(e -> {
             Student s = e.table(Student.class);
             return e.select(s)
                     .where().and(s.getAge()).ge(22)
@@ -526,7 +561,7 @@ public class SqlEnvDslTest {
         assertEquals("David", firstStudent.getStudentName());
 
         // 2. 验证 DTO 投影链式返回为强类型 TQuery<StudentDto>
-        TQuery<StudentDto> dtoQuery = orm.sql(e -> {
+        Query<StudentDto> dtoQuery = orm.sql(e -> {
             Student s = e.table(Student.class, "s");
             Teacher t = e.table(Teacher.class, "t");
             return e.select(StudentDto.class, s.getId(), s.getStudentName(), s.getAge())
@@ -556,7 +591,7 @@ public class SqlEnvDslTest {
         assertEquals(2, directDtos.size());
 
         // 3. 验证通过 orm.sql(...) 亦可获得感知类型的 TQuery<Student>
-        TQuery<Student> sqlQuery = orm.sql(e -> {
+        Query<Student> sqlQuery = orm.sql(e -> {
             Student s = e.table(Student.class);
             return e.select(s)
                     .where().and(s.getId()).eq(2L);
@@ -569,7 +604,7 @@ public class SqlEnvDslTest {
         assertEquals("Bob", bob.getStudentName());
 
         // 4. 验证 Join 子句节点本身也是强类型 TQuery<T>
-        TQuery<Student> joinQuery = orm.sql(e -> {
+        Query<Student> joinQuery = orm.sql(e -> {
             Student s = e.table(Student.class, "s");
             Teacher t = e.table(Teacher.class, "t");
             return e.select(s).leftJoin(t).on(s.getTeacherId(), t.getId());

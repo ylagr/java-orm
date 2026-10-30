@@ -1,16 +1,12 @@
 package com.javaorm.core.sql;
 
-import com.javaorm.core.ast.BinaryCondition;
-import com.javaorm.core.ast.ColumnEqualityCondition;
-import com.javaorm.core.ast.ColumnExpression;
-import com.javaorm.core.ast.SelectStatement;
-import com.javaorm.core.ast.TableJoin;
+import com.javaorm.core.ast.*;
 import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.operator.SqlOperator;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.RecordingContext;
 import com.javaorm.core.query.Query;
-import com.javaorm.core.query.TQuery;
+import com.javaorm.core.query.SelectBuilder;
 import com.javaorm.core.query.WhereBuilder;
 
 import java.util.List;
@@ -23,7 +19,7 @@ import java.util.function.Consumer;
  *
  * @param <T> 查询结果类型强类型约束
  */
-public class SqlJoinClause<T> implements TQuery<T> {
+public class SqlJoinClause<T> implements Query<T> {
 
     private final SqlSelectStream<T> selectStream;
     private final TableJoin tableJoin;
@@ -77,7 +73,7 @@ public class SqlJoinClause<T> implements TQuery<T> {
     }
 
     private ColumnExpression pathToColumnExpression(PropertyPath path) {
-        Query<?> query = selectStream.getQuery();
+        SelectBuilder<?> query = selectStream.getQuery();
         String alias = path.getExplicitAlias() != null ? path.getExplicitAlias() : query.resolveTableAlias(path);
         String colName = query.resolveColumnName(path);
         ColumnExpression ce = new ColumnExpression(alias, colName);

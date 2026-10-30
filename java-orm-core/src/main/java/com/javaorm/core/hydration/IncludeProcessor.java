@@ -11,7 +11,7 @@ import com.javaorm.core.metadata.RelationMetadata;
 import com.javaorm.core.operator.SqlOperator;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.query.IncludeSpec;
-import com.javaorm.core.query.Query;
+import com.javaorm.core.query.SelectBuilder;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -111,7 +111,7 @@ public class IncludeProcessor {
         for (int i = 0; i < keyList.size(); i += CHUNK_SIZE) {
             List<Object> chunk = keyList.subList(i, Math.min(i + CHUNK_SIZE, keyList.size()));
             @SuppressWarnings({"rawtypes", "unchecked"})
-            Query<?> targetQuery = new Query(relation.getTargetEntityClass(), dataSource, dialect, config);
+            SelectBuilder<?> targetQuery = new SelectBuilder(relation.getTargetEntityClass(), dataSource, dialect, config);
             if (includeSpec != null) {
                 includeSpec.applyConfig(targetQuery);
             }
@@ -172,7 +172,7 @@ public class IncludeProcessor {
         for (int i = 0; i < idList.size(); i += CHUNK_SIZE) {
             List<Object> chunk = idList.subList(i, Math.min(i + CHUNK_SIZE, idList.size()));
             @SuppressWarnings({"rawtypes", "unchecked"})
-            Query<?> targetQuery = new Query(relation.getTargetEntityClass(), dataSource, dialect, config);
+            SelectBuilder<?> targetQuery = new SelectBuilder(relation.getTargetEntityClass(), dataSource, dialect, config);
             if (includeSpec != null) {
                 includeSpec.applyConfig(targetQuery);
             }

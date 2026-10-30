@@ -11,24 +11,24 @@ import java.util.function.Consumer;
 public class IncludeSpec {
 
     private final PropertyPath path;
-    private final Consumer<Query<?>> queryConfig;
+    private final Consumer<SelectBuilder<?>> queryConfig;
 
     public IncludeSpec(PropertyPath path) {
-        this(path, (Consumer<Query<?>>) null);
+        this(path, (Consumer<SelectBuilder<?>>) null);
     }
 
-    public IncludeSpec(PropertyPath path, Consumer<Query<?>> queryConfig) {
+    public IncludeSpec(PropertyPath path, Consumer<SelectBuilder<?>> queryConfig) {
         this.path = path;
         this.queryConfig = queryConfig;
     }
 
     @SuppressWarnings("unchecked")
-    public static <R> IncludeSpec ofBi(PropertyPath path, BiConsumer<Query<R>, R> biConfig) {
+    public static <R> IncludeSpec ofBi(PropertyPath path, BiConsumer<SelectBuilder<R>, R> biConfig) {
         if (biConfig == null) {
             return new IncludeSpec(path);
         }
         return new IncludeSpec(path, q -> {
-            Query<R> targetQ = (Query<R>) q;
+            SelectBuilder<R> targetQ = (SelectBuilder<R>) q;
             R proxy = targetQ.proxy();
             biConfig.accept(targetQ, proxy);
         });
@@ -38,11 +38,11 @@ public class IncludeSpec {
         return path;
     }
 
-    public Consumer<Query<?>> getQueryConfig() {
+    public Consumer<SelectBuilder<?>> getQueryConfig() {
         return queryConfig;
     }
 
-    public void applyConfig(Query<?> targetQuery) {
+    public void applyConfig(SelectBuilder<?> targetQuery) {
         if (queryConfig != null && targetQuery != null) {
             queryConfig.accept(targetQuery);
         }

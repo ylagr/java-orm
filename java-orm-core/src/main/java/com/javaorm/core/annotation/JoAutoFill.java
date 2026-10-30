@@ -12,5 +12,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface JoAutoFill {
     AutoFillType value() default AutoFillType.INSERT;
+
     AutoFillType fillType() default AutoFillType.INSERT;
 }

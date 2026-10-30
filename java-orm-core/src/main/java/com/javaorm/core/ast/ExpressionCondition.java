@@ -16,11 +16,24 @@ public class ExpressionCondition implements Condition {
     }
 
     @Override
-    public LogicalOperator getLogicalOperator() { return logicalOperator; }
-    @Override
-    public void setLogicalOperator(LogicalOperator logicalOperator) { this.logicalOperator = logicalOperator; }
+    public LogicalOperator getLogicalOperator() {
+        return logicalOperator;
+    }
 
-    public SqlExpression<?> getExpression() { return expression; }
-    public SqlOperator getOperator() { return operator; }
-    public Object[] getValues() { return values; }
+    @Override
+    public void setLogicalOperator(LogicalOperator logicalOperator) {
+        this.logicalOperator = logicalOperator;
+    }
+
+    public SqlExpression<?> getExpression() {
+        return expression;
+    }
+
+    public SqlOperator getOperator() {
+        return operator;
+    }
+
+    public Object[] getValues() {
+        return values;
+    }
 }

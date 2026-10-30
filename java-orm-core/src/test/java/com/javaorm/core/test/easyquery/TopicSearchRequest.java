@@ -21,18 +21,43 @@ public class TopicSearchRequest {
 
     private Integer stars;
 
-    public String getTitlePrefix() { return titlePrefix; }
-    public void setTitlePrefix(String titlePrefix) { this.titlePrefix = titlePrefix; }
+    public String getTitlePrefix() {
+        return titlePrefix;
+    }
 
-    public LocalDateTime getCreateTimeBegin() { return createTimeBegin; }
-    public void setCreateTimeBegin(LocalDateTime createTimeBegin) { this.createTimeBegin = createTimeBegin; }
+    public void setTitlePrefix(String titlePrefix) {
+        this.titlePrefix = titlePrefix;
+    }
 
-    public LocalDateTime getCreateTimeEnd() { return createTimeEnd; }
-    public void setCreateTimeEnd(LocalDateTime createTimeEnd) { this.createTimeEnd = createTimeEnd; }
+    public LocalDateTime getCreateTimeBegin() {
+        return createTimeBegin;
+    }
 
-    public List<Integer> getStarList() { return starList; }
-    public void setStarList(List<Integer> starList) { this.starList = starList; }
+    public void setCreateTimeBegin(LocalDateTime createTimeBegin) {
+        this.createTimeBegin = createTimeBegin;
+    }
 
-    public Integer getStars() { return stars; }
-    public void setStars(Integer stars) { this.stars = stars; }
+    public LocalDateTime getCreateTimeEnd() {
+        return createTimeEnd;
+    }
+
+    public void setCreateTimeEnd(LocalDateTime createTimeEnd) {
+        this.createTimeEnd = createTimeEnd;
+    }
+
+    public List<Integer> getStarList() {
+        return starList;
+    }
+
+    public void setStarList(List<Integer> starList) {
+        this.starList = starList;
+    }
+
+    public Integer getStars() {
+        return stars;
+    }
+
+    public void setStars(Integer stars) {
+        this.stars = stars;
+    }
 }

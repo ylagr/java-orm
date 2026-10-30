@@ -22,6 +22,11 @@ public class RawSqlExpression<T> implements SqlExpression<T> {
         return this;
     }
 
-    public String getRawSql() { return rawSql; }
-    public Object[] getParams() { return params; }
+    public String getRawSql() {
+        return rawSql;
+    }
+
+    public Object[] getParams() {
+        return params;
+    }
 }

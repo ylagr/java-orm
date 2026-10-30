@@ -30,7 +30,8 @@ public class ConnectionUtils {
         if (conn != null && !isTransactionConnection(conn)) {
             try {
                 conn.close();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
     }
 }

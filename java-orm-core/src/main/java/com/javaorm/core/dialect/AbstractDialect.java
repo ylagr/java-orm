@@ -5,6 +5,7 @@ import com.javaorm.core.function.BuiltinSqlFunction;
 import com.javaorm.core.function.FunctionRenderer;
 import com.javaorm.core.function.SqlFunction;
 import com.javaorm.core.operator.SqlOperator;
+import com.javaorm.core.query.SelectBuilder;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -139,8 +140,8 @@ public abstract class AbstractDialect implements Dialect {
             }
             return;
         }
-        if (queryObj instanceof com.javaorm.core.query.Query) {
-            SelectStatement subStmt = ((com.javaorm.core.query.Query<?>) queryObj).getStatement();
+        if (queryObj instanceof SelectBuilder) {
+            SelectStatement subStmt = ((SelectBuilder<?>) queryObj).getStatement();
             SqlAndParams subSqlAndParams = buildSelect(subStmt, false);
             sql.append(subSqlAndParams.getSql());
             params.addAll(subSqlAndParams.getParams());
@@ -965,8 +966,8 @@ public abstract class AbstractDialect implements Dialect {
 
     public void renderSubQuery(Object queryObj, StringBuilder sql, List<Object> params) {
         if (queryObj == null) return;
-        if (queryObj instanceof com.javaorm.core.query.Query) {
-            SelectStatement subStmt = ((com.javaorm.core.query.Query<?>) queryObj).getStatement();
+        if (queryObj instanceof SelectBuilder) {
+            SelectStatement subStmt = ((SelectBuilder<?>) queryObj).getStatement();
             SqlAndParams subSqlAndParams = buildSelect(subStmt, false);
             sql.append(subSqlAndParams.getSql());
             params.addAll(subSqlAndParams.getParams());
@@ -985,7 +986,7 @@ public abstract class AbstractDialect implements Dialect {
 
     private boolean isQuery(Object obj) {
         if (obj == null) return false;
-        if (obj instanceof com.javaorm.core.query.Query) return true;
+        if (obj instanceof SelectBuilder) return true;
         Class<?> clazz = obj.getClass();
         if (clazz == String.class || clazz == Integer.class || clazz == Long.class || clazz == Boolean.class
                 || clazz == Double.class || clazz == Float.class || clazz == Short.class || clazz == Byte.class

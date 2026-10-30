@@ -1,17 +1,16 @@
 package com.javaorm.core.mutation;
 
-import com.javaorm.core.annotation.AutoFillType;
 import com.javaorm.core.ast.InsertStatement;
 import com.javaorm.core.config.OrmConfig;
+import com.javaorm.core.connection.ConnectionUtils;
 import com.javaorm.core.dialect.Dialect;
 import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.metadata.ColumnMetadata;
 import com.javaorm.core.metadata.EntityMetadata;
 import com.javaorm.core.metadata.EntityMetadataManager;
+import com.javaorm.core.sql.SqlEnv;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.javaorm.core.connection.ConnectionUtils;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -20,8 +19,6 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.Date;
-
-import com.javaorm.core.sql.SqlEnv;
 
 public class InsertBuilder<T> {
 

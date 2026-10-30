@@ -3,8 +3,6 @@ package com.javaorm.core.dialect;
 import com.javaorm.core.ast.SqlExpression;
 import com.javaorm.core.function.BuiltinSqlFunction;
 
-import java.util.List;
-
 public class MySQLDialect extends AbstractDialect {
 
     public MySQLDialect() {

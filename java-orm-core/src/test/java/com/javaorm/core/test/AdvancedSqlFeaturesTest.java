@@ -131,7 +131,7 @@ public class AdvancedSqlFeaturesTest {
                 .from(Student.class)
                 .groupBy(s.getTeacherId())
                 .having()
-                    .and(count(s.getId())).ge(2)
+                .and(count(s.getId())).ge(2)
                 .orderBy(s.getTeacherId()).asc()
                 .listMaps();
 
@@ -156,7 +156,7 @@ public class AdvancedSqlFeaturesTest {
                 .select(count(s.getId()).as("total"), s.getTeacherId(), avg(s.getAge()).as("avgAge"))
                 .groupBy(s.getTeacherId())
                 .having()
-                    .and(count(s.getId())).ge(2)
+                .and(count(s.getId())).ge(2)
                 .list();
 
         assertEquals(1, dtoListA.size());
@@ -190,7 +190,7 @@ public class AdvancedSqlFeaturesTest {
         // 查询名字长度大于 2 的学生 (LENGTH(t0.student_name) > 2)
         List<Student> students = orm.select(Student.class)
                 .where()
-                    .and(length(s.getStudentName())).gt(2)
+                .and(length(s.getStudentName())).gt(2)
                 .list();
 
         assertEquals(4, students.size());
@@ -207,12 +207,12 @@ public class AdvancedSqlFeaturesTest {
         // 4.1 IN 子查询：查询指导教师年龄 > 40 的学生
         List<Student> studentsIn = orm.select(Student.class)
                 .where()
-                    .and(s.getTeacherId()).in(
-                            orm.select(t.getId())
-                               .from(Teacher.class)
-                               .where()
-                                   .and(t.getAge()).gt(40)
-                    )
+                .and(s.getTeacherId()).in(
+                        orm.select(t.getId())
+                                .from(Teacher.class)
+                                .where()
+                                .and(t.getAge()).gt(40)
+                )
                 .list();
 
         assertEquals(3, studentsIn.size()); // 属于 t1 (张教授 45岁)
@@ -220,13 +220,13 @@ public class AdvancedSqlFeaturesTest {
         // 4.2 EXISTS 子查询
         List<Student> studentsExists = orm.select(Student.class)
                 .where()
-                    .andExists(
-                            orm.select(t.getId())
-                               .from(Teacher.class)
-                               .where()
-                                   .and(t.getId()).eq(s.getTeacherId())
-                                   .and(t.getTitle()).eq("讲师")
-                    )
+                .andExists(
+                        orm.select(t.getId())
+                                .from(Teacher.class)
+                                .where()
+                                .and(t.getId()).eq(s.getTeacherId())
+                                .and(t.getTitle()).eq("讲师")
+                )
                 .list();
 
         assertEquals(1, studentsExists.size());
@@ -245,12 +245,12 @@ public class AdvancedSqlFeaturesTest {
         List<Map<String, Object>> unionResult = orm.select(s.getStudentName())
                 .from(Student.class)
                 .where()
-                    .and(s.getAge()).le(20)
+                .and(s.getAge()).le(20)
                 .union(
                         orm.select(s.getStudentName())
-                           .from(Student.class)
-                           .where()
-                               .and(s.getAge()).ge(22)
+                                .from(Student.class)
+                                .where()
+                                .and(s.getAge()).ge(22)
                 )
                 .listMaps();
 
@@ -303,7 +303,7 @@ public class AdvancedSqlFeaturesTest {
         int affected1 = orm.update(Student.class)
                 .set(s.getAge(), increment(2))
                 .where()
-                    .and(s.getStudentName()).eq("学生A")
+                .and(s.getStudentName()).eq("学生A")
                 .execute();
         assertEquals(1, affected1);
 
@@ -314,10 +314,10 @@ public class AdvancedSqlFeaturesTest {
         int affected2 = orm.update(Student.class)
                 .set(s.getAge(), decrement(1))
                 .where()
-                    .andGroup((w, stu) -> {
-                        w.and(stu.getStudentName()).eq("学生B");
-                        w.or(stu.getAge()).gt(100);
-                    })
+                .andGroup((w, stu) -> {
+                    w.and(stu.getStudentName()).eq("学生B");
+                    w.or(stu.getAge()).gt(100);
+                })
                 .execute();
         assertEquals(1, affected2);
 
@@ -328,12 +328,12 @@ public class AdvancedSqlFeaturesTest {
         int affected3 = orm.update(Student.class)
                 .set(s.getAge(), 99)
                 .where()
-                    .and(s.getTeacherId()).in(
-                            orm.select(t.getId())
-                               .from(Teacher.class)
-                               .where()
-                                   .and(t.getTitle()).eq("讲师") // t2 (李讲师) 下的学生是 学生D
-                    )
+                .and(s.getTeacherId()).in(
+                        orm.select(t.getId())
+                                .from(Teacher.class)
+                                .where()
+                                .and(t.getTitle()).eq("讲师") // t2 (李讲师) 下的学生是 学生D
+                )
                 .execute();
         assertEquals(1, affected3);
 
@@ -352,9 +352,9 @@ public class AdvancedSqlFeaturesTest {
         // 8.1 andGroup((w, stu) -> ...) 逻辑删除
         int affected1 = orm.delete(Student.class)
                 .where()
-                    .andGroup((w, stu) -> {
-                        w.and(stu.getStudentName()).eq("学生A");
-                    })
+                .andGroup((w, stu) -> {
+                    w.and(stu.getStudentName()).eq("学生A");
+                })
                 .execute();
         assertEquals(1, affected1);
 
@@ -365,13 +365,13 @@ public class AdvancedSqlFeaturesTest {
         // 8.2 基于 EXISTS 子查询删除
         int affected2 = orm.delete(Student.class)
                 .where()
-                    .andExists(
-                            orm.select(t.getId())
-                               .from(Teacher.class)
-                               .where()
-                                   .and(t.getId()).eq(s.getTeacherId())
-                                   .and(t.getTitle()).eq("讲师")
-                    )
+                .andExists(
+                        orm.select(t.getId())
+                                .from(Teacher.class)
+                                .where()
+                                .and(t.getId()).eq(s.getTeacherId())
+                                .and(t.getTitle()).eq("讲师")
+                )
                 .execute();
         assertEquals(1, affected2);
 

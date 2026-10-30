@@ -1,10 +1,6 @@
 package com.javaorm.core.query;
 
-import com.javaorm.core.ast.ExpressionCondition;
-import com.javaorm.core.ast.LogicalOperator;
-import com.javaorm.core.ast.OrderDirection;
-import com.javaorm.core.ast.SqlExpression;
-import com.javaorm.core.ast.SelectStatement;
+import com.javaorm.core.ast.*;
 import com.javaorm.core.operator.PropertyOperator;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.RecordingContext;
@@ -22,18 +18,18 @@ public class HavingBuilder<T> {
 
     private final SqlEnv env;
     private final SelectStatement statement;
-    private final Query<T> query;
+    private final SelectBuilder<T> query;
     private final Supplier<List<?>> customListSupplier;
 
-    public HavingBuilder(Query<T> query) {
+    public HavingBuilder(SelectBuilder<T> query) {
         this(query, null);
     }
 
-    public HavingBuilder(Query<T> query, Supplier<List<?>> customListSupplier) {
+    public HavingBuilder(SelectBuilder<T> query, Supplier<List<?>> customListSupplier) {
         this(query != null ? query.getEnv() : null, query != null ? query.getStatement() : null, query, customListSupplier);
     }
 
-    public HavingBuilder(SqlEnv env, SelectStatement statement, Query<T> query, Supplier<List<?>> customListSupplier) {
+    public HavingBuilder(SqlEnv env, SelectStatement statement, SelectBuilder<T> query, Supplier<List<?>> customListSupplier) {
         this.env = env != null ? env : (query != null ? query.getEnv() : null);
         this.statement = statement != null ? statement : (query != null ? query.getStatement() : null);
         this.query = query;
@@ -225,15 +221,15 @@ public class HavingBuilder<T> {
         return toSql();
     }
 
-    public Query<T> union(Query<?> other) {
+    public SelectBuilder<T> union(SelectBuilder<?> other) {
         return query.union(other);
     }
 
-    public Query<T> unionAll(Query<?> other) {
+    public SelectBuilder<T> unionAll(SelectBuilder<?> other) {
         return query.unionAll(other);
     }
 
-    public Query<T> page(int pageNum, int pageSize) {
+    public SelectBuilder<T> page(int pageNum, int pageSize) {
         return query.page(pageNum, pageSize);
     }
 
