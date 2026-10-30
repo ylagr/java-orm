@@ -4,6 +4,9 @@ import com.javaorm.core.ast.SelectStatement;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.Dialect;
 import com.javaorm.core.dialect.SqlAndParams;
+import com.javaorm.core.fastbean.FastBean;
+import com.javaorm.core.fastbean.FastPropertySetter;
+import com.javaorm.core.fastbean.LambdaFactory;
 import com.javaorm.core.metadata.ColumnMetadata;
 import com.javaorm.core.metadata.EntityMetadata;
 import org.slf4j.Logger;
@@ -39,17 +42,21 @@ public class EntityHydrator {
                 ResultSetMetaData rsmd = rs.getMetaData();
                 int colCount = rsmd.getColumnCount();
 
-                @SuppressWarnings("unchecked")
-                Class<T> clazz = (Class<T>) metadata.getEntityClass();
+                // 预解析每一列对应的 ColumnMetadata 映射，避免在每行循环内重复解析元数据与字符串处理
+                ColumnMetadata[] colMapping = new ColumnMetadata[colCount + 1];
+                for (int i = 1; i <= colCount; i++) {
+                    String colLabel = rsmd.getColumnLabel(i);
+                    if (colLabel == null || colLabel.isEmpty()) {
+                        colLabel = rsmd.getColumnName(i);
+                    }
+                    colMapping[i] = metadata.getColumnByDbName(colLabel);
+                }
 
                 while (rs.next()) {
-                    T entity = clazz.getDeclaredConstructor().newInstance();
+                    @SuppressWarnings("unchecked")
+                    T entity = (T) metadata.newInstance();
                     for (int i = 1; i <= colCount; i++) {
-                        String colLabel = rsmd.getColumnLabel(i);
-                        if (colLabel == null || colLabel.isEmpty()) {
-                            colLabel = rsmd.getColumnName(i);
-                        }
-                        ColumnMetadata col = metadata.getColumnByDbName(colLabel);
+                        ColumnMetadata col = colMapping[i];
                         if (col != null) {
                             Object val = rs.getObject(i);
                             col.setValue(entity, val);
@@ -70,61 +77,47 @@ public class EntityHydrator {
         }
 
         List<DTO> list = new ArrayList<>();
-        Map<String, Field> fieldMap = new HashMap<>();
-        Class<?> curr = dtoClass;
-        while (curr != null && curr != Object.class) {
-            for (Field f : curr.getDeclaredFields()) {
-                if (Modifier.isStatic(f.getModifiers())) continue;
-                f.setAccessible(true);
-                fieldMap.put(f.getName().toLowerCase(), f);
-                fieldMap.put(f.getName().toLowerCase().replace("_", ""), f);
-            }
-            curr = curr.getSuperclass();
-        }
-
-        EntityMetadata entityMetadata = config != null ? com.javaorm.core.metadata.EntityMetadataManager.get(dtoClass, config) : com.javaorm.core.metadata.EntityMetadataManager.get(dtoClass);
-        if (entityMetadata != null) {
-            for (ColumnMetadata cm : entityMetadata.getColumns()) {
-                if (cm.getField() != null) {
-                    cm.getField().setAccessible(true);
-                    fieldMap.put(cm.getColumnName().toLowerCase(), cm.getField());
-                    fieldMap.put(cm.getColumnName().toLowerCase().replace("_", ""), cm.getField());
-                    fieldMap.put(cm.getPropertyName().toLowerCase(), cm.getField());
-                    fieldMap.put(cm.getPropertyName().toLowerCase().replace("_", ""), cm.getField());
-                }
-            }
-        }
-
-        java.lang.reflect.Constructor<DTO> ctor = dtoClass.getDeclaredConstructor();
-        ctor.setAccessible(true);
+        FastBean<DTO> fastBean = LambdaFactory.getFastBean(dtoClass);
 
         try (PreparedStatement ps = prepareStatement(conn, sqlAndParams, dialect, stmt != null && !stmt.getCtes().isEmpty())) {
-
             try (ResultSet rs = ps.executeQuery()) {
                 ResultSetMetaData rsmd = rs.getMetaData();
                 int colCount = rsmd.getColumnCount();
 
+                // 预解析每一列对应的 FastPropertySetter 与属性类型，消除行循环中的反射与字段查找
+                FastPropertySetter[] setters = new FastPropertySetter[colCount + 1];
+                Class<?>[] propTypes = new Class<?>[colCount + 1];
+
+                for (int i = 1; i <= colCount; i++) {
+                    String colLabel = rsmd.getColumnLabel(i);
+                    if (colLabel == null || colLabel.isEmpty()) {
+                        colLabel = rsmd.getColumnName(i);
+                    }
+                    String clean = colLabel.replace("\"", "").replace("`", "");
+                    String key = clean.toLowerCase();
+                    if (key.contains(".")) {
+                        key = key.substring(key.lastIndexOf('.') + 1);
+                    }
+                    FastPropertySetter setter = fastBean.getSetter(key);
+                    Class<?> pType = fastBean.getPropertyType(key);
+                    if (setter == null && key.contains("_")) {
+                        String noUnderscore = key.replace("_", "");
+                        setter = fastBean.getSetter(noUnderscore);
+                        pType = fastBean.getPropertyType(noUnderscore);
+                    }
+                    setters[i] = setter;
+                    propTypes[i] = pType;
+                }
+
                 while (rs.next()) {
-                    DTO dto = ctor.newInstance();
+                    DTO dto = fastBean.create();
                     for (int i = 1; i <= colCount; i++) {
-                        String colLabel = rsmd.getColumnLabel(i);
-                        if (colLabel == null || colLabel.isEmpty()) {
-                            colLabel = rsmd.getColumnName(i);
-                        }
-                        String clean = colLabel.replace("\"", "").replace("`", "");
-                        String key = clean.toLowerCase();
-                        if (key.contains(".")) {
-                            key = key.substring(key.lastIndexOf('.') + 1);
-                        }
-                        Field f = fieldMap.get(key);
-                        if (f == null) {
-                            f = fieldMap.get(key.replace("_", ""));
-                        }
-                        if (f != null) {
+                        FastPropertySetter setter = setters[i];
+                        if (setter != null) {
                             Object val = rs.getObject(i);
                             if (val != null) {
-                                Object converted = ColumnMetadata.convertValue(f.getType(), val);
-                                f.set(dto, converted);
+                                Object converted = ColumnMetadata.convertValue(propTypes[i], val);
+                                setter.set(dto, converted);
                             }
                         }
                     }
@@ -144,7 +137,6 @@ public class EntityHydrator {
 
         List<Map<String, Object>> list = new ArrayList<>();
         try (PreparedStatement ps = prepareStatement(conn, sqlAndParams, dialect, stmt != null && !stmt.getCtes().isEmpty())) {
-
             try (ResultSet rs = ps.executeQuery()) {
                 ResultSetMetaData rsmd = rs.getMetaData();
                 int colCount = rsmd.getColumnCount();

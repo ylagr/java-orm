@@ -22,10 +22,18 @@ public class ColumnMetadata {
     private Field field;
     private Method getter;
     private Method setter;
+    private com.javaorm.core.fastbean.FastPropertySetter fastSetter;
+    private com.javaorm.core.fastbean.FastPropertyGetter fastGetter;
 
     public Object getValue(Object entity) {
         if (entity == null) {
             return null;
+        }
+        if (fastGetter != null) {
+            try {
+                return fastGetter.get(entity);
+            } catch (Exception ignored) {
+            }
         }
         try {
             if (getter != null) {
@@ -45,18 +53,42 @@ public class ColumnMetadata {
         if (entity == null) {
             return;
         }
+        Object converted = convertValue(value, propertyType);
+        if (fastSetter != null) {
+            try {
+                fastSetter.set(entity, converted);
+                return;
+            } catch (Exception ignored) {
+            }
+        }
         try {
             if (setter != null) {
-                setter.invoke(entity, convertValue(value, propertyType));
+                setter.invoke(entity, converted);
                 return;
             }
             if (field != null) {
                 field.setAccessible(true);
-                field.set(entity, convertValue(value, propertyType));
+                field.set(entity, converted);
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to set value for property " + propertyName + " with value " + value, e);
         }
+    }
+
+    public com.javaorm.core.fastbean.FastPropertySetter getFastSetter() {
+        return fastSetter;
+    }
+
+    public void setFastSetter(com.javaorm.core.fastbean.FastPropertySetter fastSetter) {
+        this.fastSetter = fastSetter;
+    }
+
+    public com.javaorm.core.fastbean.FastPropertyGetter getFastGetter() {
+        return fastGetter;
+    }
+
+    public void setFastGetter(com.javaorm.core.fastbean.FastPropertyGetter fastGetter) {
+        this.fastGetter = fastGetter;
     }
 
     public static Object convertValue(Class<?> targetType, Object value) {
@@ -67,7 +99,23 @@ public class ColumnMetadata {
         if (value == null) {
             return null;
         }
-        if (targetType.isInstance(value)) {
+        Class<?> valClass = value.getClass();
+        if (targetType == valClass || targetType.isInstance(value)) {
+            return value;
+        }
+        if (targetType == int.class && valClass == Integer.class) {
+            return value;
+        }
+        if (targetType == long.class && valClass == Long.class) {
+            return value;
+        }
+        if (targetType == double.class && valClass == Double.class) {
+            return value;
+        }
+        if (targetType == float.class && valClass == Float.class) {
+            return value;
+        }
+        if (targetType == boolean.class && valClass == Boolean.class) {
             return value;
         }
         if (targetType == Long.class || targetType == long.class) {

@@ -3,6 +3,7 @@ package com.javaorm.core.metadata;
 import com.javaorm.core.annotation.*;
 import com.javaorm.core.config.NameConversion;
 import com.javaorm.core.config.OrmConfig;
+import com.javaorm.core.fastbean.LambdaFactory;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
@@ -94,6 +95,8 @@ public class EntityMetadataManager {
                 Method setter = findSetter(clazz, propName, field.getType());
                 rel.setGetter(getter);
                 rel.setSetter(setter);
+                rel.setFastSetter(LambdaFactory.createSetter(clazz, setter, field));
+                rel.setFastGetter(LambdaFactory.createGetter(clazz, getter, field));
                 relations.put(propName, rel);
             }
         }
@@ -111,6 +114,7 @@ public class EntityMetadataManager {
 
     private static EntityMetadata parseMetadata(Class<?> clazz, OrmConfig config) {
         EntityMetadata metadata = new EntityMetadata(clazz);
+        metadata.setBeanCreator(LambdaFactory.createConstructor(clazz));
         NameConversion nameConversion = config.getNameConversion();
 
         // 1. 解析表名（优先 @JoTable，亦兼容 JPA 的 @Table）
@@ -159,7 +163,7 @@ public class EntityMetadataManager {
             Method setter = findSetter(clazz, propName, field.getType());
 
             // 解析普通列
-            ColumnMetadata colMeta = parseColumn(field, getter, setter, nameConversion, config);
+            ColumnMetadata colMeta = parseColumn(clazz, field, getter, setter, nameConversion, config);
             if (colMeta != null && !colMeta.isIgnored()) {
                 metadata.addColumn(colMeta);
             }
@@ -248,7 +252,7 @@ public class EntityMetadataManager {
         return rel;
     }
 
-    private static ColumnMetadata parseColumn(Field field, Method getter, Method setter, NameConversion nameConversion, OrmConfig config) {
+    private static ColumnMetadata parseColumn(Class<?> clazz, Field field, Method getter, Method setter, NameConversion nameConversion, OrmConfig config) {
         Annotation[] annotations = collectAnnotations(field, getter);
 
         ColumnMetadata col = new ColumnMetadata();
@@ -257,6 +261,8 @@ public class EntityMetadataManager {
         col.setField(field);
         col.setGetter(getter);
         col.setSetter(setter);
+        col.setFastSetter(LambdaFactory.createSetter(clazz, setter, field));
+        col.setFastGetter(LambdaFactory.createGetter(clazz, getter, field));
 
         String colName = null;
         boolean isPk = "id".equalsIgnoreCase(field.getName());

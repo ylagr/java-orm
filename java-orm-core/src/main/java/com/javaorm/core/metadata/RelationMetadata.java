@@ -14,10 +14,18 @@ public class RelationMetadata {
     private Field field;
     private Method getter;
     private Method setter;
+    private com.javaorm.core.fastbean.FastPropertySetter fastSetter;
+    private com.javaorm.core.fastbean.FastPropertyGetter fastGetter;
 
     public Object getValue(Object entity) {
         if (entity == null) {
             return null;
+        }
+        if (fastGetter != null) {
+            try {
+                return fastGetter.get(entity);
+            } catch (Exception ignored) {
+            }
         }
         try {
             if (getter != null) {
@@ -37,6 +45,13 @@ public class RelationMetadata {
         if (entity == null) {
             return;
         }
+        if (fastSetter != null) {
+            try {
+                fastSetter.set(entity, value);
+                return;
+            } catch (Exception ignored) {
+            }
+        }
         try {
             if (setter != null) {
                 setter.invoke(entity, value);
@@ -49,6 +64,22 @@ public class RelationMetadata {
         } catch (Exception e) {
             throw new RuntimeException("Failed to set relation value for " + propertyName, e);
         }
+    }
+
+    public com.javaorm.core.fastbean.FastPropertySetter getFastSetter() {
+        return fastSetter;
+    }
+
+    public void setFastSetter(com.javaorm.core.fastbean.FastPropertySetter fastSetter) {
+        this.fastSetter = fastSetter;
+    }
+
+    public com.javaorm.core.fastbean.FastPropertyGetter getFastGetter() {
+        return fastGetter;
+    }
+
+    public void setFastGetter(com.javaorm.core.fastbean.FastPropertyGetter fastGetter) {
+        this.fastGetter = fastGetter;
     }
 
     public String getPropertyName() {

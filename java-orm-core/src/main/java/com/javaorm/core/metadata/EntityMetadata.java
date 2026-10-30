@@ -108,4 +108,26 @@ public class EntityMetadata {
     public ColumnMetadata getTenantColumn() {
         return tenantColumn;
     }
+
+    private com.javaorm.core.fastbean.FastBeanCreator<?> beanCreator;
+
+    public com.javaorm.core.fastbean.FastBeanCreator<?> getBeanCreator() {
+        return beanCreator;
+    }
+
+    public void setBeanCreator(com.javaorm.core.fastbean.FastBeanCreator<?> beanCreator) {
+        this.beanCreator = beanCreator;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T newInstance() {
+        if (beanCreator != null) {
+            return (T) beanCreator.create();
+        }
+        try {
+            return (T) entityClass.getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to instantiate entity " + entityClass.getName(), e);
+        }
+    }
 }
