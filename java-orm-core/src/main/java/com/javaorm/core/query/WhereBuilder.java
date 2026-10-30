@@ -968,7 +968,9 @@ public class WhereBuilder<T> {
 
         boolean matchedInMetadata = false;
         if (entityClass != null && rootQuery != null) {
-            com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(entityClass, rootQuery.getConfig());
+            com.javaorm.core.metadata.EntityMetadata meta = (entityClass == rootQuery.getRootEntityClass() && rootQuery.getRootMetadata() != null)
+                    ? rootQuery.getRootMetadata()
+                    : com.javaorm.core.metadata.EntityMetadataManager.get(entityClass, rootQuery.getConfig());
             com.javaorm.core.metadata.ColumnMetadata cm = meta.getColumnByProperty(colName);
             if (cm != null) {
                 colName = cm.getColumnName();

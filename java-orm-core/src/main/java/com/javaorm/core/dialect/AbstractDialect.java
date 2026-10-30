@@ -8,6 +8,7 @@ import com.javaorm.core.operator.SqlOperator;
 
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class AbstractDialect implements Dialect {
 
@@ -138,6 +139,13 @@ public abstract class AbstractDialect implements Dialect {
             }
             return;
         }
+        if (queryObj instanceof com.javaorm.core.query.Query) {
+            SelectStatement subStmt = ((com.javaorm.core.query.Query<?>) queryObj).getStatement();
+            SqlAndParams subSqlAndParams = buildSelect(subStmt, false);
+            sql.append(subSqlAndParams.getSql());
+            params.addAll(subSqlAndParams.getParams());
+            return;
+        }
         try {
             Method getStatement = queryObj.getClass().getMethod("getStatement");
             SelectStatement subStmt = (SelectStatement) getStatement.invoke(queryObj);
@@ -156,11 +164,11 @@ public abstract class AbstractDialect implements Dialect {
 
     @Override
     public SqlAndParams buildSelect(SelectStatement stmt, boolean renderCte) {
-        if (stmt != null && (!stmt.getJoins().isEmpty() || stmt.getRootTableName() != null)) {
+        if (stmt != null && (!stmt.getJoins().isEmpty() || (stmt.getCtes() != null && !stmt.getCtes().isEmpty()))) {
             resolveAliasesInStatement(stmt);
         }
-        StringBuilder sql = new StringBuilder();
-        List<Object> params = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(256);
+        List<Object> params = new ArrayList<>(8);
 
         // 0. Common Table Expressions (WITH ...)
         if (renderCte && !stmt.getCtes().isEmpty()) {
@@ -360,9 +368,16 @@ public abstract class AbstractDialect implements Dialect {
         return new SqlAndParams(sql.toString(), params);
     }
 
+    protected final Map<String, String> quoteCache = new ConcurrentHashMap<>();
+    protected final Map<String, String> tablePrefixCache = new ConcurrentHashMap<>();
+
     @Override
     public String quote(String identifier) {
         if (identifier == null) return null;
+        return quoteCache.computeIfAbsent(identifier, this::doQuote);
+    }
+
+    protected String doQuote(String identifier) {
         String clean = identifier;
         if (clean.length() >= 2 && clean.startsWith("\"") && clean.endsWith("\"")) {
             clean = clean.substring(1, clean.length() - 1);
@@ -403,10 +418,25 @@ public abstract class AbstractDialect implements Dialect {
         if (alias == null || alias.isEmpty()) {
             return "";
         }
-        if (alias.matches("^t\\d+$") || "tt".equalsIgnoreCase(alias)) {
-            return alias + ".";
+        return tablePrefixCache.computeIfAbsent(alias, a -> {
+            if (isSimpleAlias(a)) {
+                return a + ".";
+            }
+            return quote(a) + ".";
+        });
+    }
+
+    private static boolean isSimpleAlias(String alias) {
+        if ("tt".equalsIgnoreCase(alias)) return true;
+        int len = alias.length();
+        if (len >= 2 && (alias.charAt(0) == 't' || alias.charAt(0) == 'T')) {
+            for (int i = 1; i < len; i++) {
+                char c = alias.charAt(i);
+                if (c < '0' || c > '9') return false;
+            }
+            return true;
         }
-        return quote(alias) + ".";
+        return false;
     }
 
     protected boolean isOp(SqlOperator op, SqlOperator... targets) {
@@ -823,6 +853,13 @@ public abstract class AbstractDialect implements Dialect {
 
     public void renderSubQuery(Object queryObj, StringBuilder sql, List<Object> params) {
         if (queryObj == null) return;
+        if (queryObj instanceof com.javaorm.core.query.Query) {
+            SelectStatement subStmt = ((com.javaorm.core.query.Query<?>) queryObj).getStatement();
+            SqlAndParams subSqlAndParams = buildSelect(subStmt, false);
+            sql.append(subSqlAndParams.getSql());
+            params.addAll(subSqlAndParams.getParams());
+            return;
+        }
         try {
             Method getStatement = queryObj.getClass().getMethod("getStatement");
             SelectStatement subStmt = (SelectStatement) getStatement.invoke(queryObj);
@@ -836,8 +873,15 @@ public abstract class AbstractDialect implements Dialect {
 
     private boolean isQuery(Object obj) {
         if (obj == null) return false;
+        if (obj instanceof com.javaorm.core.query.Query) return true;
+        Class<?> clazz = obj.getClass();
+        if (clazz == String.class || clazz == Integer.class || clazz == Long.class || clazz == Boolean.class
+                || clazz == Double.class || clazz == Float.class || clazz == Short.class || clazz == Byte.class
+                || clazz == Character.class || clazz.isArray() || obj instanceof Collection) {
+            return false;
+        }
         try {
-            obj.getClass().getMethod("getStatement");
+            clazz.getMethod("getStatement");
             return true;
         } catch (NoSuchMethodException e) {
             return false;

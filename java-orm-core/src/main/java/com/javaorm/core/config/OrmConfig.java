@@ -97,4 +97,11 @@ public class OrmConfig {
     public Object getCurrentTenantId() {
         return tenantIdProvider != null ? tenantIdProvider.get() : TenantContext.getTenantId();
     }
+
+    private final java.util.Map<Class<?>, com.javaorm.core.metadata.EntityMetadata> metadataCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public com.javaorm.core.metadata.EntityMetadata getMetadata(Class<?> entityClass) {
+        if (entityClass == null) return null;
+        return metadataCache.computeIfAbsent(entityClass, c -> com.javaorm.core.metadata.EntityMetadataManager.get(c, this));
+    }
 }

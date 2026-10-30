@@ -73,7 +73,7 @@ public class Query<T> {
         this.dataSource = dataSource;
         this.dialect = dialect;
         this.config = config;
-        this.rootMetadata = EntityMetadataManager.get(rootEntityClass, config);
+        this.rootMetadata = config != null ? config.getMetadata(rootEntityClass) : EntityMetadataManager.get(rootEntityClass, config);
 
         if (!allocateAlias) {
             this.statement = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), null);
@@ -107,7 +107,7 @@ public class Query<T> {
         this.dataSource = dataSource;
         this.dialect = dialect;
         this.config = config;
-        this.rootMetadata = EntityMetadataManager.get(rootEntityClass, config);
+        this.rootMetadata = config != null ? config.getMetadata(rootEntityClass) : EntityMetadataManager.get(rootEntityClass, config);
 
         if (rootAlias == null) {
             rootAlias = nextAlias();
@@ -289,6 +289,10 @@ public class Query<T> {
             ce.as(alias);
         }
         return ce;
+    }
+
+    public EntityMetadata getRootMetadata() {
+        return rootMetadata;
     }
 
     /**
@@ -1377,16 +1381,32 @@ public class Query<T> {
     }
 
     public String resolveColumnName(PropertyPath path) {
+        if (!path.hasRelations()) {
+            Class<?> targetClass = (path.getRootEntityClass() != null && path.getRootEntityClass() != rootEntityClass)
+                    ? path.getRootEntityClass() : rootEntityClass;
+            EntityMetadata targetMeta = (targetClass == rootEntityClass && rootMetadata != null)
+                    ? rootMetadata : (config != null ? config.getMetadata(targetClass) : EntityMetadataManager.get(targetClass, config));
+            ColumnMetadata col = targetMeta.getColumnByProperty(path.getTerminalProperty());
+            if (col != null) {
+                return col.getColumnName();
+            }
+            return config != null && config.getNameConversion() != null
+                    ? config.getNameConversion().convert(path.getTerminalProperty())
+                    : path.getTerminalProperty();
+        }
         Class<?> targetClass = resolveTargetClass(path);
         if (path.getRootEntityClass() != null && path.getRootEntityClass() != rootEntityClass && !path.hasRelations()) {
             targetClass = path.getRootEntityClass();
         }
-        EntityMetadata targetMeta = EntityMetadataManager.get(targetClass, config);
+        EntityMetadata targetMeta = (targetClass == rootEntityClass && rootMetadata != null)
+                ? rootMetadata : (config != null ? config.getMetadata(targetClass) : EntityMetadataManager.get(targetClass, config));
         ColumnMetadata col = targetMeta.getColumnByProperty(path.getTerminalProperty());
         if (col != null) {
             return col.getColumnName();
         }
-        return config.getNameConversion().convert(path.getTerminalProperty());
+        return config != null && config.getNameConversion() != null
+                ? config.getNameConversion().convert(path.getTerminalProperty())
+                : path.getTerminalProperty();
     }
 
     public String resolveJoinAlias(PropertyPath path) {
@@ -1404,7 +1424,7 @@ public class Query<T> {
                 currentAlias = existingAlias;
                 RelationMetadata rel = currentMeta.getRelation(step);
                 currentClass = rel.getTargetEntityClass();
-                currentMeta = EntityMetadataManager.get(currentClass, config);
+                currentMeta = config != null ? config.getMetadata(currentClass) : EntityMetadataManager.get(currentClass, config);
                 continue;
             }
 
@@ -1416,7 +1436,7 @@ public class Query<T> {
             String nextAlias = nextAlias();
             RecordingContext.registerAlias(rel.getTargetEntityClass(), nextAlias);
             Class<?> targetClass = rel.getTargetEntityClass();
-            EntityMetadata targetMeta = EntityMetadataManager.get(targetClass, config);
+            EntityMetadata targetMeta = config != null ? config.getMetadata(targetClass) : EntityMetadataManager.get(targetClass, config);
 
             TableJoin join = new TableJoin(TableJoin.JoinType.LEFT_JOIN, targetMeta.getTableName(), nextAlias);
 
@@ -1456,13 +1476,17 @@ public class Query<T> {
     }
 
     private Class<?> resolveTargetClass(PropertyPath path) {
+        if (!path.hasRelations()) {
+            return path.getRootEntityClass() != null ? path.getRootEntityClass() : rootEntityClass;
+        }
         Class<?> current = path.getRootEntityClass() != null ? path.getRootEntityClass() : rootEntityClass;
-        EntityMetadata currentMeta = EntityMetadataManager.get(current, config);
+        EntityMetadata currentMeta = (current == rootEntityClass && rootMetadata != null)
+                ? rootMetadata : (config != null ? config.getMetadata(current) : EntityMetadataManager.get(current, config));
         for (String step : path.getRelationSteps()) {
             RelationMetadata rel = currentMeta.getRelation(step);
             if (rel == null) break;
             current = rel.getTargetEntityClass();
-            currentMeta = EntityMetadataManager.get(current, config);
+            currentMeta = config != null ? config.getMetadata(current) : EntityMetadataManager.get(current, config);
         }
         return current;
     }
