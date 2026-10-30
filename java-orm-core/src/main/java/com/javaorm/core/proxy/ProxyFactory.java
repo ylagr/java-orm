@@ -20,11 +20,17 @@ public class ProxyFactory {
 
     @SuppressWarnings("unchecked")
     public static <T> T getProxy(Class<T> entityClass) {
+        if (entityClass == null) {
+            return null;
+        }
         return (T) PROXY_INSTANCE_CACHE.computeIfAbsent(entityClass, ProxyFactory::createProxyInstance);
     }
 
     @SuppressWarnings("unchecked")
     public static <T> T createProxy(Class<T> entityClass, String alias) {
+        if (entityClass == null) {
+            return null;
+        }
         T singleton = getProxy(entityClass);
         if (alias == null) {
             return singleton;

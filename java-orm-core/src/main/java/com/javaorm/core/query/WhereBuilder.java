@@ -102,7 +102,7 @@ public class WhereBuilder<T> {
      * 获取当前实体类型的录制代理对象
      */
     public T proxy() {
-        return ProxyFactory.getProxy(entityClass);
+        return entityClass != null ? ProxyFactory.getProxy(entityClass) : null;
     }
 
     /**
@@ -140,6 +140,13 @@ public class WhereBuilder<T> {
             SqlExpression<?> expr = (SqlExpression<?>) leftOperand;
             if (rootQuery != null) {
                 rootQuery.resolveExpression(expr);
+                if (vals != null) {
+                    for (Object v : vals) {
+                        if (v instanceof SqlExpression) {
+                            rootQuery.resolveExpression((SqlExpression) v);
+                        }
+                    }
+                }
             }
             ExpressionCondition cond = new ExpressionCondition(expr, op, vals);
             cond.setLogicalOperator(logOp);
@@ -945,6 +952,13 @@ public class WhereBuilder<T> {
                         || (rootQuery != null && rootQuery.getStatement().getJoins().isEmpty());
                 if (isRoot) {
                     alias = scopeAlias;
+                } else if (rootQuery != null) {
+                    for (TableJoin join : rootQuery.getStatement().getJoins()) {
+                        if (alias.equalsIgnoreCase(join.getTableName())) {
+                            alias = join.getTableAlias();
+                            break;
+                        }
+                    }
                 }
             }
         } else {
@@ -1241,12 +1255,20 @@ public class WhereBuilder<T> {
         return new Cte<>(name, entityClass, this, false);
     }
 
+    public Cte<?> asDynamicCte(String name) {
+        return new Cte<>(name, null, this, false);
+    }
+
     public <C> Cte<C> asCte(String name, Class<C> cteClass) {
         return new Cte<>(name, cteClass, this, false);
     }
 
     public Cte<T> asCteRecursive(String name) {
         return new Cte<>(name, entityClass, this, true);
+    }
+
+    public Cte<?> asDynamicCteRecursive(String name) {
+        return new Cte<>(name, null, this, true);
     }
 
     public <C> Cte<C> asCteRecursive(String name, Class<C> cteClass) {

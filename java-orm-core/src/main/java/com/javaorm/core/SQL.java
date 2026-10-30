@@ -780,6 +780,22 @@ public class SQL {
         return new com.javaorm.core.query.Cte<>(name, cteClass, query, false);
     }
 
+    public static com.javaorm.core.query.Cte<?> cte(String name, Object query) {
+        return new com.javaorm.core.query.Cte<>(name, null, query, false);
+    }
+
+    public static com.javaorm.core.query.Cte<?> dynamicCte(String name, Object query) {
+        return new com.javaorm.core.query.Cte<>(name, null, query, false);
+    }
+
+    public static com.javaorm.core.query.Cte<?> dynamicCte(String name, Object query, boolean recursive) {
+        return new com.javaorm.core.query.Cte<>(name, null, query, recursive);
+    }
+
+    public static com.javaorm.core.query.Cte<?> dynamicCte(String name, Object query, boolean recursive, List<String> columnNames) {
+        return new com.javaorm.core.query.Cte<>(name, null, query, recursive, columnNames);
+    }
+
     public static <T> com.javaorm.core.query.Cte<T> cteRecursive(String name, com.javaorm.core.query.Query<T> query) {
         return new com.javaorm.core.query.Cte<>(name, query.getRootEntityClass(), query, true);
     }
@@ -797,6 +813,21 @@ public class SQL {
         Object query = queryBuilder.apply(cte);
         cte.setQuery(query);
         return cte;
+    }
+
+    public static com.javaorm.core.query.Cte<?> cteRecursive(String name, Object query) {
+        return new com.javaorm.core.query.Cte<>(name, null, query, true);
+    }
+
+    public static com.javaorm.core.query.Cte<?> cteRecursive(String name, java.util.function.Function<com.javaorm.core.query.Cte<?>, Object> queryBuilder) {
+        com.javaorm.core.query.Cte<?> cte = new com.javaorm.core.query.Cte<>(name, null, null, true);
+        Object query = queryBuilder.apply(cte);
+        cte.setQuery(query);
+        return cte;
+    }
+
+    public static com.javaorm.core.query.Cte<?> dynamicCteRecursive(String name, java.util.function.Function<com.javaorm.core.query.Cte<?>, Object> queryBuilder) {
+        return cteRecursive(name, queryBuilder);
     }
 
     // ==================== 原地自增与算术表达式 ====================

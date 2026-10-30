@@ -22,6 +22,11 @@ public class EntityHydrator {
     private static final Logger log = LoggerFactory.getLogger(EntityHydrator.class);
 
     public static <T> List<T> queryList(Connection conn, SelectStatement stmt, EntityMetadata metadata, Dialect dialect, OrmConfig config) throws Exception {
+        if (metadata == null) {
+            @SuppressWarnings("unchecked")
+            List<T> mapList = (List<T>) (List<?>) queryMaps(conn, stmt, dialect, config);
+            return mapList;
+        }
         SqlAndParams sqlAndParams = dialect.buildSelect(stmt);
         if (config.isPrintSql()) {
             log.info("==>  Preparing: {}", sqlAndParams.getSql());

@@ -156,6 +156,9 @@ public abstract class AbstractDialect implements Dialect {
 
     @Override
     public SqlAndParams buildSelect(SelectStatement stmt, boolean renderCte) {
+        if (stmt != null && (!stmt.getJoins().isEmpty() || stmt.getRootTableName() != null)) {
+            resolveAliasesInStatement(stmt);
+        }
         StringBuilder sql = new StringBuilder();
         List<Object> params = new ArrayList<>();
 
@@ -838,6 +841,59 @@ public abstract class AbstractDialect implements Dialect {
             return true;
         } catch (NoSuchMethodException e) {
             return false;
+        }
+    }
+
+    private void resolveAliasesInStatement(SelectStatement stmt) {
+        Map<String, String> nameToAlias = new HashMap<>();
+        if (stmt.getRootTableName() != null && stmt.getRootTableAlias() != null) {
+            nameToAlias.put(stmt.getRootTableName().toUpperCase(), stmt.getRootTableAlias());
+        }
+        for (TableJoin join : stmt.getJoins()) {
+            if (join.getTableName() != null && join.getTableAlias() != null) {
+                nameToAlias.put(join.getTableName().toUpperCase(), join.getTableAlias());
+            }
+        }
+        for (SqlExpression expr : stmt.getProjectExpressions()) {
+            resolveExpressionAlias(expr, nameToAlias);
+        }
+        for (SqlExpression expr : stmt.getGroupByExpressions()) {
+            resolveExpressionAlias(expr, nameToAlias);
+        }
+        for (OrderBy ob : stmt.getOrderBys()) {
+            if (ob.getExpression() != null) {
+                resolveExpressionAlias(ob.getExpression(), nameToAlias);
+            }
+        }
+    }
+
+    private void resolveExpressionAlias(SqlExpression<?> expr, Map<String, String> nameToAlias) {
+        if (expr == null) return;
+        if (expr instanceof ColumnExpression) {
+            ColumnExpression ce = (ColumnExpression) expr;
+            if (ce.getTableAlias() != null) {
+                String targetAlias = nameToAlias.get(ce.getTableAlias().toUpperCase());
+                if (targetAlias != null) {
+                    ce.setTableAlias(targetAlias);
+                }
+            }
+        } else if (expr instanceof FunctionExpression) {
+            for (Object arg : ((FunctionExpression) expr).getArguments()) {
+                if (arg instanceof SqlExpression) {
+                    resolveExpressionAlias((SqlExpression) arg, nameToAlias);
+                }
+            }
+        } else if (expr instanceof WindowFunctionExpression) {
+            WindowFunctionExpression<?> wfe = (WindowFunctionExpression<?>) expr;
+            resolveExpressionAlias(wfe.getFunctionExpr(), nameToAlias);
+            for (SqlExpression<?> part : wfe.getPartitionBys()) {
+                resolveExpressionAlias(part, nameToAlias);
+            }
+            for (OrderBy ob : wfe.getOrderBys()) {
+                if (ob.getExpression() != null) {
+                    resolveExpressionAlias(ob.getExpression(), nameToAlias);
+                }
+            }
         }
     }
 }

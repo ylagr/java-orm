@@ -56,7 +56,7 @@ public class DtoQuery<DTO, T> {
     }
 
     public T proxy() {
-        return ProxyFactory.getProxy(entityClass);
+        return entityClass != null ? ProxyFactory.getProxy(entityClass) : null;
     }
 
     public DtoQuery<DTO, T> select(Object... expressions) {
@@ -238,8 +238,16 @@ public class DtoQuery<DTO, T> {
         return new Cte<>(name, dtoClass, this, false);
     }
 
+    public Cte<?> asDynamicCte(String name) {
+        return new Cte<>(name, null, this, false);
+    }
+
     public Cte<DTO> asCteRecursive(String name) {
         return new Cte<>(name, dtoClass, this, true);
+    }
+
+    public Cte<?> asDynamicCteRecursive(String name) {
+        return new Cte<>(name, null, this, true);
     }
 
     public DtoQuery<DTO, T> with(Cte<?> cte) {

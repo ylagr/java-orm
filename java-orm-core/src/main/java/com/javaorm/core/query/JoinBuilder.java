@@ -40,8 +40,11 @@ public class JoinBuilder<TRoot, TJoin> {
         this.onComplete = onComplete;
     }
 
+    @SuppressWarnings("unchecked")
     public Query<TRoot> on(TriConsumer<WhereBuilder<TJoin>, TRoot, TJoin> onConsumer) {
         TableJoin join = new TableJoin(joinType, tableName, joinAlias);
+        rootQuery.getStatement().addJoin(join);
+
         if (cte == null && rootQuery.getConfig() != null && joinClass != null) {
             com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(joinClass, rootQuery.getConfig());
             if (meta != null) {
@@ -64,12 +67,26 @@ public class JoinBuilder<TRoot, TJoin> {
         WhereBuilder<TJoin> onBuilder = new WhereBuilder<>(joinClass, rootQuery, joinAlias,
                 join::addOnCondition, null, null, null, null);
 
-        TRoot rootProxy = ProxyFactory.createProxy(rootQuery.getRootEntityClass(), rootQuery.getStatement().getRootTableAlias());
-        TJoin joinProxy = ProxyFactory.createProxy(joinClass, joinAlias);
+        TRoot rootProxy = rootQuery.getRootEntityClass() != null
+                ? ProxyFactory.createProxy(rootQuery.getRootEntityClass(), rootQuery.getStatement().getRootTableAlias())
+                : (rootQuery.getRootCte() != null ? (TRoot) rootQuery.getRootCte().as(rootQuery.getStatement().getRootTableAlias()) : null);
+
+        TJoin joinProxy;
+        if (joinClass != null) {
+            joinProxy = ProxyFactory.createProxy(joinClass, joinAlias);
+        } else if (cte != null) {
+            joinProxy = (TJoin) cte.as(joinAlias);
+        } else {
+            joinProxy = null;
+        }
 
         try {
-            RecordingContext.registerAlias(joinClass, joinAlias);
-            RecordingContext.registerAlias(rootQuery.getRootEntityClass(), rootQuery.getStatement().getRootTableAlias());
+            if (joinClass != null) {
+                RecordingContext.registerAlias(joinClass, joinAlias);
+            }
+            if (rootQuery.getRootEntityClass() != null) {
+                RecordingContext.registerAlias(rootQuery.getRootEntityClass(), rootQuery.getStatement().getRootTableAlias());
+            }
             if (onConsumer != null) {
                 onConsumer.accept(onBuilder, rootProxy, joinProxy);
             }
@@ -77,7 +94,6 @@ public class JoinBuilder<TRoot, TJoin> {
             RecordingContext.clearRecording();
         }
 
-        rootQuery.getStatement().addJoin(join);
         if (cte != null) {
             rootQuery.ensureCteAdded(cte);
         }

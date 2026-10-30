@@ -9,6 +9,7 @@ import com.javaorm.core.query.*;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
+import java.util.List;
 
 /**
  * JavaOrm 核心门面与统一操作入口。
@@ -18,6 +19,10 @@ public class JavaOrm {
     private final DataSource dataSource;
     private final Dialect dialect;
     private final OrmConfig config;
+
+    public JavaOrm(DataSource dataSource) {
+        this(dataSource, null, new OrmConfig());
+    }
 
     public JavaOrm(DataSource dataSource, Dialect dialect, OrmConfig config) {
         if (dataSource == null) {
@@ -124,7 +129,7 @@ public class JavaOrm {
     }
 
     /**
-     * 定义强类型 CTE
+     * 定义强类型或动态 CTE
      */
     public <T> Cte<T> cte(String name, Query<T> query) {
         return new Cte<>(name, query.getRootEntityClass(), query, false);
@@ -136,6 +141,22 @@ public class JavaOrm {
 
     public <T> Cte<T> cte(String name, Class<T> cteClass, Object query) {
         return new Cte<>(name, cteClass, query, false);
+    }
+
+    public Cte<?> cte(String name, Object query) {
+        return new Cte<>(name, null, query, false);
+    }
+
+    public Cte<?> dynamicCte(String name, Object query) {
+        return new Cte<>(name, null, query, false);
+    }
+
+    public Cte<?> dynamicCte(String name, Object query, boolean recursive) {
+        return new Cte<>(name, null, query, recursive);
+    }
+
+    public Cte<?> dynamicCte(String name, Object query, boolean recursive, List<String> columnNames) {
+        return new Cte<>(name, null, query, recursive, columnNames);
     }
 
     public <T> Cte<T> cteRecursive(String name, Query<T> query) {
@@ -155,6 +176,21 @@ public class JavaOrm {
         Object query = queryBuilder.apply(cte);
         cte.setQuery(query);
         return cte;
+    }
+
+    public Cte<?> cteRecursive(String name, Object query) {
+        return new Cte<>(name, null, query, true);
+    }
+
+    public Cte<?> cteRecursive(String name, java.util.function.Function<Cte<?>, Object> queryBuilder) {
+        Cte<?> cte = new Cte<>(name, null, null, true);
+        Object query = queryBuilder.apply(cte);
+        cte.setQuery(query);
+        return cte;
+    }
+
+    public Cte<?> dynamicCteRecursive(String name, java.util.function.Function<Cte<?>, Object> queryBuilder) {
+        return cteRecursive(name, queryBuilder);
     }
 
     /**

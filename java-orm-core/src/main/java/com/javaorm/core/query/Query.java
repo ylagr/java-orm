@@ -30,6 +30,7 @@ public class Query<T> {
 
     private final Class<T> rootEntityClass;
     private final EntityMetadata rootMetadata;
+    private Cte<T> rootCte;
     private final DataSource dataSource;
     private Dialect dialect;
     private final OrmConfig config;
@@ -145,15 +146,22 @@ public class Query<T> {
         if (cte == null) {
             throw new IllegalArgumentException("CTE must not be null");
         }
+        this.rootCte = cte;
         this.rootEntityClass = cte.getEntityClass();
         this.dataSource = dataSource;
         this.dialect = dialect;
         this.config = config;
-        this.rootMetadata = EntityMetadataManager.get(rootEntityClass, config);
-        String rootAlias = nextAlias();
+        this.rootMetadata = rootEntityClass != null ? EntityMetadataManager.get(rootEntityClass, config) : null;
+        String rootAlias = cte.getAlias() != null ? cte.getAlias() : nextAlias();
         this.statement = new SelectStatement(rootEntityClass, cte.getName(), rootAlias);
         this.statement.addCte(cte.toClause());
-        RecordingContext.registerAlias(rootEntityClass, rootAlias);
+        if (rootEntityClass != null) {
+            RecordingContext.registerAlias(rootEntityClass, rootAlias);
+        }
+    }
+
+    public Cte<T> getRootCte() {
+        return rootCte;
     }
 
     public Class<T> getRootEntityClass() {
@@ -247,9 +255,17 @@ public class Query<T> {
             boolean isRoot = tableAlias.equalsIgnoreCase(statement.getRootTableAlias())
                     || (rootEntityClass != null && tableAlias.equalsIgnoreCase(rootEntityClass.getSimpleName()))
                     || (rootMetadata != null && tableAlias.equalsIgnoreCase(rootMetadata.getTableName()))
+                    || (statement.getRootTableName() != null && tableAlias.equalsIgnoreCase(statement.getRootTableName()))
                     || statement.getJoins().isEmpty();
             if (isRoot) {
                 tableAlias = statement.getRootTableAlias();
+            } else {
+                for (TableJoin join : statement.getJoins()) {
+                    if (tableAlias.equalsIgnoreCase(join.getTableName())) {
+                        tableAlias = join.getTableAlias();
+                        break;
+                    }
+                }
             }
         } else {
             tableAlias = statement.getRootTableAlias();
@@ -322,6 +338,10 @@ public class Query<T> {
      */
     public <R> DtoQuery<T, R> from(Class<R> fromEntityClass) {
         return new DtoQuery<>(this.rootEntityClass, fromEntityClass, dataSource, dialect, config);
+    }
+
+    public <R> DtoQuery<T, R> from(Cte<R> cte) {
+        return new DtoQuery<>(this.rootEntityClass, cte, dataSource, dialect, config);
     }
 
     /**
@@ -458,6 +478,10 @@ public class Query<T> {
         return new Cte<>(name, rootEntityClass, this, false);
     }
 
+    public Cte<?> asDynamicCte(String name) {
+        return new Cte<>(name, null, this, false);
+    }
+
     public <C> Cte<C> asCte(String name, Class<C> cteClass) {
         return new Cte<>(name, cteClass, this, false);
     }
@@ -467,6 +491,10 @@ public class Query<T> {
      */
     public Cte<T> asCteRecursive(String name) {
         return new Cte<>(name, rootEntityClass, this, true);
+    }
+
+    public Cte<?> asDynamicCteRecursive(String name) {
+        return new Cte<>(name, null, this, true);
     }
 
     public <C> Cte<C> asCteRecursive(String name, Class<C> cteClass) {
@@ -1056,10 +1084,21 @@ public class Query<T> {
                 }
                 // 分页 limit / offset 不参与 count 统计
 
-                com.javaorm.core.dialect.SqlAndParams innerSql = dialect.buildSelect(innerStmt);
-                String countSql = "SELECT COUNT(1) FROM (" + innerSql.getSql() + ") count_sub";
-                com.javaorm.core.dialect.SqlAndParams countSqlAndParams = new com.javaorm.core.dialect.SqlAndParams(countSql, innerSql.getParams());
-                return EntityHydrator.queryCount(conn, countSqlAndParams, getEffectiveConfig());
+                com.javaorm.core.dialect.SqlAndParams countSqlAndParams;
+                if (!innerStmt.getCtes().isEmpty()) {
+                    com.javaorm.core.dialect.SqlAndParams withSql = dialect.buildSelect(innerStmt, true);
+                    com.javaorm.core.dialect.SqlAndParams innerWithoutCte = dialect.buildSelect(innerStmt, false);
+                    String sqlStr = withSql.getSql();
+                    int selectIdx = sqlStr.indexOf("SELECT ");
+                    String withPrefix = selectIdx > 0 ? sqlStr.substring(0, selectIdx) : "";
+                    String countSql = withPrefix + "SELECT COUNT(1) FROM (" + innerWithoutCte.getSql() + ") count_sub";
+                    countSqlAndParams = new com.javaorm.core.dialect.SqlAndParams(countSql, withSql.getParams());
+                } else {
+                    com.javaorm.core.dialect.SqlAndParams innerSql = dialect.buildSelect(innerStmt);
+                    String countSql = "SELECT COUNT(1) FROM (" + innerSql.getSql() + ") count_sub";
+                    countSqlAndParams = new com.javaorm.core.dialect.SqlAndParams(countSql, innerSql.getParams());
+                }
+                return EntityHydrator.queryCount(conn, countSqlAndParams, getEffectiveConfig(), !innerStmt.getCtes().isEmpty(), dialect);
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute count query", e);
@@ -1111,6 +1150,20 @@ public class Query<T> {
                     ce.setPath(path);
                     ce.setTableAlias(resolveTableAlias(path));
                     ce.setColumnName(resolveColumnName(path));
+                }
+            } else if (ce.getTableAlias() != null) {
+                String ta = ce.getTableAlias();
+                if (statement.getRootTableName() != null && ta.equalsIgnoreCase(statement.getRootTableName())) {
+                    ce.setTableAlias(statement.getRootTableAlias());
+                } else if (rootMetadata != null && ta.equalsIgnoreCase(rootMetadata.getTableName())) {
+                    ce.setTableAlias(statement.getRootTableAlias());
+                } else {
+                    for (TableJoin join : statement.getJoins()) {
+                        if (ta.equalsIgnoreCase(join.getTableName())) {
+                            ce.setTableAlias(join.getTableAlias());
+                            break;
+                        }
+                    }
                 }
             }
         } else if (expr instanceof FunctionExpression) {
