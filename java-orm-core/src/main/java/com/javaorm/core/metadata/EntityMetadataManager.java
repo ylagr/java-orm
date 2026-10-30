@@ -325,7 +325,7 @@ public class EntityMetadataManager {
         return col;
     }
 
-    private static boolean hasEntityAnnotation(Class<?> clazz) {
+    public static boolean hasEntityAnnotation(Class<?> clazz) {
         if (clazz == null || clazz.isPrimitive() || clazz.getName().startsWith("java.")) return false;
         for (Annotation ann : clazz.getAnnotations()) {
             String name = ann.annotationType().getName();
