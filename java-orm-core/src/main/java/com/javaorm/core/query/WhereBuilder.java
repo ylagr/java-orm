@@ -2787,9 +2787,20 @@ public class WhereBuilder<T> implements Query<T> {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
+    public T first() {
+        return firstOrNull();
+    }
+
+    @Override
     public <R> R firstOrNull(Class<R> targetClass) {
         List<R> list = toList(targetClass);
         return (list != null && !list.isEmpty()) ? list.get(0) : null;
+    }
+
+    @Override
+    public <R> R first(Class<R> targetClass) {
+        return firstOrNull(targetClass);
     }
 
     public long count() {

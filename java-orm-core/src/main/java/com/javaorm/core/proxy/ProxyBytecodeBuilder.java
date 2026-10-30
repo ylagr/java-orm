@@ -2,6 +2,7 @@ package com.javaorm.core.proxy;
 
 import com.javaorm.core.metadata.EntityMetadataManager;
 import com.javaorm.core.metadata.RelationMetadata;
+import com.javaorm.core.metadata.ValueObjectMetadata;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.dynamic.DynamicType;
 import net.bytebuddy.implementation.FixedValue;
@@ -23,6 +24,7 @@ public class ProxyBytecodeBuilder {
 
     private static final Method RECORD_TERMINAL_METHOD;
     private static final Method RECORD_RELATION_METHOD;
+    private static final Method RECORD_VALUE_OBJECT_METHOD;
     private static final Method PROXY_EQUALS_METHOD;
     private static final Method IDENTITY_HASH_CODE_METHOD;
 
@@ -32,6 +34,8 @@ public class ProxyBytecodeBuilder {
                     Object.class, Class.class, String.class, Class.class);
             RECORD_RELATION_METHOD = FastRecorder.class.getMethod("recordRelation",
                     Object.class, Class.class, String.class, Class.class, Class.class);
+            RECORD_VALUE_OBJECT_METHOD = FastRecorder.class.getMethod("recordValueObject",
+                    Object.class, Class.class, String.class, Class.class);
             PROXY_EQUALS_METHOD = FastRecorder.class.getMethod("proxyEquals",
                     Object.class, Object.class);
             IDENTITY_HASH_CODE_METHOD = System.class.getMethod("identityHashCode",
@@ -91,6 +95,15 @@ public class ProxyBytecodeBuilder {
                     }
                 }
 
+                // 检查是否为 ValueObject（如 getAddress, getArea）
+                ValueObjectMetadata vo = EntityMetadataManager.getValueObject(entityClass, propName);
+                if (vo == null && method.getName().startsWith("is")) {
+                    vo = EntityMetadataManager.getValueObject(entityClass, method.getName());
+                    if (vo != null) {
+                        propName = method.getName();
+                    }
+                }
+
                 if (relation != null) {
                     // A. 关联导航属性：写死目标类与属性名
                     Class<?> targetClass = relation.getTargetEntityClass();
@@ -102,8 +115,18 @@ public class ProxyBytecodeBuilder {
                                             .with(entityClass, propName, targetClass, returnType)
                                             .withAssigner(net.bytebuddy.implementation.bytecode.assign.Assigner.DEFAULT, net.bytebuddy.implementation.bytecode.assign.Assigner.Typing.DYNAMIC)
                             );
+                } else if (vo != null) {
+                    // B. ValueObject 嵌入对象：写死目标 VO 类与属性名，返回 VO 代理
+                    Class<?> voClass = vo.getValueObjectClass();
+                    builder = builder.method(ElementMatchers.is(method))
+                            .intercept(
+                                    MethodCall.invoke(RECORD_VALUE_OBJECT_METHOD)
+                                            .withThis()
+                                            .with(entityClass, propName, voClass)
+                                            .withAssigner(net.bytebuddy.implementation.bytecode.assign.Assigner.DEFAULT, net.bytebuddy.implementation.bytecode.assign.Assigner.Typing.DYNAMIC)
+                            );
                 } else {
-                    // B. 叶子终端列属性：写死实体类、属性名和类型，直接返回基本类型/null默认值
+                    // C. 叶子终端列属性：写死实体类、属性名和类型，直接返回基本类型/null默认值
                     Class<?> returnType = method.getReturnType();
                     Implementation returnImpl = getReturnValueImplementation(returnType);
                     builder = builder.method(ElementMatchers.is(method))

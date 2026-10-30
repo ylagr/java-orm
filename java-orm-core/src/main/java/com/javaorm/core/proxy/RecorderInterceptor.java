@@ -75,6 +75,13 @@ public class RecorderInterceptor {
             return targetProxy;
         }
 
+        // 检查该属性名是否为 ValueObject（嵌入式值对象）
+        com.javaorm.core.metadata.ValueObjectMetadata vo = EntityMetadataManager.getValueObject(entityClass, propName);
+        if (vo != null) {
+            RecordingContext.recordValueObject(propName, vo.getValueObjectClass());
+            return ProxyFactory.getProxy(vo.getValueObjectClass());
+        }
+
         // 否则为终端叶子属性
         Class<?> returnType = method.getReturnType();
         RecordingContext.recordTerminal(propName, returnType);

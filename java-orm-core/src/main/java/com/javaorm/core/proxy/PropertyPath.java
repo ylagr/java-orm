@@ -14,6 +14,9 @@ public class PropertyPath {
     private Class<?> terminalType;
     private String explicitAlias;
 
+    private final List<String> valueObjectSteps = new ArrayList<>();
+    private boolean valueObject;
+
     public PropertyPath(Class<?> rootEntityClass) {
         this.rootEntityClass = rootEntityClass;
     }
@@ -28,6 +31,26 @@ public class PropertyPath {
 
     public void addRelationStep(String relationProperty) {
         relationSteps.add(relationProperty);
+    }
+
+    public void addValueObjectStep(String voProperty) {
+        valueObjectSteps.add(voProperty);
+    }
+
+    public List<String> getValueObjectSteps() {
+        return Collections.unmodifiableList(valueObjectSteps);
+    }
+
+    public boolean hasValueObjects() {
+        return !valueObjectSteps.isEmpty() || valueObject;
+    }
+
+    public boolean isValueObject() {
+        return valueObject;
+    }
+
+    public void setValueObject(boolean valueObject) {
+        this.valueObject = valueObject;
     }
 
     public void setTerminal(String terminalProperty, Class<?> terminalType) {
@@ -56,15 +79,19 @@ public class PropertyPath {
     }
 
     public String getFullPath() {
-        if (relationSteps.isEmpty()) {
+        List<String> allSteps = new ArrayList<>(relationSteps);
+        allSteps.addAll(valueObjectSteps);
+        if (allSteps.isEmpty()) {
             return terminalProperty != null ? terminalProperty : "";
         }
         StringBuilder sb = new StringBuilder();
-        for (String step : relationSteps) {
+        for (String step : allSteps) {
             sb.append(step).append(".");
         }
         if (terminalProperty != null) {
             sb.append(terminalProperty);
+        } else if (sb.length() > 0 && sb.charAt(sb.length() - 1) == '.') {
+            sb.setLength(sb.length() - 1);
         }
         return sb.toString();
     }

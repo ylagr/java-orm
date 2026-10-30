@@ -53,6 +53,22 @@ public class FastRecorder {
     }
 
     /**
+     * ValueObject 属性录制（如 address, area）。
+     */
+    public static Object recordValueObject(Object proxy, Class<?> entityClass, String propName, Class<?> voClass) {
+        RecordingContext.ensureStarted(entityClass);
+        String explicitAlias = RecordingContext.getProxyAlias(proxy);
+        if (explicitAlias != null) {
+            PropertyPath cur = RecordingContext.get();
+            if (cur != null) {
+                cur.setExplicitAlias(explicitAlias);
+            }
+        }
+        RecordingContext.recordValueObject(propName, voClass);
+        return ProxyFactory.getProxy(voClass);
+    }
+
+    /**
      * 代理对象的 equals 比较：避免代理类重写 equals 时触发实体内部 getter 调用。
      */
     public static boolean proxyEquals(Object thisProxy, Object other) {

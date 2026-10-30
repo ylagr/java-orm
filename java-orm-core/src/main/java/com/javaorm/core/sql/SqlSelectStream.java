@@ -96,11 +96,22 @@ public class SqlSelectStream<T> implements Query<T> {
                 EntityMetadata meta = env.getConfig() != null
                         ? env.getConfig().getMetadata(path.getRootEntityClass())
                         : EntityMetadataManager.get(path.getRootEntityClass());
-                ColumnMetadata cm = meta != null ? meta.getColumnByProperty(path.getTerminalProperty()) : null;
-                String colName = cm != null ? cm.getColumnName() : path.getTerminalProperty();
-                ColumnExpression ce = new ColumnExpression(alias, colName);
-                ce.setPath(path);
-                projectExpressions.add(ce);
+                com.javaorm.core.metadata.ValueObjectMetadata vo = meta != null ? meta.getValueObject(path.getFullPath()) : null;
+                if (vo != null) {
+                    for (ColumnMetadata leaf : vo.getAllLeafColumns()) {
+                        ColumnExpression ce = new ColumnExpression(alias, leaf.getColumnName());
+                        projectExpressions.add(ce);
+                    }
+                } else {
+                    ColumnMetadata cm = meta != null ? meta.getColumnByProperty(path.getFullPath()) : null;
+                    if (cm == null && meta != null) {
+                        cm = meta.getColumnByProperty(path.getTerminalProperty());
+                    }
+                    String colName = cm != null ? cm.getColumnName() : path.getTerminalProperty();
+                    ColumnExpression ce = new ColumnExpression(alias, colName);
+                    ce.setPath(path);
+                    projectExpressions.add(ce);
+                }
             } else if (item instanceof String) {
                 projectExpressions.add(new ColumnExpression(null, (String) item));
             }
@@ -503,9 +514,19 @@ public class SqlSelectStream<T> implements Query<T> {
     }
 
     @Override
+    public T first() {
+        return firstOrNull();
+    }
+
+    @Override
     public <R> R firstOrNull(Class<R> targetClass) {
         ensureQuery();
         return query.firstOrNull(targetClass);
+    }
+
+    @Override
+    public <R> R first(Class<R> targetClass) {
+        return firstOrNull(targetClass);
     }
 
     @Override

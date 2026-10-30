@@ -60,6 +60,26 @@ public class EntityMetadata {
         return relations.values();
     }
 
+    private final Map<String, ValueObjectMetadata> valueObjects = new LinkedHashMap<>();
+
+    public void addValueObject(ValueObjectMetadata vo) {
+        valueObjects.put(vo.getFullPropertyName(), vo);
+        valueObjects.put(vo.getPropertyName(), vo);
+    }
+
+    public ValueObjectMetadata getValueObject(String propertyName) {
+        if (propertyName == null) return null;
+        return valueObjects.get(propertyName);
+    }
+
+    public Collection<ValueObjectMetadata> getValueObjects() {
+        return valueObjects.values();
+    }
+
+    public boolean hasValueObjects() {
+        return !valueObjects.isEmpty();
+    }
+
     // Getters and Setters
     public Class<?> getEntityClass() {
         return entityClass;

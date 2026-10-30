@@ -3,7 +3,7 @@ package com.javaorm.core.metadata;
 import com.javaorm.core.annotation.*;
 import com.javaorm.core.config.NameConversion;
 import com.javaorm.core.config.OrmConfig;
-import com.javaorm.core.fastbean.LambdaFactory;
+import com.javaorm.core.fastbean.*;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
@@ -18,6 +18,7 @@ public class EntityMetadataManager {
 
     private static final Map<MetadataCacheKey, EntityMetadata> METADATA_CACHE = new ConcurrentHashMap<>();
     private static final Map<Class<?>, Map<String, RelationMetadata>> RELATIONS_CACHE = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, Map<String, ValueObjectMetadata>> VALUE_OBJECTS_CACHE = new ConcurrentHashMap<>();
 
     public static final class MetadataCacheKey {
         private final Class<?> entityClass;
@@ -103,9 +104,56 @@ public class EntityMetadataManager {
         return Collections.unmodifiableMap(relations);
     }
 
+    public static ValueObjectMetadata getValueObject(Class<?> entityClass, String propertyName) {
+        if (entityClass == null || propertyName == null) return null;
+        Map<String, ValueObjectMetadata> map = VALUE_OBJECTS_CACHE.computeIfAbsent(entityClass, EntityMetadataManager::parseClassValueObjects);
+        return map.get(propertyName);
+    }
+
+    public static boolean isValueObject(Class<?> entityClass, String propertyName) {
+        return getValueObject(entityClass, propertyName) != null;
+    }
+
+    public static Map<String, ValueObjectMetadata> parseClassValueObjects(Class<?> clazz) {
+        Map<String, ValueObjectMetadata> map = new LinkedHashMap<>();
+        Map<String, Field> fields = getAllFields(clazz);
+        for (Map.Entry<String, Field> entry : fields.entrySet()) {
+            String propName = entry.getKey();
+            Field field = entry.getValue();
+            int modifiers = field.getModifiers();
+            if (Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers)) {
+                continue;
+            }
+            if (hasValueObjectAnnotation(field, clazz, propName)) {
+                Method getter = findGetter(clazz, propName, field.getType());
+                Method setter = findSetter(clazz, propName, field.getType());
+                FastPropertyGetter fg = LambdaFactory.createGetter(clazz, getter, field);
+                FastPropertySetter fs = LambdaFactory.createSetter(clazz, setter, field);
+                FastBeanCreator<?> creator = LambdaFactory.createConstructor(field.getType());
+                ValueObjectMetadata vo = new ValueObjectMetadata(propName, propName, field.getType(), clazz, field, getter, setter, fg, fs, creator);
+                map.put(propName, vo);
+            }
+        }
+        return Collections.unmodifiableMap(map);
+    }
+
+    private static boolean hasValueObjectAnnotation(Field field, Class<?> clazz, String propName) {
+        Method getter = findGetter(clazz, propName, field.getType());
+        Annotation[] annotations = collectAnnotations(field, getter);
+        for (Annotation ann : annotations) {
+            if (ann instanceof JoValueObject) return true;
+            String name = ann.annotationType().getName();
+            if (name.endsWith(".JoValueObject") || name.endsWith(".ValueObject") || name.endsWith(".Embedded")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static void clearCache() {
         METADATA_CACHE.clear();
         RELATIONS_CACHE.clear();
+        VALUE_OBJECTS_CACHE.clear();
     }
 
     public static EntityMetadata getTableMetadata(Class<?> entityClass) {
@@ -147,7 +195,13 @@ public class EntityMetadataManager {
             metadata.addRelation(rel);
         }
 
-        // 3. 遍历字段与 Getter/Setter 解析列
+        // 3. 填充值对象（独立静态解析）
+        Map<String, ValueObjectMetadata> classVos = parseClassValueObjects(clazz);
+        for (ValueObjectMetadata vo : classVos.values()) {
+            metadata.addValueObject(vo);
+        }
+
+        // 4. 遍历字段与 Getter/Setter 解析普通列及 ValueObject 平铺列
         Map<String, Field> fields = getAllFields(clazz);
         for (Map.Entry<String, Field> entry : fields.entrySet()) {
             String propName = entry.getKey();
@@ -156,6 +210,13 @@ public class EntityMetadataManager {
             // 过滤静态与 transient 字段以及关联属性
             int modifiers = field.getModifiers();
             if (Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) || classRelations.containsKey(propName)) {
+                continue;
+            }
+
+            // 处理 ValueObject 平铺
+            if (classVos.containsKey(propName)) {
+                ValueObjectMetadata vo = classVos.get(propName);
+                parseValueObjectColumns(metadata, vo, new ArrayList<>(), nameConversion, config);
                 continue;
             }
 
@@ -170,6 +231,51 @@ public class EntityMetadataManager {
         }
 
         return metadata;
+    }
+
+    private static void parseValueObjectColumns(EntityMetadata metadata, ValueObjectMetadata vo,
+                                                List<ValueObjectStep> parentSteps,
+                                                NameConversion nameConversion, OrmConfig config) {
+        ValueObjectStep step = new ValueObjectStep(vo.getPropertyName(), vo.getValueObjectClass(),
+                vo.getField(), vo.getGetter(), vo.getSetter(), vo.getFastGetter(), vo.getFastSetter(), vo.getCreator());
+        List<ValueObjectStep> currentSteps = new ArrayList<>(parentSteps);
+        currentSteps.add(step);
+
+        Class<?> voClass = vo.getValueObjectClass();
+        Map<String, Field> fields = getAllFields(voClass);
+        for (Map.Entry<String, Field> entry : fields.entrySet()) {
+            String propName = entry.getKey();
+            Field field = entry.getValue();
+            int modifiers = field.getModifiers();
+            if (Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers)) {
+                continue;
+            }
+
+            Method getter = findGetter(voClass, propName, field.getType());
+            Method setter = findSetter(voClass, propName, field.getType());
+
+            if (hasValueObjectAnnotation(field, voClass, propName)) {
+                // 嵌套 ValueObject
+                String fullNestedProp = vo.getFullPropertyName() + "." + propName;
+                FastPropertyGetter fg = LambdaFactory.createGetter(voClass, getter, field);
+                FastPropertySetter fs = LambdaFactory.createSetter(voClass, setter, field);
+                FastBeanCreator<?> creator = LambdaFactory.createConstructor(field.getType());
+                ValueObjectMetadata nestedVo = new ValueObjectMetadata(propName, fullNestedProp, field.getType(), voClass, field, getter, setter, fg, fs, creator);
+                vo.addNestedValueObject(nestedVo);
+                metadata.addValueObject(nestedVo);
+                parseValueObjectColumns(metadata, nestedVo, currentSteps, nameConversion, config);
+            } else {
+                // 普通叶子列
+                ColumnMetadata colMeta = parseColumn(voClass, field, getter, setter, nameConversion, config);
+                if (colMeta != null && !colMeta.isIgnored()) {
+                    String fullProp = vo.getFullPropertyName() + "." + propName;
+                    colMeta.setPropertyName(fullProp);
+                    colMeta.setValueObjectSteps(currentSteps);
+                    metadata.addColumn(colMeta);
+                    vo.addColumn(colMeta);
+                }
+            }
+        }
     }
 
     private static RelationMetadata parseRelation(Field field, Method getter, Class<?> currentEntity) {

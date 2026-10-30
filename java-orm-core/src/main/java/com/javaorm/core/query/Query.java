@@ -46,9 +46,23 @@ public interface Query<T> {
     <R> R firstOrNull();
 
     /**
+     * 执行查询并返回第一条记录（firstOrNull 别名）
+     */
+    default <R> R first() {
+        return firstOrNull();
+    }
+
+    /**
      * 执行查询并映射为指定目标类型的第一条记录
      */
     <R> R firstOrNull(Class<R> targetClass);
+
+    /**
+     * 执行查询并映射为指定目标类型的第一条记录（firstOrNull 别名）
+     */
+    default <R> R first(Class<R> targetClass) {
+        return firstOrNull(targetClass);
+    }
 
     /**
      * 执行查询并返回字典列表

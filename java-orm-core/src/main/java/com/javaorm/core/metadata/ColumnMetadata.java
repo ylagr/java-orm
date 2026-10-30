@@ -24,24 +24,52 @@ public class ColumnMetadata {
     private Method setter;
     private com.javaorm.core.fastbean.FastPropertySetter fastSetter;
     private com.javaorm.core.fastbean.FastPropertyGetter fastGetter;
+    private java.util.List<ValueObjectStep> valueObjectSteps;
+
+    public java.util.List<ValueObjectStep> getValueObjectSteps() {
+        return valueObjectSteps;
+    }
+
+    public void setValueObjectSteps(java.util.List<ValueObjectStep> valueObjectSteps) {
+        this.valueObjectSteps = valueObjectSteps;
+    }
+
+    public boolean isValueObjectProperty() {
+        return valueObjectSteps != null && !valueObjectSteps.isEmpty();
+    }
 
     public Object getValue(Object entity) {
         if (entity == null) {
             return null;
         }
+        if (valueObjectSteps != null && !valueObjectSteps.isEmpty()) {
+            Object current = entity;
+            for (ValueObjectStep step : valueObjectSteps) {
+                current = step.getValue(current);
+                if (current == null) {
+                    return null;
+                }
+            }
+            return getLeafValue(current);
+        }
+        return getLeafValue(entity);
+    }
+
+    private Object getLeafValue(Object target) {
+        if (target == null) return null;
         if (fastGetter != null) {
             try {
-                return fastGetter.get(entity);
+                return fastGetter.get(target);
             } catch (Exception ignored) {
             }
         }
         try {
             if (getter != null) {
-                return getter.invoke(entity);
+                return getter.invoke(target);
             }
             if (field != null) {
                 field.setAccessible(true);
-                return field.get(entity);
+                return field.get(target);
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to get value for property " + propertyName, e);
@@ -53,22 +81,54 @@ public class ColumnMetadata {
         if (entity == null) {
             return;
         }
+        if (valueObjectSteps != null && !valueObjectSteps.isEmpty()) {
+            // DDD 规则：如果从数据库查出值为 null，且宿主尚未创建该 VO，则不创建空壳对象
+            if (value == null) {
+                Object current = entity;
+                for (int i = 0; i < valueObjectSteps.size(); i++) {
+                    current = valueObjectSteps.get(i).getValue(current);
+                    if (current == null) {
+                        return;
+                    }
+                }
+                setLeafValue(current, null);
+                return;
+            }
+
+            // 值为非空：逐级确保父级 VO 实例化并挂载到宿主上
+            Object current = entity;
+            for (ValueObjectStep step : valueObjectSteps) {
+                Object next = step.getValue(current);
+                if (next == null) {
+                    next = step.newInstance();
+                    step.setValue(current, next);
+                }
+                current = next;
+            }
+            setLeafValue(current, value);
+            return;
+        }
+        setLeafValue(entity, value);
+    }
+
+    private void setLeafValue(Object target, Object value) {
+        if (target == null) return;
         Object converted = convertValue(value, propertyType);
         if (fastSetter != null) {
             try {
-                fastSetter.set(entity, converted);
+                fastSetter.set(target, converted);
                 return;
             } catch (Exception ignored) {
             }
         }
         try {
             if (setter != null) {
-                setter.invoke(entity, converted);
+                setter.invoke(target, converted);
                 return;
             }
             if (field != null) {
                 field.setAccessible(true);
-                field.set(entity, converted);
+                field.set(target, converted);
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to set value for property " + propertyName + " with value " + value, e);

@@ -23,6 +23,9 @@ public class RecordingContext {
         PropertyPath cur = CURRENT_PATH.get();
         if (cur == null) {
             CURRENT_PATH.set(new PropertyPath(rootEntityClass));
+        } else if (cur.isValueObject() && cur.getTerminalType() == rootEntityClass) {
+            // 正在当前 ValueObject 代理对象上调用方法（如 addressProxy.getCity()），保持当前路径
+            return;
         } else if (cur.getTerminalProperty() != null) {
             // 前一个属性已完成录制，推入队列，开启新实体的录制
             RECORDED_QUEUE.get().offer(cur);
@@ -104,9 +107,33 @@ public class RecordingContext {
         }
     }
 
+    public static void recordValueObject(String voProperty, Class<?> voType) {
+        PropertyPath path = CURRENT_PATH.get();
+        if (path != null) {
+            if (path.isValueObject()) {
+                // 上一个也是 VO，将上一个转为 VO 步骤（支持嵌套 VO）
+                path.addValueObjectStep(path.getTerminalProperty());
+            } else if (path.getTerminalProperty() != null) {
+                // 上一个普通属性已完成，推入队列
+                RECORDED_QUEUE.get().offer(path);
+                path = new PropertyPath(path.getRootEntityClass());
+                CURRENT_PATH.set(path);
+            }
+            path.setTerminal(voProperty, voType);
+            path.setValueObject(true);
+        }
+    }
+
     public static void recordTerminal(String terminalProperty, Class<?> terminalType) {
         PropertyPath path = CURRENT_PATH.get();
         if (path != null) {
+            if (path.isValueObject()) {
+                // 前一个调用是 VO（如 address.city），将 address 转为 VO 步骤，当前 terminal 为 city
+                path.addValueObjectStep(path.getTerminalProperty());
+                path.setValueObject(false);
+                path.setTerminal(terminalProperty, terminalType);
+                return;
+            }
             if (path.getTerminalProperty() != null) {
                 // 前一个属性已完成录制，推入队列，开启新属性
                 RECORDED_QUEUE.get().offer(path);

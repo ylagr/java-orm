@@ -837,7 +837,10 @@ public class SqlEnv {
         EntityMetadata meta = (entityClass != null)
                 ? (config != null ? config.getMetadata(entityClass) : EntityMetadataManager.get(entityClass, config))
                 : null;
-        ColumnMetadata col = meta != null ? meta.getColumnByProperty(path.getTerminalProperty()) : null;
+        ColumnMetadata col = meta != null ? meta.getColumnByProperty(path.getFullPath()) : null;
+        if (col == null && meta != null) {
+            col = meta.getColumnByProperty(path.getTerminalProperty());
+        }
         if (col != null) {
             return col.getColumnName();
         }

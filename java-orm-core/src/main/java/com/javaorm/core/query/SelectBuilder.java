@@ -333,10 +333,33 @@ public class SelectBuilder<T> implements Query<T> {
                 } else if (item instanceof SqlExpression) {
                     expr = (SqlExpression) item;
                 } else if (pathIdx < paths.size()) {
-                    expr = pathToColumnExpression(paths.get(pathIdx++));
+                    PropertyPath p = paths.get(pathIdx++);
+                    EntityMetadata targetMeta = (p.getRootEntityClass() == rootEntityClass && rootMetadata != null)
+                            ? rootMetadata : (getConfig() != null ? getConfig().getMetadata(p.getRootEntityClass()) : EntityMetadataManager.get(p.getRootEntityClass(), getConfig()));
+                    com.javaorm.core.metadata.ValueObjectMetadata vo = targetMeta != null ? targetMeta.getValueObject(p.getFullPath()) : null;
+                    if (vo != null) {
+                        String alias = resolveTableAlias(p);
+                        for (ColumnMetadata leaf : vo.getAllLeafColumns()) {
+                            ColumnExpression ce = new ColumnExpression(alias, leaf.getColumnName());
+                            statement.addProjectExpression(ce);
+                        }
+                        continue;
+                    }
+                    expr = pathToColumnExpression(p);
                 } else {
                     PropertyPath p = RecordingContext.finish(rootEntityClass);
                     if (p != null) {
+                        EntityMetadata targetMeta = (p.getRootEntityClass() == rootEntityClass && rootMetadata != null)
+                                ? rootMetadata : (getConfig() != null ? getConfig().getMetadata(p.getRootEntityClass()) : EntityMetadataManager.get(p.getRootEntityClass(), getConfig()));
+                        com.javaorm.core.metadata.ValueObjectMetadata vo = targetMeta != null ? targetMeta.getValueObject(p.getFullPath()) : null;
+                        if (vo != null) {
+                            String alias = resolveTableAlias(p);
+                            for (ColumnMetadata leaf : vo.getAllLeafColumns()) {
+                                ColumnExpression ce = new ColumnExpression(alias, leaf.getColumnName());
+                                statement.addProjectExpression(ce);
+                            }
+                            continue;
+                        }
                         expr = pathToColumnExpression(p);
                     } else if (item instanceof String) {
                         expr = stringToColumnExpression((String) item);
@@ -1122,10 +1145,18 @@ public class SelectBuilder<T> implements Query<T> {
         return single();
     }
 
+    public T first() {
+        return firstOrNull();
+    }
+
     @Override
     public <R> R firstOrNull(Class<R> targetClass) {
         List<R> list = toList(targetClass);
         return (list != null && !list.isEmpty()) ? list.get(0) : null;
+    }
+
+    public <R> R first(Class<R> targetClass) {
+        return firstOrNull(targetClass);
     }
 
     public T singleOrNull() {
@@ -1411,7 +1442,10 @@ public class SelectBuilder<T> implements Query<T> {
                     ? path.getRootEntityClass() : rootEntityClass;
             EntityMetadata targetMeta = (targetClass == rootEntityClass && rootMetadata != null)
                     ? rootMetadata : (getConfig() != null ? getConfig().getMetadata(targetClass) : EntityMetadataManager.get(targetClass, getConfig()));
-            ColumnMetadata col = targetMeta.getColumnByProperty(path.getTerminalProperty());
+            ColumnMetadata col = targetMeta != null ? targetMeta.getColumnByProperty(path.getFullPath()) : null;
+            if (col == null && targetMeta != null) {
+                col = targetMeta.getColumnByProperty(path.getTerminalProperty());
+            }
             if (col != null) {
                 return col.getColumnName();
             }
@@ -1425,7 +1459,10 @@ public class SelectBuilder<T> implements Query<T> {
         }
         EntityMetadata targetMeta = (targetClass == rootEntityClass && rootMetadata != null)
                 ? rootMetadata : (getConfig() != null ? getConfig().getMetadata(targetClass) : EntityMetadataManager.get(targetClass, getConfig()));
-        ColumnMetadata col = targetMeta.getColumnByProperty(path.getTerminalProperty());
+        ColumnMetadata col = targetMeta != null ? targetMeta.getColumnByProperty(path.getFullPath()) : null;
+        if (col == null && targetMeta != null) {
+            col = targetMeta.getColumnByProperty(path.getTerminalProperty());
+        }
         if (col != null) {
             return col.getColumnName();
         }
