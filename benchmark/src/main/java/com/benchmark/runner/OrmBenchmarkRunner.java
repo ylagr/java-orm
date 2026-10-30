@@ -11,6 +11,7 @@ import com.javaorm.core.JavaOrm;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.SQLiteDialect;
 import com.javaorm.core.proxy.ProxyFactory;
+import com.javaorm.core.query.WhereBuilder;
 import org.sqlite.SQLiteDataSource;
 
 import java.time.LocalDateTime;
@@ -97,10 +98,11 @@ public class OrmBenchmarkRunner {
         }, warmup, 1);
 
         // JavaOrm Proxy (ByteBuddy 动态拦截)
+        WhereBuilder<com.benchmark.entity.javaorm.Student> where = javaOrm.select(com.benchmark.entity.javaorm.Student.class).where();
         long javaOrmTime = measure(() -> {
             Integer age = 0;
             for (int i = 0; i < iterations; i++) {
-                age = javaOrmProxy.getAge();
+                where.and(javaOrmProxy.getAge());
             }
             consume(age);
         }, warmup, rounds);
@@ -126,10 +128,12 @@ public class OrmBenchmarkRunner {
         long javaOrmTime = measure(() -> {
             for (int i = 0; i < iterations; i++) {
                 javaOrm.select(com.benchmark.entity.javaorm.Student.class)
-                        .where()
-                            .and(s -> s.getAge()).ge(18)
-                            .and(s -> s.getStudentName()).like("王%")
-                        .orderBy(s -> s.getAge()).desc();
+                        .where((w, s) -> {
+                            w.and(s.getAge()).ge(18)
+                                    .and(s.getStudentName()).like("王%")
+                                    .orderBy(s.getAge()).desc();
+                        });
+
             }
         }, warmup, rounds);
 
@@ -159,7 +163,7 @@ public class OrmBenchmarkRunner {
                 long id = (i % 400) + 1;
                 com.benchmark.entity.javaorm.Student s = javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                         .where()
-                            .and(st -> st.getId()).eq(id)
+                        .and(st -> st.getId()).eq(id)
                         .single();
                 consume(s);
             }
@@ -188,7 +192,7 @@ public class OrmBenchmarkRunner {
             for (int i = 0; i < iterations; i++) {
                 List<com.benchmark.entity.javaorm.Student> list = javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                         .where()
-                            .and(s -> s.getAge()).ge(22)
+                        .and(s -> s.getAge()).ge(22)
                         .list();
                 consume(list.size());
             }
@@ -216,7 +220,7 @@ public class OrmBenchmarkRunner {
             for (int i = 0; i < iterations; i++) {
                 List<com.benchmark.entity.javaorm.Student> list = javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                         .where()
-                            .and(s -> s.getTeacher().getAge()).gt(35)
+                        .and(s -> s.getTeacher().getAge()).gt(35)
                         .list();
                 consume(list.size());
             }
@@ -286,12 +290,16 @@ public class OrmBenchmarkRunner {
         for (int i = 0; i < rounds; i++) {
             task.run();
             if (delayMs > 0) {
-                try { Thread.sleep(delayMs); } catch (InterruptedException ignored) {}
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException ignored) {
+                }
             }
         }
     }
 
     private static volatile Object blackHole;
+
     private static void consume(Object obj) {
         blackHole = obj;
     }
