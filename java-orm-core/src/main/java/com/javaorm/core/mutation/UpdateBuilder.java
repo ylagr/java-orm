@@ -35,9 +35,6 @@ public class UpdateBuilder<T> {
     private static final Logger log = LoggerFactory.getLogger(UpdateBuilder.class);
 
     private final SqlEnv env;
-    private final DataSource dataSource;
-    private final Dialect dialect;
-    private final OrmConfig config;
     private final Class<T> entityClass;
     private final EntityMetadata metadata;
     private Boolean printSqlOverride = null;
@@ -46,11 +43,8 @@ public class UpdateBuilder<T> {
 
     public UpdateBuilder(SqlEnv env, Class<T> entityClass) {
         this.env = env != null ? env : new SqlEnv(null, null, null);
-        this.dataSource = this.env.getDataSource();
-        this.dialect = this.env.getDialect();
-        this.config = this.env.getConfig();
         this.entityClass = entityClass;
-        this.metadata = EntityMetadataManager.get(entityClass, this.config);
+        this.metadata = EntityMetadataManager.get(entityClass, this.env.getConfig());
         this.statement = new UpdateStatement(entityClass, metadata != null ? metadata.getTableName() : null);
         this.queryHelper = new Query<>(this.env, entityClass, false);
         if (metadata != null) {
@@ -66,10 +60,10 @@ public class UpdateBuilder<T> {
         // 自动注入多租户隔离保护
         if (metadata != null && metadata.hasTenant()) {
             ColumnMetadata tc = metadata.getTenantColumn();
-            Object tenantId = this.config != null ? this.config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+            Object tenantId = this.env.getConfig() != null ? this.env.getConfig().getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
             if (tenantId != null) {
                 statement.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
-            } else if (this.config != null && this.config.isTenantStrict()) {
+            } else if (this.env.getConfig() != null && this.env.getConfig().isTenantStrict()) {
                 throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
             }
         }
@@ -84,15 +78,15 @@ public class UpdateBuilder<T> {
     }
 
     public DataSource getDataSource() {
-        return dataSource;
+        return env.getDataSource();
     }
 
     public Dialect getDialect() {
-        return dialect;
+        return env.getDialect();
     }
 
     public OrmConfig getConfig() {
-        return config;
+        return env.getConfig();
     }
 
     public EntityMetadata getMetadata() {
@@ -112,7 +106,7 @@ public class UpdateBuilder<T> {
     }
 
     public UpdateBuilder<T> printSql() {
-        this.printSqlOverride = config.isPrintSql();
+        this.printSqlOverride = getConfig() != null ? getConfig().isPrintSql() : false;
         return this;
     }
 
@@ -134,7 +128,7 @@ public class UpdateBuilder<T> {
     }
 
     public String toSql(Dialect customDialect) {
-        return (customDialect != null ? customDialect : dialect).buildUpdate(statement).getSql();
+        return (customDialect != null ? customDialect : getDialect()).buildUpdate(statement).getSql();
     }
 
     public String toSQL(Dialect customDialect) {
@@ -153,7 +147,7 @@ public class UpdateBuilder<T> {
         }
         if (path != null) {
             ColumnMetadata col = metadata.getColumnByProperty(path.getTerminalProperty());
-            String colName = col != null ? col.getColumnName() : config.getNameConversion().convert(path.getTerminalProperty());
+            String colName = col != null ? col.getColumnName() : (getConfig() != null && getConfig().getNameConversion() != null ? getConfig().getNameConversion().convert(path.getTerminalProperty()) : path.getTerminalProperty());
             if (value instanceof SqlExpression) {
                 queryHelper.resolveExpression((SqlExpression) value);
             }
@@ -171,8 +165,8 @@ public class UpdateBuilder<T> {
             ColumnMetadata dbCol = metadata.getColumnByDbName(propertyOrColumn);
             if (dbCol != null) {
                 colName = dbCol.getColumnName();
-            } else if (config != null && config.getNameConversion() != null) {
-                colName = config.getNameConversion().convert(propertyOrColumn);
+            } else if (getConfig() != null && getConfig().getNameConversion() != null) {
+                colName = getConfig().getNameConversion().convert(propertyOrColumn);
             }
         }
         if (value instanceof SqlExpression) {
@@ -194,7 +188,7 @@ public class UpdateBuilder<T> {
             throw new IllegalStateException("No proxy property accessed before calling set(...)! E.g. set(s.getAge(), 20)");
         }
         ColumnMetadata col = metadata.getColumnByProperty(path.getTerminalProperty());
-        String colName = col != null ? col.getColumnName() : config.getNameConversion().convert(path.getTerminalProperty());
+        String colName = col != null ? col.getColumnName() : (getConfig() != null && getConfig().getNameConversion() != null ? getConfig().getNameConversion().convert(path.getTerminalProperty()) : path.getTerminalProperty());
         if (value instanceof SqlExpression) {
             queryHelper.resolveExpression((SqlExpression) value);
         }
@@ -205,7 +199,7 @@ public class UpdateBuilder<T> {
     public <R> UpdateBuilder<T> set(Function<T, R> propertyGetter, Object value) {
         PropertyPath path = recordPath(propertyGetter);
         ColumnMetadata col = metadata.getColumnByProperty(path.getTerminalProperty());
-        String colName = col != null ? col.getColumnName() : config.getNameConversion().convert(path.getTerminalProperty());
+        String colName = col != null ? col.getColumnName() : (getConfig() != null && getConfig().getNameConversion() != null ? getConfig().getNameConversion().convert(path.getTerminalProperty()) : path.getTerminalProperty());
         if (value instanceof SqlExpression) {
             queryHelper.resolveExpression((SqlExpression) value);
         }

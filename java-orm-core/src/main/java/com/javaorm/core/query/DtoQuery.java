@@ -28,18 +28,16 @@ public class DtoQuery<DTO, T> {
     private final SqlEnv env;
     private final Class<DTO> dtoClass;
     private final Class<T> entityClass;
-    private final DataSource dataSource;
-    private final Dialect dialect;
-    private final OrmConfig config;
     private final Query<T> underlyingQuery;
+
+    public DtoQuery(SqlEnv env, Class<DTO> dtoClass, Class<T> entityClass) {
+        this(env, dtoClass, entityClass, null);
+    }
 
     public DtoQuery(SqlEnv env, Class<DTO> dtoClass, Class<T> entityClass, String rootAlias) {
         this.env = env != null ? env : new SqlEnv(null, null, null);
         this.dtoClass = dtoClass;
         this.entityClass = entityClass;
-        this.dataSource = this.env.getDataSource();
-        this.dialect = this.env.getDialect();
-        this.config = this.env.getConfig();
         this.underlyingQuery = new Query<>(this.env, entityClass, rootAlias);
     }
 
@@ -50,9 +48,6 @@ public class DtoQuery<DTO, T> {
         this.env = env != null ? env : new SqlEnv(null, null, null);
         this.dtoClass = dtoClass;
         this.entityClass = cte.getEntityClass();
-        this.dataSource = this.env.getDataSource();
-        this.dialect = this.env.getDialect();
-        this.config = this.env.getConfig();
         this.underlyingQuery = new Query<>(this.env, cte);
     }
 
@@ -70,6 +65,21 @@ public class DtoQuery<DTO, T> {
 
     public SqlEnv getEnv() {
         return env != null ? env : (underlyingQuery != null ? underlyingQuery.getEnv() : null);
+    }
+
+    public DataSource getDataSource() {
+        SqlEnv effective = getEnv();
+        return effective != null ? effective.getDataSource() : null;
+    }
+
+    public Dialect getDialect() {
+        SqlEnv effective = getEnv();
+        return effective != null ? effective.getDialect() : null;
+    }
+
+    public OrmConfig getConfig() {
+        SqlEnv effective = getEnv();
+        return effective != null ? effective.getConfig() : null;
     }
 
     public T proxy() {
@@ -240,14 +250,11 @@ public class DtoQuery<DTO, T> {
     }
 
     public List<DTO> list() {
-        if (underlyingQuery != null && underlyingQuery.getEnv() != null) {
-            return underlyingQuery.getEnv().executeSelectDtoList(null, underlyingQuery.getStatement(), dtoClass);
+        SqlEnv effectiveEnv = getEnv();
+        if (effectiveEnv != null) {
+            return effectiveEnv.executeSelectDtoList(null, underlyingQuery.getStatement(), dtoClass);
         }
-        try (Connection conn = dataSource.getConnection()) {
-            return EntityHydrator.queryDtoList(conn, underlyingQuery.getStatement(), dtoClass, dialect, underlyingQuery.getEffectiveConfig());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to query DTO list for " + dtoClass.getName(), e);
-        }
+        throw new IllegalStateException("SqlEnv is not configured for DtoQuery");
     }
 
     public List<DTO> toList() {

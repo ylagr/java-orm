@@ -15,21 +15,31 @@ public class DtoFromStageQuery<DTO> {
     private final SqlEnv env;
     private final Class<DTO> dtoClass;
     private final Object[] expressions;
-    private final DataSource dataSource;
-    private final Dialect dialect;
-    private final OrmConfig config;
 
     public DtoFromStageQuery(SqlEnv env, Class<DTO> dtoClass, Object[] expressions) {
         this.env = env != null ? env : new SqlEnv(null, null, null);
         this.dtoClass = dtoClass;
         this.expressions = expressions;
-        this.dataSource = this.env.getDataSource();
-        this.dialect = this.env.getDialect();
-        this.config = this.env.getConfig();
     }
 
     public DtoFromStageQuery(Class<DTO> dtoClass, Object[] expressions, DataSource dataSource, Dialect dialect, OrmConfig config) {
         this(new SqlEnv(dataSource, dialect, config), dtoClass, expressions);
+    }
+
+    public SqlEnv getEnv() {
+        return env;
+    }
+
+    public DataSource getDataSource() {
+        return env.getDataSource();
+    }
+
+    public Dialect getDialect() {
+        return env.getDialect();
+    }
+
+    public OrmConfig getConfig() {
+        return env.getConfig();
     }
 
     public <T> DtoQuery<DTO, T> from(Class<T> entityClass) {
@@ -49,9 +59,6 @@ public class DtoFromStageQuery<DTO> {
         return query;
     }
 
-    public SqlEnv getEnv() {
-        return env;
-    }
 
     private boolean hasSubQuery() {
         if (expressions == null) return false;

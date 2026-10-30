@@ -30,9 +30,6 @@ import java.util.function.Function;
 public class Query<T> {
 
     private final SqlEnv env;
-    private final DataSource dataSource;
-    private final Dialect dialect;
-    private final OrmConfig config;
     private final Class<T> rootEntityClass;
     private final EntityMetadata rootMetadata;
     private Cte<T> rootCte;
@@ -88,9 +85,6 @@ public class Query<T> {
 
     public Query(SqlEnv env, Class<T> rootEntityClass, boolean allocateAlias) {
         this.env = env != null ? env : new SqlEnv(null, null, null);
-        this.dataSource = this.env.getDataSource();
-        this.dialect = this.env.getDialect();
-        this.config = this.env.getConfig();
         this.rootEntityClass = rootEntityClass;
         this.rootMetadata = this.env.getConfig() != null ? this.env.getConfig().getMetadata(rootEntityClass) : EntityMetadataManager.get(rootEntityClass, this.env.getConfig());
 
@@ -108,9 +102,6 @@ public class Query<T> {
 
     public Query(SqlEnv env, Class<T> rootEntityClass, String rootAlias) {
         this.env = env != null ? env : new SqlEnv(null, null, null);
-        this.dataSource = this.env.getDataSource();
-        this.dialect = this.env.getDialect();
-        this.config = this.env.getConfig();
         this.rootEntityClass = rootEntityClass;
         this.rootMetadata = this.env.getConfig() != null ? this.env.getConfig().getMetadata(rootEntityClass) : EntityMetadataManager.get(rootEntityClass, this.env.getConfig());
 
@@ -137,9 +128,6 @@ public class Query<T> {
             throw new IllegalArgumentException("CTE must not be null");
         }
         this.env = env != null ? env : new SqlEnv(null, null, null);
-        this.dataSource = this.env.getDataSource();
-        this.dialect = this.env.getDialect();
-        this.config = this.env.getConfig();
         this.rootCte = cte;
         this.rootEntityClass = cte.getEntityClass();
         this.rootMetadata = rootEntityClass != null ? EntityMetadataManager.get(rootEntityClass, this.env.getConfig()) : null;
@@ -304,8 +292,8 @@ public class Query<T> {
                 ColumnMetadata dbCol = rootMetadata.getColumnByDbName(colName);
                 if (dbCol != null) {
                     colName = dbCol.getColumnName();
-                } else if (config != null && config.getNameConversion() != null) {
-                    colName = config.getNameConversion().convert(colName);
+                } else if (getConfig() != null && getConfig().getNameConversion() != null) {
+                    colName = getConfig().getNameConversion().convert(colName);
                 }
             }
         }
@@ -366,11 +354,11 @@ public class Query<T> {
      * 绑定源表，转为 DTO 投影查询（例如 orm.select(StatDto.class).from(Student.class)...）
      */
     public <R> DtoQuery<T, R> from(Class<R> fromEntityClass) {
-        return new DtoQuery<>(this.rootEntityClass, fromEntityClass, dataSource, dialect, config);
+        return new DtoQuery<>(this.env, this.rootEntityClass, fromEntityClass);
     }
 
     public <R> DtoQuery<T, R> from(Cte<R> cte) {
-        return new DtoQuery<>(this.rootEntityClass, cte, dataSource, dialect, config);
+        return new DtoQuery<>(this.env, this.rootEntityClass, cte);
     }
 
     /**
@@ -698,7 +686,7 @@ public class Query<T> {
 
     // --- 实体表连接支持 ---
     public <TJoin> JoinBuilder<T, TJoin> leftJoin(Class<TJoin> entityClass) {
-        EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
+        EntityMetadata meta = EntityMetadataManager.get(entityClass, getConfig());
         String joinAlias = obtainJoinAlias(entityClass);
         return new JoinBuilder<>(this, TableJoin.JoinType.LEFT_JOIN, meta.getTableName(), entityClass, joinAlias, null);
     }
@@ -708,7 +696,7 @@ public class Query<T> {
     }
 
     public <TJoin> JoinBuilder<T, TJoin> innerJoin(Class<TJoin> entityClass) {
-        EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
+        EntityMetadata meta = EntityMetadataManager.get(entityClass, getConfig());
         String joinAlias = obtainJoinAlias(entityClass);
         return new JoinBuilder<>(this, TableJoin.JoinType.INNER_JOIN, meta.getTableName(), entityClass, joinAlias, null);
     }
@@ -718,7 +706,7 @@ public class Query<T> {
     }
 
     public <TJoin> JoinBuilder<T, TJoin> rightJoin(Class<TJoin> entityClass) {
-        EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
+        EntityMetadata meta = EntityMetadataManager.get(entityClass, getConfig());
         String joinAlias = obtainJoinAlias(entityClass);
         return new JoinBuilder<>(this, TableJoin.JoinType.RIGHT_JOIN, meta.getTableName(), entityClass, joinAlias, null);
     }
@@ -1153,8 +1141,8 @@ public class Query<T> {
                         ColumnMetadata dbCol = rootMetadata.getColumnByDbName(ce.getColumnName());
                         if (dbCol != null) {
                             ce.setColumnName(dbCol.getColumnName());
-                        } else if (config != null && config.getNameConversion() != null) {
-                            ce.setColumnName(config.getNameConversion().convert(ce.getColumnName()));
+                        } else if (getConfig() != null && getConfig().getNameConversion() != null) {
+                            ce.setColumnName(getConfig().getNameConversion().convert(ce.getColumnName()));
                         }
                     }
                 }
@@ -1225,8 +1213,8 @@ public class Query<T> {
                     ColumnMetadata cm = rootMetadata.getColumnByProperty(bc.getColumnName());
                     if (cm != null) {
                         bc.setColumnName(cm.getColumnName());
-                    } else if (config != null && config.getNameConversion() != null) {
-                        bc.setColumnName(config.getNameConversion().convert(bc.getColumnName()));
+                    } else if (getConfig() != null && getConfig().getNameConversion() != null) {
+                        bc.setColumnName(getConfig().getNameConversion().convert(bc.getColumnName()));
                     }
                 }
             }
@@ -1395,13 +1383,13 @@ public class Query<T> {
             Class<?> targetClass = (path.getRootEntityClass() != null && path.getRootEntityClass() != rootEntityClass)
                     ? path.getRootEntityClass() : rootEntityClass;
             EntityMetadata targetMeta = (targetClass == rootEntityClass && rootMetadata != null)
-                    ? rootMetadata : (config != null ? config.getMetadata(targetClass) : EntityMetadataManager.get(targetClass, config));
+                    ? rootMetadata : (getConfig() != null ? getConfig().getMetadata(targetClass) : EntityMetadataManager.get(targetClass, getConfig()));
             ColumnMetadata col = targetMeta.getColumnByProperty(path.getTerminalProperty());
             if (col != null) {
                 return col.getColumnName();
             }
-            return config != null && config.getNameConversion() != null
-                    ? config.getNameConversion().convert(path.getTerminalProperty())
+            return getConfig() != null && getConfig().getNameConversion() != null
+                    ? getConfig().getNameConversion().convert(path.getTerminalProperty())
                     : path.getTerminalProperty();
         }
         Class<?> targetClass = resolveTargetClass(path);
@@ -1409,13 +1397,13 @@ public class Query<T> {
             targetClass = path.getRootEntityClass();
         }
         EntityMetadata targetMeta = (targetClass == rootEntityClass && rootMetadata != null)
-                ? rootMetadata : (config != null ? config.getMetadata(targetClass) : EntityMetadataManager.get(targetClass, config));
+                ? rootMetadata : (getConfig() != null ? getConfig().getMetadata(targetClass) : EntityMetadataManager.get(targetClass, getConfig()));
         ColumnMetadata col = targetMeta.getColumnByProperty(path.getTerminalProperty());
         if (col != null) {
             return col.getColumnName();
         }
-        return config != null && config.getNameConversion() != null
-                ? config.getNameConversion().convert(path.getTerminalProperty())
+        return getConfig() != null && getConfig().getNameConversion() != null
+                ? getConfig().getNameConversion().convert(path.getTerminalProperty())
                 : path.getTerminalProperty();
     }
 
@@ -1434,7 +1422,7 @@ public class Query<T> {
                 currentAlias = existingAlias;
                 RelationMetadata rel = currentMeta.getRelation(step);
                 currentClass = rel.getTargetEntityClass();
-                currentMeta = config != null ? config.getMetadata(currentClass) : EntityMetadataManager.get(currentClass, config);
+                currentMeta = getConfig() != null ? getConfig().getMetadata(currentClass) : EntityMetadataManager.get(currentClass, getConfig());
                 continue;
             }
 
@@ -1446,7 +1434,7 @@ public class Query<T> {
             String nextAlias = nextAlias();
             RecordingContext.registerAlias(rel.getTargetEntityClass(), nextAlias);
             Class<?> targetClass = rel.getTargetEntityClass();
-            EntityMetadata targetMeta = config != null ? config.getMetadata(targetClass) : EntityMetadataManager.get(targetClass, config);
+            EntityMetadata targetMeta = getConfig() != null ? getConfig().getMetadata(targetClass) : EntityMetadataManager.get(targetClass, getConfig());
 
             TableJoin join = new TableJoin(TableJoin.JoinType.LEFT_JOIN, targetMeta.getTableName(), nextAlias);
 
@@ -1454,8 +1442,8 @@ public class Query<T> {
             ColumnMetadata selfCol = currentMeta.getColumnByProperty(rel.getSelfProperty());
             ColumnMetadata targetCol = targetMeta.getColumnByProperty(rel.getTargetProperty());
 
-            String selfColName = selfCol != null ? selfCol.getColumnName() : config.getNameConversion().convert(rel.getSelfProperty());
-            String targetColName = targetCol != null ? targetCol.getColumnName() : config.getNameConversion().convert(rel.getTargetProperty());
+            String selfColName = selfCol != null ? selfCol.getColumnName() : (getConfig() != null && getConfig().getNameConversion() != null ? getConfig().getNameConversion().convert(rel.getSelfProperty()) : rel.getSelfProperty());
+            String targetColName = targetCol != null ? targetCol.getColumnName() : (getConfig() != null && getConfig().getNameConversion() != null ? getConfig().getNameConversion().convert(rel.getTargetProperty()) : rel.getTargetProperty());
 
             join.addOnCondition(new ColumnEqualityCondition(currentAlias, selfColName, nextAlias, targetColName));
 
@@ -1468,7 +1456,7 @@ public class Query<T> {
             // 子表多租户自动过滤
             if (targetMeta.hasTenant()) {
                 ColumnMetadata tc = targetMeta.getTenantColumn();
-                Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+                Object tenantId = getConfig() != null ? getConfig().getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
                 if (tenantId != null) {
                     join.addOnCondition(new BinaryCondition(nextAlias, tc.getColumnName(), SqlOperator.EQ, tenantId));
                 }
@@ -1491,12 +1479,12 @@ public class Query<T> {
         }
         Class<?> current = path.getRootEntityClass() != null ? path.getRootEntityClass() : rootEntityClass;
         EntityMetadata currentMeta = (current == rootEntityClass && rootMetadata != null)
-                ? rootMetadata : (config != null ? config.getMetadata(current) : EntityMetadataManager.get(current, config));
+                ? rootMetadata : (getConfig() != null ? getConfig().getMetadata(current) : EntityMetadataManager.get(current, getConfig()));
         for (String step : path.getRelationSteps()) {
             RelationMetadata rel = currentMeta.getRelation(step);
             if (rel == null) break;
             current = rel.getTargetEntityClass();
-            currentMeta = config != null ? config.getMetadata(current) : EntityMetadataManager.get(current, config);
+            currentMeta = getConfig() != null ? getConfig().getMetadata(current) : EntityMetadataManager.get(current, getConfig());
         }
         return current;
     }
