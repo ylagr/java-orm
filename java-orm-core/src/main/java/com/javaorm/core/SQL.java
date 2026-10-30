@@ -133,51 +133,51 @@ public class SQL {
         return new FunctionExpression<Long>(BuiltinSqlFunction.COUNT, toExpression(prop)).distinct();
     }
 
-    public static <T> FunctionExpression<T> sum(SqlExpression<T> expr) {
+    public static <T extends Number> FunctionExpression<T> sum(SqlExpression<T> expr) {
         return new FunctionExpression<>(BuiltinSqlFunction.SUM, expr);
     }
 
-    public static <T> FunctionExpression<T> sum(T prop) {
+    public static <T extends Number> FunctionExpression<T> sum(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.SUM, toExpression(prop));
     }
 
-    public static <T> FunctionExpression<T> sumDistinct(SqlExpression<T> expr) {
+    public static <T extends Number> FunctionExpression<T> sumDistinct(SqlExpression<T> expr) {
         return new FunctionExpression<T>(BuiltinSqlFunction.SUM, expr).distinct();
     }
 
-    public static <T> FunctionExpression<T> sumDistinct(T prop) {
+    public static <T extends Number> FunctionExpression<T> sumDistinct(T prop) {
         return new FunctionExpression<T>(BuiltinSqlFunction.SUM, toExpression(prop)).distinct();
     }
 
-    public static <T> FunctionExpression<Double> avg(SqlExpression<T> expr) {
+    public static <T extends Number> FunctionExpression<Double> avg(SqlExpression<T> expr) {
         return new FunctionExpression<>(BuiltinSqlFunction.AVG, expr);
     }
 
-    public static <T> FunctionExpression<Double> avg(T prop) {
+    public static <T extends Number> FunctionExpression<Double> avg(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.AVG, toExpression(prop));
     }
 
-    public static <T> FunctionExpression<Double> avgDistinct(SqlExpression<T> expr) {
+    public static <T extends Number> FunctionExpression<Double> avgDistinct(SqlExpression<T> expr) {
         return new FunctionExpression<Double>(BuiltinSqlFunction.AVG, expr).distinct();
     }
 
-    public static <T> FunctionExpression<Double> avgDistinct(T prop) {
+    public static <T extends Number> FunctionExpression<Double> avgDistinct(T prop) {
         return new FunctionExpression<Double>(BuiltinSqlFunction.AVG, toExpression(prop)).distinct();
     }
 
-    public static <T> FunctionExpression<T> max(SqlExpression<T> expr) {
+    public static <T extends Comparable<? super T>> FunctionExpression<T> max(SqlExpression<T> expr) {
         return new FunctionExpression<>(BuiltinSqlFunction.MAX, expr);
     }
 
-    public static <T> FunctionExpression<T> max(T prop) {
+    public static <T extends Comparable<? super T>> FunctionExpression<T> max(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.MAX, toExpression(prop));
     }
 
-    public static <T> FunctionExpression<T> min(SqlExpression<T> expr) {
+    public static <T extends Comparable<? super T>> FunctionExpression<T> min(SqlExpression<T> expr) {
         return new FunctionExpression<>(BuiltinSqlFunction.MIN, expr);
     }
 
-    public static <T> FunctionExpression<T> min(T prop) {
+    public static <T extends Comparable<? super T>> FunctionExpression<T> min(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.MIN, toExpression(prop));
     }
 
@@ -197,19 +197,19 @@ public class SQL {
         return new FunctionExpression<>(BuiltinSqlFunction.GROUP_CONCAT, toExpression(prop), separator);
     }
 
-    public static <T> FunctionExpression<Double> stddev(SqlExpression<T> expr) {
+    public static <T extends Number> FunctionExpression<Double> stddev(SqlExpression<T> expr) {
         return new FunctionExpression<>(BuiltinSqlFunction.STDDEV, expr);
     }
 
-    public static <T> FunctionExpression<Double> stddev(T prop) {
+    public static <T extends Number> FunctionExpression<Double> stddev(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.STDDEV, toExpression(prop));
     }
 
-    public static <T> FunctionExpression<Double> variance(SqlExpression<T> expr) {
+    public static <T extends Number> FunctionExpression<Double> variance(SqlExpression<T> expr) {
         return new FunctionExpression<>(BuiltinSqlFunction.VARIANCE, expr);
     }
 
-    public static <T> FunctionExpression<Double> variance(T prop) {
+    public static <T extends Number> FunctionExpression<Double> variance(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.VARIANCE, toExpression(prop));
     }
 
@@ -313,107 +313,179 @@ public class SQL {
     }
 
     // ==================== 日期时间函数 ====================
-    public static FunctionExpression<String> dateFormat(Object prop, String pattern) {
+    public static <T> FunctionExpression<String> dateFormat(T prop, String pattern) {
         return new FunctionExpression<>(BuiltinSqlFunction.DATE_FORMAT, toExpression(prop), pattern);
     }
 
-    public static FunctionExpression<String> dateFormat(Object prop) {
+    public static <T> FunctionExpression<String> dateFormat(T prop) {
         return dateFormat(prop, "yyyy-MM-dd HH:mm:ss");
     }
 
-    public static FunctionExpression<String> dateToString(Object prop, String pattern) {
+    public static <T> FunctionExpression<String> dateToString(T prop, String pattern) {
         return dateFormat(prop, pattern);
     }
 
-    public static FunctionExpression<String> dateToString(Object prop) {
+    public static <T> FunctionExpression<String> dateToString(T prop) {
         return dateFormat(prop);
     }
 
-    public static FunctionExpression<java.util.Date> strToDate(Object prop, String pattern) {
+    public static <T> FunctionExpression<java.util.Date> strToDate(T prop, String pattern) {
         return new FunctionExpression<>(BuiltinSqlFunction.STR_TO_DATE, toExpression(prop), pattern);
     }
 
-    public static FunctionExpression<java.util.Date> stringToDate(Object prop, String pattern) {
+    public static <T> FunctionExpression<java.util.Date> stringToDate(T prop, String pattern) {
         return strToDate(prop, pattern);
     }
 
-    public static FunctionExpression<java.util.Date> toDate(Object prop, String pattern) {
+    public static <T> FunctionExpression<java.util.Date> toDate(T prop, String pattern) {
         return strToDate(prop, pattern);
     }
 
-    public static FunctionExpression<java.util.Date> toDate(Object prop) {
+    public static <T> FunctionExpression<java.util.Date> toDate(T prop) {
         return strToDate(prop, "yyyy-MM-dd HH:mm:ss");
     }
 
-    public static <T> FunctionExpression<T> dateAdd(T prop, Object amount, DateUnit unit) {
+    public static <T> FunctionExpression<T> dateAdd(T prop, Number amount, DateUnit unit) {
         return new FunctionExpression<>(BuiltinSqlFunction.DATE_ADD, toExpression(prop), amount, unit.name());
     }
 
-    public static <T> FunctionExpression<T> dateAdd(T prop, Object amount, String unit) {
+    public static <T> FunctionExpression<T> dateAdd(T prop, SqlExpression<? extends Number> amount, DateUnit unit) {
+        return new FunctionExpression<>(BuiltinSqlFunction.DATE_ADD, toExpression(prop), amount, unit.name());
+    }
+
+    public static <T> FunctionExpression<T> dateAdd(T prop, Number amount, String unit) {
         return new FunctionExpression<>(BuiltinSqlFunction.DATE_ADD, toExpression(prop), amount, unit);
     }
 
-    public static <T> FunctionExpression<T> dateAdd(T prop, Object amount) {
+    public static <T> FunctionExpression<T> dateAdd(T prop, SqlExpression<? extends Number> amount, String unit) {
+        return new FunctionExpression<>(BuiltinSqlFunction.DATE_ADD, toExpression(prop), amount, unit);
+    }
+
+    public static <T> FunctionExpression<T> dateAdd(T prop, Number amount) {
         return dateAdd(prop, amount, DateUnit.DAY);
     }
 
-    public static <T> FunctionExpression<T> dateAddDays(T prop, Object days) {
+    public static <T> FunctionExpression<T> dateAdd(T prop, SqlExpression<? extends Number> amount) {
+        return dateAdd(prop, amount, DateUnit.DAY);
+    }
+
+    public static <T> FunctionExpression<T> dateAddDays(T prop, Number days) {
         return dateAdd(prop, days, DateUnit.DAY);
     }
 
-    public static <T> FunctionExpression<T> dateAddMonths(T prop, Object months) {
+    public static <T> FunctionExpression<T> dateAddDays(T prop, SqlExpression<? extends Number> days) {
+        return dateAdd(prop, days, DateUnit.DAY);
+    }
+
+    public static <T> FunctionExpression<T> dateAddMonths(T prop, Number months) {
         return dateAdd(prop, months, DateUnit.MONTH);
     }
 
-    public static <T> FunctionExpression<T> dateAddYears(T prop, Object years) {
+    public static <T> FunctionExpression<T> dateAddMonths(T prop, SqlExpression<? extends Number> months) {
+        return dateAdd(prop, months, DateUnit.MONTH);
+    }
+
+    public static <T> FunctionExpression<T> dateAddYears(T prop, Number years) {
         return dateAdd(prop, years, DateUnit.YEAR);
     }
 
-    public static <T> FunctionExpression<T> dateAddHours(T prop, Object hours) {
+    public static <T> FunctionExpression<T> dateAddYears(T prop, SqlExpression<? extends Number> years) {
+        return dateAdd(prop, years, DateUnit.YEAR);
+    }
+
+    public static <T> FunctionExpression<T> dateAddHours(T prop, Number hours) {
         return dateAdd(prop, hours, DateUnit.HOUR);
     }
 
-    public static <T> FunctionExpression<T> dateAddMinutes(T prop, Object minutes) {
+    public static <T> FunctionExpression<T> dateAddHours(T prop, SqlExpression<? extends Number> hours) {
+        return dateAdd(prop, hours, DateUnit.HOUR);
+    }
+
+    public static <T> FunctionExpression<T> dateAddMinutes(T prop, Number minutes) {
         return dateAdd(prop, minutes, DateUnit.MINUTE);
     }
 
-    public static <T> FunctionExpression<T> dateAddSeconds(T prop, Object seconds) {
+    public static <T> FunctionExpression<T> dateAddMinutes(T prop, SqlExpression<? extends Number> minutes) {
+        return dateAdd(prop, minutes, DateUnit.MINUTE);
+    }
+
+    public static <T> FunctionExpression<T> dateAddSeconds(T prop, Number seconds) {
         return dateAdd(prop, seconds, DateUnit.SECOND);
     }
 
-    public static <T> FunctionExpression<T> dateSub(T prop, Object amount, DateUnit unit) {
+    public static <T> FunctionExpression<T> dateAddSeconds(T prop, SqlExpression<? extends Number> seconds) {
+        return dateAdd(prop, seconds, DateUnit.SECOND);
+    }
+
+    public static <T> FunctionExpression<T> dateSub(T prop, Number amount, DateUnit unit) {
         return new FunctionExpression<>(BuiltinSqlFunction.DATE_SUB, toExpression(prop), amount, unit.name());
     }
 
-    public static <T> FunctionExpression<T> dateSub(T prop, Object amount, String unit) {
+    public static <T> FunctionExpression<T> dateSub(T prop, SqlExpression<? extends Number> amount, DateUnit unit) {
+        return new FunctionExpression<>(BuiltinSqlFunction.DATE_SUB, toExpression(prop), amount, unit.name());
+    }
+
+    public static <T> FunctionExpression<T> dateSub(T prop, Number amount, String unit) {
         return new FunctionExpression<>(BuiltinSqlFunction.DATE_SUB, toExpression(prop), amount, unit);
     }
 
-    public static <T> FunctionExpression<T> dateSub(T prop, Object amount) {
+    public static <T> FunctionExpression<T> dateSub(T prop, SqlExpression<? extends Number> amount, String unit) {
+        return new FunctionExpression<>(BuiltinSqlFunction.DATE_SUB, toExpression(prop), amount, unit);
+    }
+
+    public static <T> FunctionExpression<T> dateSub(T prop, Number amount) {
         return dateSub(prop, amount, DateUnit.DAY);
     }
 
-    public static <T> FunctionExpression<T> dateSubDays(T prop, Object days) {
+    public static <T> FunctionExpression<T> dateSub(T prop, SqlExpression<? extends Number> amount) {
+        return dateSub(prop, amount, DateUnit.DAY);
+    }
+
+    public static <T> FunctionExpression<T> dateSubDays(T prop, Number days) {
         return dateSub(prop, days, DateUnit.DAY);
     }
 
-    public static <T> FunctionExpression<T> dateSubMonths(T prop, Object months) {
+    public static <T> FunctionExpression<T> dateSubDays(T prop, SqlExpression<? extends Number> days) {
+        return dateSub(prop, days, DateUnit.DAY);
+    }
+
+    public static <T> FunctionExpression<T> dateSubMonths(T prop, Number months) {
         return dateSub(prop, months, DateUnit.MONTH);
     }
 
-    public static <T> FunctionExpression<T> dateSubYears(T prop, Object years) {
+    public static <T> FunctionExpression<T> dateSubMonths(T prop, SqlExpression<? extends Number> months) {
+        return dateSub(prop, months, DateUnit.MONTH);
+    }
+
+    public static <T> FunctionExpression<T> dateSubYears(T prop, Number years) {
         return dateSub(prop, years, DateUnit.YEAR);
     }
 
-    public static <T> FunctionExpression<T> dateSubHours(T prop, Object hours) {
+    public static <T> FunctionExpression<T> dateSubYears(T prop, SqlExpression<? extends Number> years) {
+        return dateSub(prop, years, DateUnit.YEAR);
+    }
+
+    public static <T> FunctionExpression<T> dateSubHours(T prop, Number hours) {
         return dateSub(prop, hours, DateUnit.HOUR);
     }
 
-    public static <T> FunctionExpression<T> dateSubMinutes(T prop, Object minutes) {
+    public static <T> FunctionExpression<T> dateSubHours(T prop, SqlExpression<? extends Number> hours) {
+        return dateSub(prop, hours, DateUnit.HOUR);
+    }
+
+    public static <T> FunctionExpression<T> dateSubMinutes(T prop, Number minutes) {
         return dateSub(prop, minutes, DateUnit.MINUTE);
     }
 
-    public static <T> FunctionExpression<T> dateSubSeconds(T prop, Object seconds) {
+    public static <T> FunctionExpression<T> dateSubMinutes(T prop, SqlExpression<? extends Number> minutes) {
+        return dateSub(prop, minutes, DateUnit.MINUTE);
+    }
+
+    public static <T> FunctionExpression<T> dateSubSeconds(T prop, Number seconds) {
+        return dateSub(prop, seconds, DateUnit.SECOND);
+    }
+
+    public static <T> FunctionExpression<T> dateSubSeconds(T prop, SqlExpression<? extends Number> seconds) {
         return dateSub(prop, seconds, DateUnit.SECOND);
     }
 
@@ -421,39 +493,39 @@ public class SQL {
         return new FunctionExpression<>(BuiltinSqlFunction.LAST_DAY, toExpression(prop));
     }
 
-    public static FunctionExpression<Integer> dateDiff(Object d1, Object d2) {
+    public static <T1, T2> FunctionExpression<Integer> dateDiff(T1 d1, T2 d2) {
         return new FunctionExpression<>(BuiltinSqlFunction.DATEDIFF, toExpressions(d1, d2));
     }
 
-    public static FunctionExpression<Integer> dayOfWeek(Object prop) {
+    public static <T> FunctionExpression<Integer> dayOfWeek(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.DAYOFWEEK, toExpression(prop));
     }
 
-    public static FunctionExpression<Integer> dayOfYear(Object prop) {
+    public static <T> FunctionExpression<Integer> dayOfYear(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.DAYOFYEAR, toExpression(prop));
     }
 
-    public static FunctionExpression<Integer> year(Object prop) {
+    public static <T> FunctionExpression<Integer> year(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.YEAR, toExpression(prop));
     }
 
-    public static FunctionExpression<Integer> month(Object prop) {
+    public static <T> FunctionExpression<Integer> month(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.MONTH, toExpression(prop));
     }
 
-    public static FunctionExpression<Integer> day(Object prop) {
+    public static <T> FunctionExpression<Integer> day(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.DAY, toExpression(prop));
     }
 
-    public static FunctionExpression<Integer> hour(Object prop) {
+    public static <T> FunctionExpression<Integer> hour(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.HOUR, toExpression(prop));
     }
 
-    public static FunctionExpression<Integer> minute(Object prop) {
+    public static <T> FunctionExpression<Integer> minute(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.MINUTE, toExpression(prop));
     }
 
-    public static FunctionExpression<Integer> second(Object prop) {
+    public static <T> FunctionExpression<Integer> second(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.SECOND, toExpression(prop));
     }
 
@@ -482,216 +554,414 @@ public class SQL {
     }
 
     // ==================== 字符串函数 ====================
-    public static FunctionExpression<Integer> length(Object prop) {
+    public static <T extends CharSequence> FunctionExpression<Integer> length(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.LENGTH, toExpression(prop));
     }
 
-    public static FunctionExpression<Integer> charLength(Object prop) {
+    public static <T extends CharSequence> FunctionExpression<Integer> length(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.LENGTH, expr);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<Integer> charLength(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.CHAR_LENGTH, toExpression(prop));
     }
 
-    public static FunctionExpression<String> lower(Object prop) {
+    public static <T extends CharSequence> FunctionExpression<Integer> charLength(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.CHAR_LENGTH, expr);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> lower(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.LOWER, toExpression(prop));
     }
 
-    public static FunctionExpression<String> upper(Object prop) {
+    public static <T extends CharSequence> FunctionExpression<String> lower(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.LOWER, expr);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> upper(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.UPPER, toExpression(prop));
     }
 
-    public static FunctionExpression<String> trim(Object prop) {
+    public static <T extends CharSequence> FunctionExpression<String> upper(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.UPPER, expr);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> trim(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.TRIM, toExpression(prop));
     }
 
-    public static FunctionExpression<String> ltrim(Object prop) {
+    public static <T extends CharSequence> FunctionExpression<String> trim(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.TRIM, expr);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> ltrim(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.LTRIM, toExpression(prop));
     }
 
-    public static FunctionExpression<String> rtrim(Object prop) {
+    public static <T extends CharSequence> FunctionExpression<String> ltrim(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.LTRIM, expr);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> rtrim(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.RTRIM, toExpression(prop));
     }
 
-    public static FunctionExpression<String> concat(Object... props) {
-        return new FunctionExpression<>(BuiltinSqlFunction.CONCAT, toExpressions(props));
+    public static <T extends CharSequence> FunctionExpression<String> rtrim(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.RTRIM, expr);
     }
 
-    public static FunctionExpression<String> concatWs(Object separator, Object... props) {
+    @SafeVarargs
+    public static <T> FunctionExpression<String> concat(T... props) {
+        return new FunctionExpression<>(BuiltinSqlFunction.CONCAT, toExpressions((Object[]) props));
+    }
+
+    @SafeVarargs
+    public static <T> FunctionExpression<String> concatWs(CharSequence separator, T... props) {
         Object[] all = new Object[props.length + 1];
         all[0] = separator;
         System.arraycopy(props, 0, all, 1, props.length);
         return new FunctionExpression<>(BuiltinSqlFunction.CONCAT_WS, toExpressions(all));
     }
 
-    public static FunctionExpression<String> subString(Object prop, int start, int len) {
+    public static <T extends CharSequence> FunctionExpression<String> subString(T prop, int start, int len) {
         return new FunctionExpression<>(BuiltinSqlFunction.SUBSTRING, toExpression(prop), start, len);
     }
 
-    public static FunctionExpression<String> subString(Object prop, int start) {
+    public static <T extends CharSequence> FunctionExpression<String> subString(SqlExpression<T> expr, int start, int len) {
+        return new FunctionExpression<>(BuiltinSqlFunction.SUBSTRING, expr, start, len);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> subString(T prop, int start) {
         return new FunctionExpression<>(BuiltinSqlFunction.SUBSTRING, toExpression(prop), start);
     }
 
-    public static FunctionExpression<String> substring(Object prop, int start, int len) {
+    public static <T extends CharSequence> FunctionExpression<String> subString(SqlExpression<T> expr, int start) {
+        return new FunctionExpression<>(BuiltinSqlFunction.SUBSTRING, expr, start);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> substring(T prop, int start, int len) {
         return subString(prop, start, len);
     }
 
-    public static FunctionExpression<String> substring(Object prop, int start) {
+    public static <T extends CharSequence> FunctionExpression<String> substring(SqlExpression<T> expr, int start, int len) {
+        return subString(expr, start, len);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> substring(T prop, int start) {
         return subString(prop, start);
     }
 
-    public static FunctionExpression<String> substr(Object prop, int start, int len) {
+    public static <T extends CharSequence> FunctionExpression<String> substring(SqlExpression<T> expr, int start) {
+        return subString(expr, start);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> substr(T prop, int start, int len) {
         return subString(prop, start, len);
     }
 
-    public static FunctionExpression<String> substr(Object prop, int start) {
+    public static <T extends CharSequence> FunctionExpression<String> substr(SqlExpression<T> expr, int start, int len) {
+        return subString(expr, start, len);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> substr(T prop, int start) {
         return subString(prop, start);
     }
 
-    public static FunctionExpression<String> replace(Object prop, Object target, Object replacement) {
+    public static <T extends CharSequence> FunctionExpression<String> substr(SqlExpression<T> expr, int start) {
+        return subString(expr, start);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> replace(T prop, Object target, Object replacement) {
         return new FunctionExpression<>(BuiltinSqlFunction.REPLACE, toExpressions(prop, target, replacement));
     }
 
-    public static FunctionExpression<String> left(Object prop, int len) {
+    public static <T extends CharSequence> FunctionExpression<String> replace(SqlExpression<T> expr, Object target, Object replacement) {
+        return new FunctionExpression<>(BuiltinSqlFunction.REPLACE, toExpressions(expr, target, replacement));
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> left(T prop, int len) {
         return new FunctionExpression<>(BuiltinSqlFunction.LEFT, toExpression(prop), len);
     }
 
-    public static FunctionExpression<String> right(Object prop, int len) {
+    public static <T extends CharSequence> FunctionExpression<String> left(SqlExpression<T> expr, int len) {
+        return new FunctionExpression<>(BuiltinSqlFunction.LEFT, expr, len);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> right(T prop, int len) {
         return new FunctionExpression<>(BuiltinSqlFunction.RIGHT, toExpression(prop), len);
     }
 
-    public static FunctionExpression<Integer> instr(Object str, Object substr) {
+    public static <T extends CharSequence> FunctionExpression<String> right(SqlExpression<T> expr, int len) {
+        return new FunctionExpression<>(BuiltinSqlFunction.RIGHT, expr, len);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<Integer> instr(T str, Object substr) {
         return new FunctionExpression<>(BuiltinSqlFunction.INSTR, toExpressions(str, substr));
     }
 
-    public static FunctionExpression<Integer> locate(Object substr, Object str) {
+    public static <T extends CharSequence> FunctionExpression<Integer> locate(Object substr, T str) {
         return new FunctionExpression<>(BuiltinSqlFunction.LOCATE, toExpressions(substr, str));
     }
 
-    public static FunctionExpression<String> md5(Object prop) {
+    public static <T extends CharSequence> FunctionExpression<String> md5(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.MD5, toExpression(prop));
     }
 
-    public static FunctionExpression<String> lpad(Object prop, int len, Object pad) {
+    public static <T extends CharSequence> FunctionExpression<String> md5(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.MD5, expr);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> lpad(T prop, int len, Object pad) {
         return new FunctionExpression<>(BuiltinSqlFunction.LPAD, toExpressions(prop, len, pad));
     }
 
-    public static FunctionExpression<String> rpad(Object prop, int len, Object pad) {
+    public static <T extends CharSequence> FunctionExpression<String> rpad(T prop, int len, Object pad) {
         return new FunctionExpression<>(BuiltinSqlFunction.RPAD, toExpressions(prop, len, pad));
     }
 
-    public static FunctionExpression<String> reverse(Object prop) {
+    public static <T extends CharSequence> FunctionExpression<String> reverse(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.REVERSE, toExpression(prop));
     }
 
-    public static FunctionExpression<String> repeat(Object prop, int count) {
+    public static <T extends CharSequence> FunctionExpression<String> reverse(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.REVERSE, expr);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<String> repeat(T prop, int count) {
         return new FunctionExpression<>(BuiltinSqlFunction.REPEAT, toExpression(prop), count);
     }
 
-    public static FunctionExpression<Integer> ascii(Object prop) {
+    public static <T extends CharSequence> FunctionExpression<String> repeat(SqlExpression<T> expr, int count) {
+        return new FunctionExpression<>(BuiltinSqlFunction.REPEAT, expr, count);
+    }
+
+    public static <T extends CharSequence> FunctionExpression<Integer> ascii(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.ASCII, toExpression(prop));
     }
 
+    public static <T extends CharSequence> FunctionExpression<Integer> ascii(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.ASCII, expr);
+    }
+
     // ==================== 数值函数 ====================
-    public static <T> FunctionExpression<T> abs(T prop) {
+    public static <T extends Number> FunctionExpression<T> abs(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.ABS, toExpression(prop));
     }
 
-    public static <T> FunctionExpression<T> round(T prop, int scale) {
+    public static <T extends Number> FunctionExpression<T> abs(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.ABS, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<T> round(T prop, int scale) {
         return new FunctionExpression<>(BuiltinSqlFunction.ROUND, toExpression(prop), scale);
     }
 
-    public static <T> FunctionExpression<T> round(T prop) {
+    public static <T extends Number> FunctionExpression<T> round(SqlExpression<T> expr, int scale) {
+        return new FunctionExpression<>(BuiltinSqlFunction.ROUND, expr, scale);
+    }
+
+    public static <T extends Number> FunctionExpression<T> round(T prop) {
         return round(prop, 0);
     }
 
-    public static <T> FunctionExpression<T> ceil(T prop) {
+    public static <T extends Number> FunctionExpression<T> round(SqlExpression<T> expr) {
+        return round(expr, 0);
+    }
+
+    public static <T extends Number> FunctionExpression<T> ceil(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.CEIL, toExpression(prop));
     }
 
-    public static <T> FunctionExpression<T> ceiling(T prop) {
+    public static <T extends Number> FunctionExpression<T> ceil(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.CEIL, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<T> ceiling(T prop) {
         return ceil(prop);
     }
 
-    public static <T> FunctionExpression<T> floor(T prop) {
+    public static <T extends Number> FunctionExpression<T> ceiling(SqlExpression<T> expr) {
+        return ceil(expr);
+    }
+
+    public static <T extends Number> FunctionExpression<T> floor(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.FLOOR, toExpression(prop));
     }
 
-    public static <T> FunctionExpression<T> mod(T prop, Object divisor) {
+    public static <T extends Number> FunctionExpression<T> floor(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.FLOOR, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<T> mod(T prop, Number divisor) {
         return new FunctionExpression<>(BuiltinSqlFunction.MOD, toExpressions(prop, divisor));
     }
 
-    public static FunctionExpression<Double> sqrt(Object prop) {
+    public static <T extends Number> FunctionExpression<T> mod(T prop, SqlExpression<? extends Number> divisor) {
+        return new FunctionExpression<>(BuiltinSqlFunction.MOD, toExpressions(prop, divisor));
+    }
+
+    public static <T extends Number> FunctionExpression<T> mod(SqlExpression<T> expr, Number divisor) {
+        return new FunctionExpression<>(BuiltinSqlFunction.MOD, toExpressions(expr, divisor));
+    }
+
+    public static <T extends Number> FunctionExpression<T> mod(SqlExpression<T> expr, SqlExpression<? extends Number> divisor) {
+        return new FunctionExpression<>(BuiltinSqlFunction.MOD, toExpressions(expr, divisor));
+    }
+
+    public static <T extends Number> FunctionExpression<Double> sqrt(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.SQRT, toExpression(prop));
     }
 
-    public static FunctionExpression<Double> power(Object prop, Object exponent) {
+    public static <T extends Number> FunctionExpression<Double> sqrt(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.SQRT, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<Double> power(T prop, Number exponent) {
         return new FunctionExpression<>(BuiltinSqlFunction.POWER, toExpressions(prop, exponent));
     }
 
-    public static FunctionExpression<Integer> sign(Object prop) {
+    public static <T extends Number> FunctionExpression<Double> power(T prop, SqlExpression<? extends Number> exponent) {
+        return new FunctionExpression<>(BuiltinSqlFunction.POWER, toExpressions(prop, exponent));
+    }
+
+    public static <T extends Number> FunctionExpression<Double> power(SqlExpression<T> expr, Number exponent) {
+        return new FunctionExpression<>(BuiltinSqlFunction.POWER, toExpressions(expr, exponent));
+    }
+
+    public static <T extends Number> FunctionExpression<Double> power(SqlExpression<T> expr, SqlExpression<? extends Number> exponent) {
+        return new FunctionExpression<>(BuiltinSqlFunction.POWER, toExpressions(expr, exponent));
+    }
+
+    public static <T extends Number> FunctionExpression<Integer> sign(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.SIGN, toExpression(prop));
     }
 
-    public static <T> FunctionExpression<T> truncate(T prop, int scale) {
+    public static <T extends Number> FunctionExpression<Integer> sign(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.SIGN, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<T> truncate(T prop, int scale) {
         return new FunctionExpression<>(BuiltinSqlFunction.TRUNCATE, toExpression(prop), scale);
     }
 
-    public static <T> FunctionExpression<T> trunc(T prop, int scale) {
+    public static <T extends Number> FunctionExpression<T> truncate(SqlExpression<T> expr, int scale) {
+        return new FunctionExpression<>(BuiltinSqlFunction.TRUNCATE, expr, scale);
+    }
+
+    public static <T extends Number> FunctionExpression<T> trunc(T prop, int scale) {
         return truncate(prop, scale);
     }
 
-    public static <T> FunctionExpression<T> trunc(T prop) {
+    public static <T extends Number> FunctionExpression<T> trunc(SqlExpression<T> expr, int scale) {
+        return truncate(expr, scale);
+    }
+
+    public static <T extends Number> FunctionExpression<T> trunc(T prop) {
         return truncate(prop, 0);
     }
 
-    public static FunctionExpression<Double> exp(Object prop) {
+    public static <T extends Number> FunctionExpression<T> trunc(SqlExpression<T> expr) {
+        return truncate(expr, 0);
+    }
+
+    public static <T extends Number> FunctionExpression<Double> exp(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.EXP, toExpression(prop));
     }
 
-    public static FunctionExpression<Double> ln(Object prop) {
+    public static <T extends Number> FunctionExpression<Double> exp(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.EXP, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<Double> ln(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.LN, toExpression(prop));
     }
 
-    public static FunctionExpression<Double> log(Object prop) {
+    public static <T extends Number> FunctionExpression<Double> ln(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.LN, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<Double> log(T prop) {
         return ln(prop);
     }
 
-    public static FunctionExpression<Double> log(Object base, Object prop) {
+    public static <T extends Number> FunctionExpression<Double> log(SqlExpression<T> expr) {
+        return ln(expr);
+    }
+
+    public static <T extends Number> FunctionExpression<Double> log(Number base, T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.LOG, toExpressions(base, prop));
+    }
+
+    public static <T extends Number> FunctionExpression<Double> log(Number base, SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.LOG, toExpressions(base, expr));
     }
 
     public static FunctionExpression<Double> pi() {
         return new FunctionExpression<>(BuiltinSqlFunction.PI);
     }
 
-    public static FunctionExpression<Double> sin(Object prop) {
+    public static <T extends Number> FunctionExpression<Double> sin(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.SIN, toExpression(prop));
     }
 
-    public static FunctionExpression<Double> cos(Object prop) {
+    public static <T extends Number> FunctionExpression<Double> sin(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.SIN, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<Double> cos(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.COS, toExpression(prop));
     }
 
-    public static FunctionExpression<Double> tan(Object prop) {
+    public static <T extends Number> FunctionExpression<Double> cos(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.COS, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<Double> tan(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.TAN, toExpression(prop));
     }
 
-    public static FunctionExpression<Double> asin(Object prop) {
+    public static <T extends Number> FunctionExpression<Double> tan(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.TAN, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<Double> asin(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.ASIN, toExpression(prop));
     }
 
-    public static FunctionExpression<Double> acos(Object prop) {
+    public static <T extends Number> FunctionExpression<Double> asin(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.ASIN, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<Double> acos(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.ACOS, toExpression(prop));
     }
 
-    public static FunctionExpression<Double> atan(Object prop) {
+    public static <T extends Number> FunctionExpression<Double> acos(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.ACOS, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<Double> atan(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.ATAN, toExpression(prop));
     }
 
-    public static FunctionExpression<Double> degrees(Object prop) {
+    public static <T extends Number> FunctionExpression<Double> atan(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.ATAN, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<Double> degrees(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.DEGREES, toExpression(prop));
     }
 
-    public static FunctionExpression<Double> radians(Object prop) {
+    public static <T extends Number> FunctionExpression<Double> degrees(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.DEGREES, expr);
+    }
+
+    public static <T extends Number> FunctionExpression<Double> radians(T prop) {
         return new FunctionExpression<>(BuiltinSqlFunction.RADIANS, toExpression(prop));
+    }
+
+    public static <T extends Number> FunctionExpression<Double> radians(SqlExpression<T> expr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.RADIANS, expr);
     }
 
     // ==================== 空值控制与条件分支 ====================
@@ -713,12 +983,12 @@ public class SQL {
     }
 
     @SafeVarargs
-    public static <T> FunctionExpression<T> greatest(T... props) {
+    public static <T extends Comparable<? super T>> FunctionExpression<T> greatest(T... props) {
         return new FunctionExpression<>(BuiltinSqlFunction.GREATEST, toExpressions((Object[]) props));
     }
 
     @SafeVarargs
-    public static <T> FunctionExpression<T> least(T... props) {
+    public static <T extends Comparable<? super T>> FunctionExpression<T> least(T... props) {
         return new FunctionExpression<>(BuiltinSqlFunction.LEAST, toExpressions((Object[]) props));
     }
 
@@ -730,7 +1000,7 @@ public class SQL {
         return new CaseWhenBuilder<>(condition, thenVal);
     }
 
-    public static <T> CaseWhenBuilder<T> caseWhen(Object prop, com.javaorm.core.operator.SqlOperator op, Object val, T thenVal) {
+    public static <R, T> CaseWhenBuilder<T> caseWhen(R prop, com.javaorm.core.operator.SqlOperator op, R val, T thenVal) {
         return new CaseWhenBuilder<>(prop, op, val, thenVal);
     }
 
@@ -742,27 +1012,43 @@ public class SQL {
         return iif(condition, trueVal, falseVal);
     }
 
-    public static <T> FunctionExpression<T> cast(Object prop, String targetType) {
+    public static <T, S> FunctionExpression<T> cast(S prop, String targetType) {
         return new FunctionExpression<>(BuiltinSqlFunction.CAST, toExpression(prop), targetType);
     }
 
-    public static FunctionExpression<String> castAsChar(Object prop) {
+    public static <T> FunctionExpression<String> castAsChar(T prop) {
         return cast(prop, "CHAR");
     }
 
-    public static FunctionExpression<Long> castAsInt(Object prop) {
+    public static <T> FunctionExpression<Long> castAsInt(T prop) {
         return cast(prop, "SIGNED");
     }
 
-    public static FunctionExpression<java.math.BigDecimal> castAsDecimal(Object prop, int precision, int scale) {
+    public static <T> FunctionExpression<java.math.BigDecimal> castAsDecimal(T prop, int precision, int scale) {
         return cast(prop, "DECIMAL(" + precision + "," + scale + ")");
     }
 
-    public static FunctionExpression<java.util.Date> castAsDate(Object prop) {
+    public static <T> FunctionExpression<java.util.Date> castAsDate(T prop) {
         return cast(prop, "DATE");
     }
 
     // ==================== 子查询与原生片段 ====================
+    public static <T> SubQueryExpression<T> subQuery(com.javaorm.core.query.Query<T> query) {
+        return new SubQueryExpression<>(query);
+    }
+
+    public static <T> SubQueryExpression<T> subQuery(com.javaorm.core.query.WhereBuilder<T> whereBuilder) {
+        return new SubQueryExpression<>(whereBuilder);
+    }
+
+    public static <T> SubQueryExpression<T> subQuery(SqlExpression<T> expr) {
+        return new SubQueryExpression<>(expr);
+    }
+
+    public static <T> SubQueryExpression<T> subQuery(String rawSql) {
+        return new SubQueryExpression<>(rawSql);
+    }
+
     public static <T> SubQueryExpression<T> subQuery(Object query) {
         return new SubQueryExpression<>(query);
     }

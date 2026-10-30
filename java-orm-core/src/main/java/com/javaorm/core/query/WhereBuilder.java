@@ -343,6 +343,41 @@ public class WhereBuilder<T> {
         return this;
     }
 
+    public WhereBuilder<T> andExists(Query<?> subQuery) {
+        return andExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> andExists(boolean condition, Query<?> subQuery) {
+        return andExists(condition, (Object) subQuery);
+    }
+
+    public WhereBuilder<T> andExists(WhereBuilder<?> subQuery) {
+        return andExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> andExists(boolean condition, WhereBuilder<?> subQuery) {
+        return andExists(condition, (Object) subQuery);
+    }
+
+    public WhereBuilder<T> andExists(SqlExpression<?> subQuery) {
+        return andExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> andExists(boolean condition, SqlExpression<?> subQuery) {
+        return andExists(condition, (Object) subQuery);
+    }
+
+    public WhereBuilder<T> andExists(String rawSql, Object... params) {
+        return andExists(true, rawSql, params);
+    }
+
+    public WhereBuilder<T> andExists(boolean condition, String rawSql, Object... params) {
+        if (!condition) {
+            return this;
+        }
+        return andExists(condition, (Object) new RawSqlExpression<>(rawSql, params));
+    }
+
     public WhereBuilder<T> andExists(Object subQuery) {
         return andExists(true, subQuery);
     }
@@ -355,6 +390,41 @@ public class WhereBuilder<T> {
         cond.setLogicalOperator(LogicalOperator.AND);
         conditionReceiver.accept(cond);
         return this;
+    }
+
+    public WhereBuilder<T> andNotExists(Query<?> subQuery) {
+        return andNotExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> andNotExists(boolean condition, Query<?> subQuery) {
+        return andNotExists(condition, (Object) subQuery);
+    }
+
+    public WhereBuilder<T> andNotExists(WhereBuilder<?> subQuery) {
+        return andNotExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> andNotExists(boolean condition, WhereBuilder<?> subQuery) {
+        return andNotExists(condition, (Object) subQuery);
+    }
+
+    public WhereBuilder<T> andNotExists(SqlExpression<?> subQuery) {
+        return andNotExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> andNotExists(boolean condition, SqlExpression<?> subQuery) {
+        return andNotExists(condition, (Object) subQuery);
+    }
+
+    public WhereBuilder<T> andNotExists(String rawSql, Object... params) {
+        return andNotExists(true, rawSql, params);
+    }
+
+    public WhereBuilder<T> andNotExists(boolean condition, String rawSql, Object... params) {
+        if (!condition) {
+            return this;
+        }
+        return andNotExists(condition, (Object) new RawSqlExpression<>(rawSql, params));
     }
 
     public WhereBuilder<T> andNotExists(Object subQuery) {
@@ -371,6 +441,41 @@ public class WhereBuilder<T> {
         return this;
     }
 
+    public WhereBuilder<T> orExists(Query<?> subQuery) {
+        return orExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> orExists(boolean condition, Query<?> subQuery) {
+        return orExists(condition, (Object) subQuery);
+    }
+
+    public WhereBuilder<T> orExists(WhereBuilder<?> subQuery) {
+        return orExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> orExists(boolean condition, WhereBuilder<?> subQuery) {
+        return orExists(condition, (Object) subQuery);
+    }
+
+    public WhereBuilder<T> orExists(SqlExpression<?> subQuery) {
+        return orExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> orExists(boolean condition, SqlExpression<?> subQuery) {
+        return orExists(condition, (Object) subQuery);
+    }
+
+    public WhereBuilder<T> orExists(String rawSql, Object... params) {
+        return orExists(true, rawSql, params);
+    }
+
+    public WhereBuilder<T> orExists(boolean condition, String rawSql, Object... params) {
+        if (!condition) {
+            return this;
+        }
+        return orExists(condition, (Object) new RawSqlExpression<>(rawSql, params));
+    }
+
     public WhereBuilder<T> orExists(Object subQuery) {
         return orExists(true, subQuery);
     }
@@ -383,6 +488,41 @@ public class WhereBuilder<T> {
         cond.setLogicalOperator(LogicalOperator.OR);
         conditionReceiver.accept(cond);
         return this;
+    }
+
+    public WhereBuilder<T> orNotExists(Query<?> subQuery) {
+        return orNotExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> orNotExists(boolean condition, Query<?> subQuery) {
+        return orNotExists(condition, (Object) subQuery);
+    }
+
+    public WhereBuilder<T> orNotExists(WhereBuilder<?> subQuery) {
+        return orNotExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> orNotExists(boolean condition, WhereBuilder<?> subQuery) {
+        return orNotExists(condition, (Object) subQuery);
+    }
+
+    public WhereBuilder<T> orNotExists(SqlExpression<?> subQuery) {
+        return orNotExists(true, subQuery);
+    }
+
+    public WhereBuilder<T> orNotExists(boolean condition, SqlExpression<?> subQuery) {
+        return orNotExists(condition, (Object) subQuery);
+    }
+
+    public WhereBuilder<T> orNotExists(String rawSql, Object... params) {
+        return orNotExists(true, rawSql, params);
+    }
+
+    public WhereBuilder<T> orNotExists(boolean condition, String rawSql, Object... params) {
+        if (!condition) {
+            return this;
+        }
+        return orNotExists(condition, (Object) new RawSqlExpression<>(rawSql, params));
     }
 
     public WhereBuilder<T> orNotExists(Object subQuery) {
@@ -470,255 +610,879 @@ public class WhereBuilder<T> {
     // ==================== 快捷扁平断言语法 (eq, ne, gt, ge, lt, le, like 等) ====================
 
     // --- eq ---
-    public <R> WhereBuilder<T> eq(R propOrExpr, Object val) {
+    public <R> WhereBuilder<T> eq(R propOrExpr, R val) {
         return eq(true, propOrExpr, val);
     }
-    public <R> WhereBuilder<T> eq(boolean condition, R propOrExpr, Object val) {
+    public <R> WhereBuilder<T> eq(boolean condition, R propOrExpr, R val) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.EQ, val);
     }
-    public <R> WhereBuilder<T> eq(SqlExpression<R> expr, Object val) {
+    public <R extends Number> WhereBuilder<T> eq(R propOrExpr, Number val, Object... dummy) {
+        return eq(true, propOrExpr, val);
+    }
+    public <R extends Number> WhereBuilder<T> eq(boolean condition, R propOrExpr, Number val, Object... dummy) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.EQ, val);
+    }
+    public <R> WhereBuilder<T> eq(R propOrExpr, SqlExpression<? extends R> val) {
+        return eq(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> eq(boolean condition, R propOrExpr, SqlExpression<? extends R> val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.EQ, val);
+    }
+    public <R> WhereBuilder<T> eq(R propOrExpr, Query<?> subQuery) {
+        return eq(true, propOrExpr, subQuery);
+    }
+    public <R> WhereBuilder<T> eq(boolean condition, R propOrExpr, Query<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.EQ, subQuery);
+    }
+    public <R> WhereBuilder<T> eq(R propOrExpr, WhereBuilder<?> subQuery) {
+        return eq(true, propOrExpr, subQuery);
+    }
+    public <R> WhereBuilder<T> eq(boolean condition, R propOrExpr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.EQ, subQuery);
+    }
+
+    public <R> WhereBuilder<T> eq(SqlExpression<R> expr, SqlExpression<? extends R> val) {
         return eq(true, expr, val);
     }
-    public <R> WhereBuilder<T> eq(boolean condition, SqlExpression<R> expr, Object val) {
+    public <R> WhereBuilder<T> eq(boolean condition, SqlExpression<R> expr, SqlExpression<? extends R> val) {
         return executeFlatCondition(condition, expr, SqlOperator.EQ, val);
     }
-    public WhereBuilder<T> eq(String propertyOrColumn, Object val) {
-        return eq(true, propertyOrColumn, val);
+    public <R> WhereBuilder<T> eq(SqlExpression<R> expr, R val, Object... dummy) {
+        return eq(true, expr, val);
     }
-    public WhereBuilder<T> eq(boolean condition, String propertyOrColumn, Object val) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.EQ, val);
+    public <R> WhereBuilder<T> eq(boolean condition, SqlExpression<R> expr, R val, Object... dummy) {
+        return executeFlatCondition(condition, expr, SqlOperator.EQ, val);
     }
+    public <R> WhereBuilder<T> eq(SqlExpression<R> expr, Query<?> subQuery) {
+        return eq(true, expr, subQuery);
+    }
+    public <R> WhereBuilder<T> eq(boolean condition, SqlExpression<R> expr, Query<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.EQ, subQuery);
+    }
+    public <R> WhereBuilder<T> eq(SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return eq(true, expr, subQuery);
+    }
+    public <R> WhereBuilder<T> eq(boolean condition, SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.EQ, subQuery);
+    }
+
     public <R> WhereBuilder<T> eq(Function<T, R> getter, R val) {
         return eq(true, getter, val);
     }
     public <R> WhereBuilder<T> eq(boolean condition, Function<T, R> getter, R val) {
         return executeFlatCondition(condition, getter, SqlOperator.EQ, val);
     }
+    public <R extends Number> WhereBuilder<T> eq(Function<T, R> getter, Number val, Object... dummy) {
+        return eq(true, getter, val);
+    }
+    public <R extends Number> WhereBuilder<T> eq(boolean condition, Function<T, R> getter, Number val, Object... dummy) {
+        return executeFlatCondition(condition, getter, SqlOperator.EQ, val);
+    }
+    public <R> WhereBuilder<T> eq(Function<T, R> getter, SqlExpression<? extends R> val) {
+        return eq(true, getter, val);
+    }
+    public <R> WhereBuilder<T> eq(boolean condition, Function<T, R> getter, SqlExpression<? extends R> val) {
+        return executeFlatCondition(condition, getter, SqlOperator.EQ, val);
+    }
+    public <R> WhereBuilder<T> eq(Function<T, R> getter, Query<?> subQuery) {
+        return eq(true, getter, subQuery);
+    }
+    public <R> WhereBuilder<T> eq(boolean condition, Function<T, R> getter, Query<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.EQ, subQuery);
+    }
+    public <R> WhereBuilder<T> eq(Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return eq(true, getter, subQuery);
+    }
+    public <R> WhereBuilder<T> eq(boolean condition, Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.EQ, subQuery);
+    }
+
+    public <R> WhereBuilder<T> eq(String propertyOrColumn, R val) {
+        return eq(true, propertyOrColumn, val);
+    }
+    public <R> WhereBuilder<T> eq(boolean condition, String propertyOrColumn, R val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.EQ, val);
+    }
+    public WhereBuilder<T> eq(String propertyOrColumn, SqlExpression<?> val) {
+        return eq(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> eq(boolean condition, String propertyOrColumn, SqlExpression<?> val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.EQ, val);
+    }
+    public WhereBuilder<T> eq(String propertyOrColumn, Query<?> subQuery) {
+        return eq(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> eq(boolean condition, String propertyOrColumn, Query<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.EQ, subQuery);
+    }
+    public WhereBuilder<T> eq(String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return eq(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> eq(boolean condition, String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.EQ, subQuery);
+    }
 
     // --- ne ---
-    public <R> WhereBuilder<T> ne(R propOrExpr, Object val) {
+    public <R> WhereBuilder<T> ne(R propOrExpr, R val) {
         return ne(true, propOrExpr, val);
     }
-    public <R> WhereBuilder<T> ne(boolean condition, R propOrExpr, Object val) {
+    public <R> WhereBuilder<T> ne(boolean condition, R propOrExpr, R val) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.NE, val);
     }
-    public <R> WhereBuilder<T> ne(SqlExpression<R> expr, Object val) {
+    public <R extends Number> WhereBuilder<T> ne(R propOrExpr, Number val, Object... dummy) {
+        return ne(true, propOrExpr, val);
+    }
+    public <R extends Number> WhereBuilder<T> ne(boolean condition, R propOrExpr, Number val, Object... dummy) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NE, val);
+    }
+    public <R> WhereBuilder<T> ne(R propOrExpr, SqlExpression<? extends R> val) {
+        return ne(true, propOrExpr, val);
+    }
+    public <R> WhereBuilder<T> ne(boolean condition, R propOrExpr, SqlExpression<? extends R> val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NE, val);
+    }
+    public <R> WhereBuilder<T> ne(R propOrExpr, Query<?> subQuery) {
+        return ne(true, propOrExpr, subQuery);
+    }
+    public <R> WhereBuilder<T> ne(boolean condition, R propOrExpr, Query<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NE, subQuery);
+    }
+    public <R> WhereBuilder<T> ne(R propOrExpr, WhereBuilder<?> subQuery) {
+        return ne(true, propOrExpr, subQuery);
+    }
+    public <R> WhereBuilder<T> ne(boolean condition, R propOrExpr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NE, subQuery);
+    }
+
+    public <R> WhereBuilder<T> ne(SqlExpression<R> expr, SqlExpression<? extends R> val) {
         return ne(true, expr, val);
     }
-    public <R> WhereBuilder<T> ne(boolean condition, SqlExpression<R> expr, Object val) {
+    public <R> WhereBuilder<T> ne(boolean condition, SqlExpression<R> expr, SqlExpression<? extends R> val) {
         return executeFlatCondition(condition, expr, SqlOperator.NE, val);
     }
-    public WhereBuilder<T> ne(String propertyOrColumn, Object val) {
-        return ne(true, propertyOrColumn, val);
+    public <R> WhereBuilder<T> ne(SqlExpression<R> expr, R val, Object... dummy) {
+        return ne(true, expr, val);
     }
-    public WhereBuilder<T> ne(boolean condition, String propertyOrColumn, Object val) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NE, val);
+    public <R> WhereBuilder<T> ne(boolean condition, SqlExpression<R> expr, R val, Object... dummy) {
+        return executeFlatCondition(condition, expr, SqlOperator.NE, val);
     }
+    public <R> WhereBuilder<T> ne(SqlExpression<R> expr, Query<?> subQuery) {
+        return ne(true, expr, subQuery);
+    }
+    public <R> WhereBuilder<T> ne(boolean condition, SqlExpression<R> expr, Query<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.NE, subQuery);
+    }
+    public <R> WhereBuilder<T> ne(SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return ne(true, expr, subQuery);
+    }
+    public <R> WhereBuilder<T> ne(boolean condition, SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.NE, subQuery);
+    }
+
     public <R> WhereBuilder<T> ne(Function<T, R> getter, R val) {
         return ne(true, getter, val);
     }
     public <R> WhereBuilder<T> ne(boolean condition, Function<T, R> getter, R val) {
         return executeFlatCondition(condition, getter, SqlOperator.NE, val);
     }
+    public <R extends Number> WhereBuilder<T> ne(Function<T, R> getter, Number val, Object... dummy) {
+        return ne(true, getter, val);
+    }
+    public <R extends Number> WhereBuilder<T> ne(boolean condition, Function<T, R> getter, Number val, Object... dummy) {
+        return executeFlatCondition(condition, getter, SqlOperator.NE, val);
+    }
+    public <R> WhereBuilder<T> ne(Function<T, R> getter, SqlExpression<? extends R> val) {
+        return ne(true, getter, val);
+    }
+    public <R> WhereBuilder<T> ne(boolean condition, Function<T, R> getter, SqlExpression<? extends R> val) {
+        return executeFlatCondition(condition, getter, SqlOperator.NE, val);
+    }
+    public <R> WhereBuilder<T> ne(Function<T, R> getter, Query<?> subQuery) {
+        return ne(true, getter, subQuery);
+    }
+    public <R> WhereBuilder<T> ne(boolean condition, Function<T, R> getter, Query<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.NE, subQuery);
+    }
+    public <R> WhereBuilder<T> ne(Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return ne(true, getter, subQuery);
+    }
+    public <R> WhereBuilder<T> ne(boolean condition, Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.NE, subQuery);
+    }
+
+    public <R> WhereBuilder<T> ne(String propertyOrColumn, R val) {
+        return ne(true, propertyOrColumn, val);
+    }
+    public <R> WhereBuilder<T> ne(boolean condition, String propertyOrColumn, R val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NE, val);
+    }
+    public WhereBuilder<T> ne(String propertyOrColumn, SqlExpression<?> val) {
+        return ne(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> ne(boolean condition, String propertyOrColumn, SqlExpression<?> val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NE, val);
+    }
+    public WhereBuilder<T> ne(String propertyOrColumn, Query<?> subQuery) {
+        return ne(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> ne(boolean condition, String propertyOrColumn, Query<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NE, subQuery);
+    }
+    public WhereBuilder<T> ne(String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return ne(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> ne(boolean condition, String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NE, subQuery);
+    }
 
     // --- gt ---
-    public <R> WhereBuilder<T> gt(R propOrExpr, Object val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(R propOrExpr, R val) {
         return gt(true, propOrExpr, val);
     }
-    public <R> WhereBuilder<T> gt(boolean condition, R propOrExpr, Object val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, R propOrExpr, R val) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.GT, val);
     }
-    public <R> WhereBuilder<T> gt(SqlExpression<R> expr, Object val) {
+    public <R extends Number & Comparable<?>> WhereBuilder<T> gt(R propOrExpr, Number val, Object... dummy) {
+        return gt(true, propOrExpr, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> gt(boolean condition, R propOrExpr, Number val, Object... dummy) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.GT, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(R propOrExpr, SqlExpression<? extends R> val) {
+        return gt(true, propOrExpr, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, R propOrExpr, SqlExpression<? extends R> val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.GT, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(R propOrExpr, Query<?> subQuery) {
+        return gt(true, propOrExpr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, R propOrExpr, Query<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.GT, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(R propOrExpr, WhereBuilder<?> subQuery) {
+        return gt(true, propOrExpr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, R propOrExpr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.GT, subQuery);
+    }
+
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(SqlExpression<R> expr, SqlExpression<? extends R> val) {
         return gt(true, expr, val);
     }
-    public <R> WhereBuilder<T> gt(boolean condition, SqlExpression<R> expr, Object val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, SqlExpression<R> expr, SqlExpression<? extends R> val) {
         return executeFlatCondition(condition, expr, SqlOperator.GT, val);
     }
-    public WhereBuilder<T> gt(String propertyOrColumn, Object val) {
-        return gt(true, propertyOrColumn, val);
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(SqlExpression<R> expr, R val) {
+        return gt(true, expr, val);
     }
-    public WhereBuilder<T> gt(boolean condition, String propertyOrColumn, Object val) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.GT, val);
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, SqlExpression<R> expr, R val) {
+        return executeFlatCondition(condition, expr, SqlOperator.GT, val);
     }
-    public <R> WhereBuilder<T> gt(Function<T, R> getter, R val) {
+    public <R extends Number & Comparable<?>> WhereBuilder<T> gt(SqlExpression<R> expr, Number val, Object... dummy) {
+        return gt(true, expr, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> gt(boolean condition, SqlExpression<R> expr, Number val, Object... dummy) {
+        return executeFlatCondition(condition, expr, SqlOperator.GT, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(SqlExpression<R> expr, Query<?> subQuery) {
+        return gt(true, expr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, SqlExpression<R> expr, Query<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.GT, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return gt(true, expr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.GT, subQuery);
+    }
+
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(Function<T, R> getter, R val) {
         return gt(true, getter, val);
     }
-    public <R> WhereBuilder<T> gt(boolean condition, Function<T, R> getter, R val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, Function<T, R> getter, R val) {
         return executeFlatCondition(condition, getter, SqlOperator.GT, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> gt(Function<T, R> getter, Number val, Object... dummy) {
+        return gt(true, getter, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> gt(boolean condition, Function<T, R> getter, Number val, Object... dummy) {
+        return executeFlatCondition(condition, getter, SqlOperator.GT, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(Function<T, R> getter, SqlExpression<? extends R> val) {
+        return gt(true, getter, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, Function<T, R> getter, SqlExpression<? extends R> val) {
+        return executeFlatCondition(condition, getter, SqlOperator.GT, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(Function<T, R> getter, Query<?> subQuery) {
+        return gt(true, getter, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, Function<T, R> getter, Query<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.GT, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return gt(true, getter, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.GT, subQuery);
+    }
+
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(String propertyOrColumn, R val) {
+        return gt(true, propertyOrColumn, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> gt(boolean condition, String propertyOrColumn, R val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.GT, val);
+    }
+    public WhereBuilder<T> gt(String propertyOrColumn, SqlExpression<?> val) {
+        return gt(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> gt(boolean condition, String propertyOrColumn, SqlExpression<?> val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.GT, val);
+    }
+    public WhereBuilder<T> gt(String propertyOrColumn, Query<?> subQuery) {
+        return gt(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> gt(boolean condition, String propertyOrColumn, Query<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.GT, subQuery);
+    }
+    public WhereBuilder<T> gt(String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return gt(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> gt(boolean condition, String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.GT, subQuery);
     }
 
     // --- ge ---
-    public <R> WhereBuilder<T> ge(R propOrExpr, Object val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(R propOrExpr, R val) {
         return ge(true, propOrExpr, val);
     }
-    public <R> WhereBuilder<T> ge(boolean condition, R propOrExpr, Object val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, R propOrExpr, R val) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.GE, val);
     }
-    public <R> WhereBuilder<T> ge(SqlExpression<R> expr, Object val) {
+    public <R extends Number & Comparable<?>> WhereBuilder<T> ge(R propOrExpr, Number val, Object... dummy) {
+        return ge(true, propOrExpr, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> ge(boolean condition, R propOrExpr, Number val, Object... dummy) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.GE, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(R propOrExpr, SqlExpression<? extends R> val) {
+        return ge(true, propOrExpr, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, R propOrExpr, SqlExpression<? extends R> val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.GE, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(R propOrExpr, Query<?> subQuery) {
+        return ge(true, propOrExpr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, R propOrExpr, Query<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.GE, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(R propOrExpr, WhereBuilder<?> subQuery) {
+        return ge(true, propOrExpr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, R propOrExpr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.GE, subQuery);
+    }
+
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(SqlExpression<R> expr, SqlExpression<? extends R> val) {
         return ge(true, expr, val);
     }
-    public <R> WhereBuilder<T> ge(boolean condition, SqlExpression<R> expr, Object val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, SqlExpression<R> expr, SqlExpression<? extends R> val) {
         return executeFlatCondition(condition, expr, SqlOperator.GE, val);
     }
-    public WhereBuilder<T> ge(String propertyOrColumn, Object val) {
-        return ge(true, propertyOrColumn, val);
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(SqlExpression<R> expr, R val) {
+        return ge(true, expr, val);
     }
-    public WhereBuilder<T> ge(boolean condition, String propertyOrColumn, Object val) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.GE, val);
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, SqlExpression<R> expr, R val) {
+        return executeFlatCondition(condition, expr, SqlOperator.GE, val);
     }
-    public <R> WhereBuilder<T> ge(Function<T, R> getter, R val) {
+    public <R extends Number & Comparable<?>> WhereBuilder<T> ge(SqlExpression<R> expr, Number val, Object... dummy) {
+        return ge(true, expr, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> ge(boolean condition, SqlExpression<R> expr, Number val, Object... dummy) {
+        return executeFlatCondition(condition, expr, SqlOperator.GE, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(SqlExpression<R> expr, Query<?> subQuery) {
+        return ge(true, expr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, SqlExpression<R> expr, Query<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.GE, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return ge(true, expr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.GE, subQuery);
+    }
+
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(Function<T, R> getter, R val) {
         return ge(true, getter, val);
     }
-    public <R> WhereBuilder<T> ge(boolean condition, Function<T, R> getter, R val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, Function<T, R> getter, R val) {
         return executeFlatCondition(condition, getter, SqlOperator.GE, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> ge(Function<T, R> getter, Number val, Object... dummy) {
+        return ge(true, getter, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> ge(boolean condition, Function<T, R> getter, Number val, Object... dummy) {
+        return executeFlatCondition(condition, getter, SqlOperator.GE, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(Function<T, R> getter, SqlExpression<? extends R> val) {
+        return ge(true, getter, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, Function<T, R> getter, SqlExpression<? extends R> val) {
+        return executeFlatCondition(condition, getter, SqlOperator.GE, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(Function<T, R> getter, Query<?> subQuery) {
+        return ge(true, getter, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, Function<T, R> getter, Query<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.GE, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return ge(true, getter, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.GE, subQuery);
+    }
+
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(String propertyOrColumn, R val) {
+        return ge(true, propertyOrColumn, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> ge(boolean condition, String propertyOrColumn, R val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.GE, val);
+    }
+    public WhereBuilder<T> ge(String propertyOrColumn, SqlExpression<?> val) {
+        return ge(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> ge(boolean condition, String propertyOrColumn, SqlExpression<?> val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.GE, val);
+    }
+    public WhereBuilder<T> ge(String propertyOrColumn, Query<?> subQuery) {
+        return ge(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> ge(boolean condition, String propertyOrColumn, Query<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.GE, subQuery);
+    }
+    public WhereBuilder<T> ge(String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return ge(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> ge(boolean condition, String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.GE, subQuery);
     }
 
     // --- lt ---
-    public <R> WhereBuilder<T> lt(R propOrExpr, Object val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(R propOrExpr, R val) {
         return lt(true, propOrExpr, val);
     }
-    public <R> WhereBuilder<T> lt(boolean condition, R propOrExpr, Object val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, R propOrExpr, R val) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.LT, val);
     }
-    public <R> WhereBuilder<T> lt(SqlExpression<R> expr, Object val) {
+    public <R extends Number & Comparable<?>> WhereBuilder<T> lt(R propOrExpr, Number val, Object... dummy) {
+        return lt(true, propOrExpr, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> lt(boolean condition, R propOrExpr, Number val, Object... dummy) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LT, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(R propOrExpr, SqlExpression<? extends R> val) {
+        return lt(true, propOrExpr, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, R propOrExpr, SqlExpression<? extends R> val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LT, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(R propOrExpr, Query<?> subQuery) {
+        return lt(true, propOrExpr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, R propOrExpr, Query<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LT, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(R propOrExpr, WhereBuilder<?> subQuery) {
+        return lt(true, propOrExpr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, R propOrExpr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LT, subQuery);
+    }
+
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(SqlExpression<R> expr, SqlExpression<? extends R> val) {
         return lt(true, expr, val);
     }
-    public <R> WhereBuilder<T> lt(boolean condition, SqlExpression<R> expr, Object val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, SqlExpression<R> expr, SqlExpression<? extends R> val) {
         return executeFlatCondition(condition, expr, SqlOperator.LT, val);
     }
-    public WhereBuilder<T> lt(String propertyOrColumn, Object val) {
-        return lt(true, propertyOrColumn, val);
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(SqlExpression<R> expr, R val) {
+        return lt(true, expr, val);
     }
-    public WhereBuilder<T> lt(boolean condition, String propertyOrColumn, Object val) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LT, val);
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, SqlExpression<R> expr, R val) {
+        return executeFlatCondition(condition, expr, SqlOperator.LT, val);
     }
-    public <R> WhereBuilder<T> lt(Function<T, R> getter, R val) {
+    public <R extends Number & Comparable<?>> WhereBuilder<T> lt(SqlExpression<R> expr, Number val, Object... dummy) {
+        return lt(true, expr, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> lt(boolean condition, SqlExpression<R> expr, Number val, Object... dummy) {
+        return executeFlatCondition(condition, expr, SqlOperator.LT, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(SqlExpression<R> expr, Query<?> subQuery) {
+        return lt(true, expr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, SqlExpression<R> expr, Query<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.LT, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return lt(true, expr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.LT, subQuery);
+    }
+
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(Function<T, R> getter, R val) {
         return lt(true, getter, val);
     }
-    public <R> WhereBuilder<T> lt(boolean condition, Function<T, R> getter, R val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, Function<T, R> getter, R val) {
         return executeFlatCondition(condition, getter, SqlOperator.LT, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> lt(Function<T, R> getter, Number val, Object... dummy) {
+        return lt(true, getter, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> lt(boolean condition, Function<T, R> getter, Number val, Object... dummy) {
+        return executeFlatCondition(condition, getter, SqlOperator.LT, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(Function<T, R> getter, SqlExpression<? extends R> val) {
+        return lt(true, getter, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, Function<T, R> getter, SqlExpression<? extends R> val) {
+        return executeFlatCondition(condition, getter, SqlOperator.LT, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(Function<T, R> getter, Query<?> subQuery) {
+        return lt(true, getter, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, Function<T, R> getter, Query<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.LT, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return lt(true, getter, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.LT, subQuery);
+    }
+
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(String propertyOrColumn, R val) {
+        return lt(true, propertyOrColumn, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> lt(boolean condition, String propertyOrColumn, R val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LT, val);
+    }
+    public WhereBuilder<T> lt(String propertyOrColumn, SqlExpression<?> val) {
+        return lt(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> lt(boolean condition, String propertyOrColumn, SqlExpression<?> val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LT, val);
+    }
+    public WhereBuilder<T> lt(String propertyOrColumn, Query<?> subQuery) {
+        return lt(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> lt(boolean condition, String propertyOrColumn, Query<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LT, subQuery);
+    }
+    public WhereBuilder<T> lt(String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return lt(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> lt(boolean condition, String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LT, subQuery);
     }
 
     // --- le ---
-    public <R> WhereBuilder<T> le(R propOrExpr, Object val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(R propOrExpr, R val) {
         return le(true, propOrExpr, val);
     }
-    public <R> WhereBuilder<T> le(boolean condition, R propOrExpr, Object val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, R propOrExpr, R val) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.LE, val);
     }
-    public <R> WhereBuilder<T> le(SqlExpression<R> expr, Object val) {
+    public <R extends Number & Comparable<?>> WhereBuilder<T> le(R propOrExpr, Number val, Object... dummy) {
+        return le(true, propOrExpr, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> le(boolean condition, R propOrExpr, Number val, Object... dummy) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LE, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(R propOrExpr, SqlExpression<? extends R> val) {
+        return le(true, propOrExpr, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, R propOrExpr, SqlExpression<? extends R> val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LE, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(R propOrExpr, Query<?> subQuery) {
+        return le(true, propOrExpr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, R propOrExpr, Query<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LE, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(R propOrExpr, WhereBuilder<?> subQuery) {
+        return le(true, propOrExpr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, R propOrExpr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LE, subQuery);
+    }
+
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(SqlExpression<R> expr, SqlExpression<? extends R> val) {
         return le(true, expr, val);
     }
-    public <R> WhereBuilder<T> le(boolean condition, SqlExpression<R> expr, Object val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, SqlExpression<R> expr, SqlExpression<? extends R> val) {
         return executeFlatCondition(condition, expr, SqlOperator.LE, val);
     }
-    public WhereBuilder<T> le(String propertyOrColumn, Object val) {
-        return le(true, propertyOrColumn, val);
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(SqlExpression<R> expr, R val) {
+        return le(true, expr, val);
     }
-    public WhereBuilder<T> le(boolean condition, String propertyOrColumn, Object val) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LE, val);
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, SqlExpression<R> expr, R val) {
+        return executeFlatCondition(condition, expr, SqlOperator.LE, val);
     }
-    public <R> WhereBuilder<T> le(Function<T, R> getter, R val) {
+    public <R extends Number & Comparable<?>> WhereBuilder<T> le(SqlExpression<R> expr, Number val, Object... dummy) {
+        return le(true, expr, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> le(boolean condition, SqlExpression<R> expr, Number val, Object... dummy) {
+        return executeFlatCondition(condition, expr, SqlOperator.LE, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(SqlExpression<R> expr, Query<?> subQuery) {
+        return le(true, expr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, SqlExpression<R> expr, Query<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.LE, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return le(true, expr, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.LE, subQuery);
+    }
+
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(Function<T, R> getter, R val) {
         return le(true, getter, val);
     }
-    public <R> WhereBuilder<T> le(boolean condition, Function<T, R> getter, R val) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, Function<T, R> getter, R val) {
         return executeFlatCondition(condition, getter, SqlOperator.LE, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> le(Function<T, R> getter, Number val, Object... dummy) {
+        return le(true, getter, val);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> le(boolean condition, Function<T, R> getter, Number val, Object... dummy) {
+        return executeFlatCondition(condition, getter, SqlOperator.LE, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(Function<T, R> getter, SqlExpression<? extends R> val) {
+        return le(true, getter, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, Function<T, R> getter, SqlExpression<? extends R> val) {
+        return executeFlatCondition(condition, getter, SqlOperator.LE, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(Function<T, R> getter, Query<?> subQuery) {
+        return le(true, getter, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, Function<T, R> getter, Query<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.LE, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return le(true, getter, subQuery);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.LE, subQuery);
+    }
+
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(String propertyOrColumn, R val) {
+        return le(true, propertyOrColumn, val);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> le(boolean condition, String propertyOrColumn, R val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LE, val);
+    }
+    public WhereBuilder<T> le(String propertyOrColumn, SqlExpression<?> val) {
+        return le(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> le(boolean condition, String propertyOrColumn, SqlExpression<?> val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LE, val);
+    }
+    public WhereBuilder<T> le(String propertyOrColumn, Query<?> subQuery) {
+        return le(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> le(boolean condition, String propertyOrColumn, Query<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LE, subQuery);
+    }
+    public WhereBuilder<T> le(String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return le(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> le(boolean condition, String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LE, subQuery);
     }
 
     // --- like ---
-    public <R> WhereBuilder<T> like(R propOrExpr, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> like(R propOrExpr, String val) {
         return like(true, propOrExpr, val);
     }
-    public <R> WhereBuilder<T> like(boolean condition, R propOrExpr, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> like(boolean condition, R propOrExpr, String val) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.LIKE, val);
     }
-    public WhereBuilder<T> like(String propertyOrColumn, Object val) {
-        return like(true, propertyOrColumn, val);
+    public <R extends CharSequence> WhereBuilder<T> like(R propOrExpr, SqlExpression<? extends CharSequence> val) {
+        return like(true, propOrExpr, val);
     }
-    public WhereBuilder<T> like(boolean condition, String propertyOrColumn, Object val) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, val);
+    public <R extends CharSequence> WhereBuilder<T> like(boolean condition, R propOrExpr, SqlExpression<? extends CharSequence> val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.LIKE, val);
     }
-    public <R> WhereBuilder<T> like(Function<T, R> getter, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> like(SqlExpression<R> expr, String val) {
+        return like(true, expr, val);
+    }
+    public <R extends CharSequence> WhereBuilder<T> like(boolean condition, SqlExpression<R> expr, String val) {
+        return executeFlatCondition(condition, expr, SqlOperator.LIKE, val);
+    }
+    public <R extends CharSequence> WhereBuilder<T> like(SqlExpression<R> expr, SqlExpression<? extends CharSequence> val) {
+        return like(true, expr, val);
+    }
+    public <R extends CharSequence> WhereBuilder<T> like(boolean condition, SqlExpression<R> expr, SqlExpression<? extends CharSequence> val) {
+        return executeFlatCondition(condition, expr, SqlOperator.LIKE, val);
+    }
+    public <R extends CharSequence> WhereBuilder<T> like(Function<T, R> getter, String val) {
         return like(true, getter, val);
     }
-    public <R> WhereBuilder<T> like(boolean condition, Function<T, R> getter, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> like(boolean condition, Function<T, R> getter, String val) {
         return executeFlatCondition(condition, getter, SqlOperator.LIKE, val);
     }
+    public <R extends CharSequence> WhereBuilder<T> like(Function<T, R> getter, SqlExpression<? extends CharSequence> val) {
+        return like(true, getter, val);
+    }
+    public <R extends CharSequence> WhereBuilder<T> like(boolean condition, Function<T, R> getter, SqlExpression<? extends CharSequence> val) {
+        return executeFlatCondition(condition, getter, SqlOperator.LIKE, val);
+    }
+    public WhereBuilder<T> like(String propertyOrColumn, String val) {
+        return like(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> like(boolean condition, String propertyOrColumn, String val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, val);
+    }
+    public WhereBuilder<T> like(String propertyOrColumn, SqlExpression<? extends CharSequence> val) {
+        return like(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> like(boolean condition, String propertyOrColumn, SqlExpression<? extends CharSequence> val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, val);
+    }
 
-    public <R> WhereBuilder<T> likeLeft(R propOrExpr, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> likeLeft(R propOrExpr, String val) {
         return likeLeft(true, propOrExpr, val);
     }
-    public <R> WhereBuilder<T> likeLeft(boolean condition, R propOrExpr, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> likeLeft(boolean condition, R propOrExpr, String val) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.LIKE, "%" + val);
     }
-    public WhereBuilder<T> likeLeft(String propertyOrColumn, Object val) {
-        return likeLeft(true, propertyOrColumn, val);
+    public <R extends CharSequence> WhereBuilder<T> likeLeft(SqlExpression<R> expr, String val) {
+        return likeLeft(true, expr, val);
     }
-    public WhereBuilder<T> likeLeft(boolean condition, String propertyOrColumn, Object val) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, "%" + val);
+    public <R extends CharSequence> WhereBuilder<T> likeLeft(boolean condition, SqlExpression<R> expr, String val) {
+        return executeFlatCondition(condition, expr, SqlOperator.LIKE, "%" + val);
     }
-    public <R> WhereBuilder<T> likeLeft(Function<T, R> getter, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> likeLeft(Function<T, R> getter, String val) {
         return likeLeft(true, getter, val);
     }
-    public <R> WhereBuilder<T> likeLeft(boolean condition, Function<T, R> getter, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> likeLeft(boolean condition, Function<T, R> getter, String val) {
         return executeFlatCondition(condition, getter, SqlOperator.LIKE, "%" + val);
     }
+    public WhereBuilder<T> likeLeft(String propertyOrColumn, String val) {
+        return likeLeft(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> likeLeft(boolean condition, String propertyOrColumn, String val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, "%" + val);
+    }
 
-    public <R> WhereBuilder<T> likeRight(R propOrExpr, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> likeRight(R propOrExpr, String val) {
         return likeRight(true, propOrExpr, val);
     }
-    public <R> WhereBuilder<T> likeRight(boolean condition, R propOrExpr, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> likeRight(boolean condition, R propOrExpr, String val) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.LIKE, val + "%");
     }
-    public WhereBuilder<T> likeRight(String propertyOrColumn, Object val) {
-        return likeRight(true, propertyOrColumn, val);
+    public <R extends CharSequence> WhereBuilder<T> likeRight(SqlExpression<R> expr, String val) {
+        return likeRight(true, expr, val);
     }
-    public WhereBuilder<T> likeRight(boolean condition, String propertyOrColumn, Object val) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, val + "%");
+    public <R extends CharSequence> WhereBuilder<T> likeRight(boolean condition, SqlExpression<R> expr, String val) {
+        return executeFlatCondition(condition, expr, SqlOperator.LIKE, val + "%");
     }
-    public <R> WhereBuilder<T> likeRight(Function<T, R> getter, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> likeRight(Function<T, R> getter, String val) {
         return likeRight(true, getter, val);
     }
-    public <R> WhereBuilder<T> likeRight(boolean condition, Function<T, R> getter, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> likeRight(boolean condition, Function<T, R> getter, String val) {
         return executeFlatCondition(condition, getter, SqlOperator.LIKE, val + "%");
     }
+    public WhereBuilder<T> likeRight(String propertyOrColumn, String val) {
+        return likeRight(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> likeRight(boolean condition, String propertyOrColumn, String val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, val + "%");
+    }
 
-    public <R> WhereBuilder<T> likeAll(R propOrExpr, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> likeAll(R propOrExpr, String val) {
         return likeAll(true, propOrExpr, val);
     }
-    public <R> WhereBuilder<T> likeAll(boolean condition, R propOrExpr, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> likeAll(boolean condition, R propOrExpr, String val) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.LIKE, "%" + val + "%");
     }
-    public WhereBuilder<T> likeAll(String propertyOrColumn, Object val) {
-        return likeAll(true, propertyOrColumn, val);
+    public <R extends CharSequence> WhereBuilder<T> likeAll(SqlExpression<R> expr, String val) {
+        return likeAll(true, expr, val);
     }
-    public WhereBuilder<T> likeAll(boolean condition, String propertyOrColumn, Object val) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, "%" + val + "%");
+    public <R extends CharSequence> WhereBuilder<T> likeAll(boolean condition, SqlExpression<R> expr, String val) {
+        return executeFlatCondition(condition, expr, SqlOperator.LIKE, "%" + val + "%");
     }
-    public <R> WhereBuilder<T> likeAll(Function<T, R> getter, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> likeAll(Function<T, R> getter, String val) {
         return likeAll(true, getter, val);
     }
-    public <R> WhereBuilder<T> likeAll(boolean condition, Function<T, R> getter, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> likeAll(boolean condition, Function<T, R> getter, String val) {
         return executeFlatCondition(condition, getter, SqlOperator.LIKE, "%" + val + "%");
     }
+    public WhereBuilder<T> likeAll(String propertyOrColumn, String val) {
+        return likeAll(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> likeAll(boolean condition, String propertyOrColumn, String val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.LIKE, "%" + val + "%");
+    }
 
-    public <R> WhereBuilder<T> notLike(R propOrExpr, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> notLike(R propOrExpr, String val) {
         return notLike(true, propOrExpr, val);
     }
-    public <R> WhereBuilder<T> notLike(boolean condition, R propOrExpr, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> notLike(boolean condition, R propOrExpr, String val) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_LIKE, val);
     }
-    public WhereBuilder<T> notLike(String propertyOrColumn, Object val) {
-        return notLike(true, propertyOrColumn, val);
+    public <R extends CharSequence> WhereBuilder<T> notLike(R propOrExpr, SqlExpression<? extends CharSequence> val) {
+        return notLike(true, propOrExpr, val);
     }
-    public WhereBuilder<T> notLike(boolean condition, String propertyOrColumn, Object val) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_LIKE, val);
+    public <R extends CharSequence> WhereBuilder<T> notLike(boolean condition, R propOrExpr, SqlExpression<? extends CharSequence> val) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_LIKE, val);
     }
-    public <R> WhereBuilder<T> notLike(Function<T, R> getter, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> notLike(SqlExpression<R> expr, String val) {
+        return notLike(true, expr, val);
+    }
+    public <R extends CharSequence> WhereBuilder<T> notLike(boolean condition, SqlExpression<R> expr, String val) {
+        return executeFlatCondition(condition, expr, SqlOperator.NOT_LIKE, val);
+    }
+    public <R extends CharSequence> WhereBuilder<T> notLike(SqlExpression<R> expr, SqlExpression<? extends CharSequence> val) {
+        return notLike(true, expr, val);
+    }
+    public <R extends CharSequence> WhereBuilder<T> notLike(boolean condition, SqlExpression<R> expr, SqlExpression<? extends CharSequence> val) {
+        return executeFlatCondition(condition, expr, SqlOperator.NOT_LIKE, val);
+    }
+    public <R extends CharSequence> WhereBuilder<T> notLike(Function<T, R> getter, String val) {
         return notLike(true, getter, val);
     }
-    public <R> WhereBuilder<T> notLike(boolean condition, Function<T, R> getter, Object val) {
+    public <R extends CharSequence> WhereBuilder<T> notLike(boolean condition, Function<T, R> getter, String val) {
         return executeFlatCondition(condition, getter, SqlOperator.NOT_LIKE, val);
+    }
+    public <R extends CharSequence> WhereBuilder<T> notLike(Function<T, R> getter, SqlExpression<? extends CharSequence> val) {
+        return notLike(true, getter, val);
+    }
+    public <R extends CharSequence> WhereBuilder<T> notLike(boolean condition, Function<T, R> getter, SqlExpression<? extends CharSequence> val) {
+        return executeFlatCondition(condition, getter, SqlOperator.NOT_LIKE, val);
+    }
+    public WhereBuilder<T> notLike(String propertyOrColumn, String val) {
+        return notLike(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> notLike(boolean condition, String propertyOrColumn, String val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_LIKE, val);
+    }
+    public WhereBuilder<T> notLike(String propertyOrColumn, SqlExpression<? extends CharSequence> val) {
+        return notLike(true, propertyOrColumn, val);
+    }
+    public WhereBuilder<T> notLike(boolean condition, String propertyOrColumn, SqlExpression<? extends CharSequence> val) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_LIKE, val);
     }
 
     // --- isNull / isNotNull ---
@@ -727,6 +1491,12 @@ public class WhereBuilder<T> {
     }
     public <R> WhereBuilder<T> isNull(boolean condition, R propOrExpr) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.IS_NULL);
+    }
+    public <R> WhereBuilder<T> isNull(SqlExpression<R> expr) {
+        return isNull(true, expr);
+    }
+    public <R> WhereBuilder<T> isNull(boolean condition, SqlExpression<R> expr) {
+        return executeFlatCondition(condition, expr, SqlOperator.IS_NULL);
     }
     public WhereBuilder<T> isNull(String propertyOrColumn) {
         return isNull(true, propertyOrColumn);
@@ -747,6 +1517,12 @@ public class WhereBuilder<T> {
     public <R> WhereBuilder<T> isNotNull(boolean condition, R propOrExpr) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.IS_NOT_NULL);
     }
+    public <R> WhereBuilder<T> isNotNull(SqlExpression<R> expr) {
+        return isNotNull(true, expr);
+    }
+    public <R> WhereBuilder<T> isNotNull(boolean condition, SqlExpression<R> expr) {
+        return executeFlatCondition(condition, expr, SqlOperator.IS_NOT_NULL);
+    }
     public WhereBuilder<T> isNotNull(String propertyOrColumn) {
         return isNotNull(true, propertyOrColumn);
     }
@@ -761,116 +1537,360 @@ public class WhereBuilder<T> {
     }
 
     // --- in / notIn ---
-    public <R> WhereBuilder<T> in(R propOrExpr, Collection<?> values) {
+    public <R> WhereBuilder<T> in(R propOrExpr, Collection<? extends R> values) {
         return in(true, propOrExpr, values);
     }
-    public <R> WhereBuilder<T> in(boolean condition, R propOrExpr, Collection<?> values) {
+    public <R> WhereBuilder<T> in(boolean condition, R propOrExpr, Collection<? extends R> values) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.IN, values);
     }
-    public <R> WhereBuilder<T> in(R propOrExpr, Object... values) {
+    @SafeVarargs
+    public final <R> WhereBuilder<T> in(R propOrExpr, R... values) {
         return in(true, propOrExpr, values);
     }
-    public <R> WhereBuilder<T> in(boolean condition, R propOrExpr, Object... values) {
+    @SafeVarargs
+    public final <R> WhereBuilder<T> in(boolean condition, R propOrExpr, R... values) {
         if (values != null && values.length == 1 && values[0] instanceof Collection) {
-            return in(condition, propOrExpr, (Collection<?>) values[0]);
+            return in(condition, propOrExpr, (Collection<? extends R>) values[0]);
         }
-        return executeFlatCondition(condition, propOrExpr, SqlOperator.IN, values);
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.IN, (Object[]) values);
     }
-    public WhereBuilder<T> in(String propertyOrColumn, Collection<?> values) {
-        return in(true, propertyOrColumn, values);
+    public <R> WhereBuilder<T> in(R propOrExpr, Query<?> subQuery) {
+        return in(true, propOrExpr, subQuery);
     }
-    public WhereBuilder<T> in(boolean condition, String propertyOrColumn, Collection<?> values) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.IN, values);
+    public <R> WhereBuilder<T> in(boolean condition, R propOrExpr, Query<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.IN, subQuery);
     }
-    public WhereBuilder<T> in(String propertyOrColumn, Object... values) {
-        return in(true, propertyOrColumn, values);
+    public <R> WhereBuilder<T> in(R propOrExpr, WhereBuilder<?> subQuery) {
+        return in(true, propOrExpr, subQuery);
     }
-    public WhereBuilder<T> in(boolean condition, String propertyOrColumn, Object... values) {
-        if (values != null && values.length == 1 && values[0] instanceof Collection) {
-            return in(condition, propertyOrColumn, (Collection<?>) values[0]);
-        }
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.IN, values);
+    public <R> WhereBuilder<T> in(boolean condition, R propOrExpr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.IN, subQuery);
     }
-    public <R> WhereBuilder<T> in(Function<T, R> getter, Collection<?> values) {
-        return in(true, getter, values);
+    public <R> WhereBuilder<T> in(R propOrExpr, SqlExpression<?> subQuery) {
+        return in(true, propOrExpr, subQuery);
     }
-    public <R> WhereBuilder<T> in(boolean condition, Function<T, R> getter, Collection<?> values) {
-        return executeFlatCondition(condition, getter, SqlOperator.IN, values);
-    }
-    public <R> WhereBuilder<T> in(Function<T, R> getter, Object... values) {
-        return in(true, getter, values);
-    }
-    public <R> WhereBuilder<T> in(boolean condition, Function<T, R> getter, Object... values) {
-        if (values != null && values.length == 1 && values[0] instanceof Collection) {
-            return in(condition, getter, (Collection<?>) values[0]);
-        }
-        return executeFlatCondition(condition, getter, SqlOperator.IN, values);
+    public <R> WhereBuilder<T> in(boolean condition, R propOrExpr, SqlExpression<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.IN, subQuery);
     }
 
-    public <R> WhereBuilder<T> notIn(R propOrExpr, Collection<?> values) {
+    public <R> WhereBuilder<T> in(SqlExpression<R> expr, Collection<? extends R> values) {
+        return in(true, expr, values);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, SqlExpression<R> expr, Collection<? extends R> values) {
+        return executeFlatCondition(condition, expr, SqlOperator.IN, values);
+    }
+    @SafeVarargs
+    public final <R> WhereBuilder<T> in(SqlExpression<R> expr, R... values) {
+        return in(true, expr, values);
+    }
+    @SafeVarargs
+    public final <R> WhereBuilder<T> in(boolean condition, SqlExpression<R> expr, R... values) {
+        if (values != null && values.length == 1 && values[0] instanceof Collection) {
+            return in(condition, expr, (Collection<? extends R>) values[0]);
+        }
+        return executeFlatCondition(condition, expr, SqlOperator.IN, (Object[]) values);
+    }
+    public <R> WhereBuilder<T> in(SqlExpression<R> expr, Query<?> subQuery) {
+        return in(true, expr, subQuery);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, SqlExpression<R> expr, Query<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.IN, subQuery);
+    }
+    public <R> WhereBuilder<T> in(SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return in(true, expr, subQuery);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.IN, subQuery);
+    }
+    public <R> WhereBuilder<T> in(SqlExpression<R> expr, SqlExpression<?> subQuery) {
+        return in(true, expr, subQuery);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, SqlExpression<R> expr, SqlExpression<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.IN, subQuery);
+    }
+
+    public <R> WhereBuilder<T> in(Function<T, R> getter, Collection<? extends R> values) {
+        return in(true, getter, values);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, Function<T, R> getter, Collection<? extends R> values) {
+        return executeFlatCondition(condition, getter, SqlOperator.IN, values);
+    }
+    @SafeVarargs
+    public final <R> WhereBuilder<T> in(Function<T, R> getter, R... values) {
+        return in(true, getter, values);
+    }
+    @SafeVarargs
+    public final <R> WhereBuilder<T> in(boolean condition, Function<T, R> getter, R... values) {
+        if (values != null && values.length == 1 && values[0] instanceof Collection) {
+            return in(condition, getter, (Collection<? extends R>) values[0]);
+        }
+        return executeFlatCondition(condition, getter, SqlOperator.IN, (Object[]) values);
+    }
+    public <R> WhereBuilder<T> in(Function<T, R> getter, Query<?> subQuery) {
+        return in(true, getter, subQuery);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, Function<T, R> getter, Query<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.IN, subQuery);
+    }
+    public <R> WhereBuilder<T> in(Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return in(true, getter, subQuery);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.IN, subQuery);
+    }
+    public <R> WhereBuilder<T> in(Function<T, R> getter, SqlExpression<?> subQuery) {
+        return in(true, getter, subQuery);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, Function<T, R> getter, SqlExpression<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.IN, subQuery);
+    }
+
+    public <R> WhereBuilder<T> in(String propertyOrColumn, Collection<? extends R> values) {
+        return in(true, propertyOrColumn, values);
+    }
+    public <R> WhereBuilder<T> in(boolean condition, String propertyOrColumn, Collection<? extends R> values) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.IN, values);
+    }
+    @SafeVarargs
+    public final <R> WhereBuilder<T> in(String propertyOrColumn, R... values) {
+        return in(true, propertyOrColumn, values);
+    }
+    @SafeVarargs
+    public final <R> WhereBuilder<T> in(boolean condition, String propertyOrColumn, R... values) {
+        if (values != null && values.length == 1 && values[0] instanceof Collection) {
+            return in(condition, propertyOrColumn, (Collection<? extends R>) values[0]);
+        }
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.IN, (Object[]) values);
+    }
+    public WhereBuilder<T> in(String propertyOrColumn, Query<?> subQuery) {
+        return in(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> in(boolean condition, String propertyOrColumn, Query<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.IN, subQuery);
+    }
+    public WhereBuilder<T> in(String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return in(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> in(boolean condition, String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.IN, subQuery);
+    }
+    public WhereBuilder<T> in(String propertyOrColumn, SqlExpression<?> subQuery) {
+        return in(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> in(boolean condition, String propertyOrColumn, SqlExpression<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.IN, subQuery);
+    }
+
+    public <R> WhereBuilder<T> notIn(R propOrExpr, Collection<? extends R> values) {
         return notIn(true, propOrExpr, values);
     }
-    public <R> WhereBuilder<T> notIn(boolean condition, R propOrExpr, Collection<?> values) {
+    public <R> WhereBuilder<T> notIn(boolean condition, R propOrExpr, Collection<? extends R> values) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_IN, values);
     }
-    public <R> WhereBuilder<T> notIn(R propOrExpr, Object... values) {
+    @SafeVarargs
+    public final <R> WhereBuilder<T> notIn(R propOrExpr, R... values) {
         return notIn(true, propOrExpr, values);
     }
-    public <R> WhereBuilder<T> notIn(boolean condition, R propOrExpr, Object... values) {
+    @SafeVarargs
+    public final <R> WhereBuilder<T> notIn(boolean condition, R propOrExpr, R... values) {
         if (values != null && values.length == 1 && values[0] instanceof Collection) {
-            return notIn(condition, propOrExpr, (Collection<?>) values[0]);
+            return notIn(condition, propOrExpr, (Collection<? extends R>) values[0]);
         }
-        return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_IN, values);
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_IN, (Object[]) values);
     }
-    public WhereBuilder<T> notIn(String propertyOrColumn, Collection<?> values) {
-        return notIn(true, propertyOrColumn, values);
+    public <R> WhereBuilder<T> notIn(R propOrExpr, Query<?> subQuery) {
+        return notIn(true, propOrExpr, subQuery);
     }
-    public WhereBuilder<T> notIn(boolean condition, String propertyOrColumn, Collection<?> values) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_IN, values);
+    public <R> WhereBuilder<T> notIn(boolean condition, R propOrExpr, Query<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_IN, subQuery);
     }
-    public WhereBuilder<T> notIn(String propertyOrColumn, Object... values) {
-        return notIn(true, propertyOrColumn, values);
+    public <R> WhereBuilder<T> notIn(R propOrExpr, WhereBuilder<?> subQuery) {
+        return notIn(true, propOrExpr, subQuery);
     }
-    public WhereBuilder<T> notIn(boolean condition, String propertyOrColumn, Object... values) {
+    public <R> WhereBuilder<T> notIn(boolean condition, R propOrExpr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_IN, subQuery);
+    }
+    public <R> WhereBuilder<T> notIn(R propOrExpr, SqlExpression<?> subQuery) {
+        return notIn(true, propOrExpr, subQuery);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, R propOrExpr, SqlExpression<?> subQuery) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_IN, subQuery);
+    }
+
+    public <R> WhereBuilder<T> notIn(SqlExpression<R> expr, Collection<? extends R> values) {
+        return notIn(true, expr, values);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, SqlExpression<R> expr, Collection<? extends R> values) {
+        return executeFlatCondition(condition, expr, SqlOperator.NOT_IN, values);
+    }
+    @SafeVarargs
+    public final <R> WhereBuilder<T> notIn(SqlExpression<R> expr, R... values) {
+        return notIn(true, expr, values);
+    }
+    @SafeVarargs
+    public final <R> WhereBuilder<T> notIn(boolean condition, SqlExpression<R> expr, R... values) {
         if (values != null && values.length == 1 && values[0] instanceof Collection) {
-            return notIn(condition, propertyOrColumn, (Collection<?>) values[0]);
+            return notIn(condition, expr, (Collection<? extends R>) values[0]);
         }
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_IN, values);
+        return executeFlatCondition(condition, expr, SqlOperator.NOT_IN, (Object[]) values);
     }
-    public <R> WhereBuilder<T> notIn(Function<T, R> getter, Collection<?> values) {
+    public <R> WhereBuilder<T> notIn(SqlExpression<R> expr, Query<?> subQuery) {
+        return notIn(true, expr, subQuery);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, SqlExpression<R> expr, Query<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.NOT_IN, subQuery);
+    }
+    public <R> WhereBuilder<T> notIn(SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return notIn(true, expr, subQuery);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, SqlExpression<R> expr, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.NOT_IN, subQuery);
+    }
+    public <R> WhereBuilder<T> notIn(SqlExpression<R> expr, SqlExpression<?> subQuery) {
+        return notIn(true, expr, subQuery);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, SqlExpression<R> expr, SqlExpression<?> subQuery) {
+        return executeFlatCondition(condition, expr, SqlOperator.NOT_IN, subQuery);
+    }
+
+    public <R> WhereBuilder<T> notIn(Function<T, R> getter, Collection<? extends R> values) {
         return notIn(true, getter, values);
     }
-    public <R> WhereBuilder<T> notIn(boolean condition, Function<T, R> getter, Collection<?> values) {
+    public <R> WhereBuilder<T> notIn(boolean condition, Function<T, R> getter, Collection<? extends R> values) {
         return executeFlatCondition(condition, getter, SqlOperator.NOT_IN, values);
     }
-    public <R> WhereBuilder<T> notIn(Function<T, R> getter, Object... values) {
+    @SafeVarargs
+    public final <R> WhereBuilder<T> notIn(Function<T, R> getter, R... values) {
         return notIn(true, getter, values);
     }
-    public <R> WhereBuilder<T> notIn(boolean condition, Function<T, R> getter, Object... values) {
+    @SafeVarargs
+    public final <R> WhereBuilder<T> notIn(boolean condition, Function<T, R> getter, R... values) {
         if (values != null && values.length == 1 && values[0] instanceof Collection) {
-            return notIn(condition, getter, (Collection<?>) values[0]);
+            return notIn(condition, getter, (Collection<? extends R>) values[0]);
         }
-        return executeFlatCondition(condition, getter, SqlOperator.NOT_IN, values);
+        return executeFlatCondition(condition, getter, SqlOperator.NOT_IN, (Object[]) values);
+    }
+    public <R> WhereBuilder<T> notIn(Function<T, R> getter, Query<?> subQuery) {
+        return notIn(true, getter, subQuery);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, Function<T, R> getter, Query<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.NOT_IN, subQuery);
+    }
+    public <R> WhereBuilder<T> notIn(Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return notIn(true, getter, subQuery);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, Function<T, R> getter, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.NOT_IN, subQuery);
+    }
+    public <R> WhereBuilder<T> notIn(Function<T, R> getter, SqlExpression<?> subQuery) {
+        return notIn(true, getter, subQuery);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, Function<T, R> getter, SqlExpression<?> subQuery) {
+        return executeFlatCondition(condition, getter, SqlOperator.NOT_IN, subQuery);
+    }
+
+    public <R> WhereBuilder<T> notIn(String propertyOrColumn, Collection<? extends R> values) {
+        return notIn(true, propertyOrColumn, values);
+    }
+    public <R> WhereBuilder<T> notIn(boolean condition, String propertyOrColumn, Collection<? extends R> values) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_IN, values);
+    }
+    @SafeVarargs
+    public final <R> WhereBuilder<T> notIn(String propertyOrColumn, R... values) {
+        return notIn(true, propertyOrColumn, values);
+    }
+    @SafeVarargs
+    public final <R> WhereBuilder<T> notIn(boolean condition, String propertyOrColumn, R... values) {
+        if (values != null && values.length == 1 && values[0] instanceof Collection) {
+            return notIn(condition, propertyOrColumn, (Collection<? extends R>) values[0]);
+        }
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_IN, (Object[]) values);
+    }
+    public WhereBuilder<T> notIn(String propertyOrColumn, Query<?> subQuery) {
+        return notIn(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> notIn(boolean condition, String propertyOrColumn, Query<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_IN, subQuery);
+    }
+    public WhereBuilder<T> notIn(String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return notIn(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> notIn(boolean condition, String propertyOrColumn, WhereBuilder<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_IN, subQuery);
+    }
+    public WhereBuilder<T> notIn(String propertyOrColumn, SqlExpression<?> subQuery) {
+        return notIn(true, propertyOrColumn, subQuery);
+    }
+    public WhereBuilder<T> notIn(boolean condition, String propertyOrColumn, SqlExpression<?> subQuery) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_IN, subQuery);
     }
 
     // --- between ---
-    public <R> WhereBuilder<T> between(R propOrExpr, Object min, Object max) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(R propOrExpr, R min, R max) {
         return between(true, propOrExpr, min, max);
     }
-    public <R> WhereBuilder<T> between(boolean condition, R propOrExpr, Object min, Object max) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(boolean condition, R propOrExpr, R min, R max) {
         return executeFlatCondition(condition, propOrExpr, SqlOperator.BETWEEN, min, max);
     }
-    public WhereBuilder<T> between(String propertyOrColumn, Object min, Object max) {
-        return between(true, propertyOrColumn, min, max);
+    public <R extends Number & Comparable<?>> WhereBuilder<T> between(R propOrExpr, Number min, Number max, Object... dummy) {
+        return between(true, propOrExpr, min, max);
     }
-    public WhereBuilder<T> between(boolean condition, String propertyOrColumn, Object min, Object max) {
-        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.BETWEEN, min, max);
+    public <R extends Number & Comparable<?>> WhereBuilder<T> between(boolean condition, R propOrExpr, Number min, Number max, Object... dummy) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.BETWEEN, min, max);
     }
-    public <R> WhereBuilder<T> between(Function<T, R> getter, R min, R max) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(R propOrExpr, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
+        return between(true, propOrExpr, min, max);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(boolean condition, R propOrExpr, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.BETWEEN, min, max);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(SqlExpression<R> expr, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
+        return between(true, expr, min, max);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(boolean condition, SqlExpression<R> expr, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
+        return executeFlatCondition(condition, expr, SqlOperator.BETWEEN, min, max);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(SqlExpression<R> expr, R min, R max) {
+        return between(true, expr, min, max);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(boolean condition, SqlExpression<R> expr, R min, R max) {
+        return executeFlatCondition(condition, expr, SqlOperator.BETWEEN, min, max);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> between(SqlExpression<R> expr, Number min, Number max, Object... dummy) {
+        return between(true, expr, min, max);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> between(boolean condition, SqlExpression<R> expr, Number min, Number max, Object... dummy) {
+        return executeFlatCondition(condition, expr, SqlOperator.BETWEEN, min, max);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(Function<T, R> getter, R min, R max) {
         return between(true, getter, min, max);
     }
-    public <R> WhereBuilder<T> between(boolean condition, Function<T, R> getter, R min, R max) {
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(boolean condition, Function<T, R> getter, R min, R max) {
         return executeFlatCondition(condition, getter, SqlOperator.BETWEEN, min, max);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> between(Function<T, R> getter, Number min, Number max, Object... dummy) {
+        return between(true, getter, min, max);
+    }
+    public <R extends Number & Comparable<?>> WhereBuilder<T> between(boolean condition, Function<T, R> getter, Number min, Number max, Object... dummy) {
+        return executeFlatCondition(condition, getter, SqlOperator.BETWEEN, min, max);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(Function<T, R> getter, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
+        return between(true, getter, min, max);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(boolean condition, Function<T, R> getter, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
+        return executeFlatCondition(condition, getter, SqlOperator.BETWEEN, min, max);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(String propertyOrColumn, R min, R max) {
+        return between(true, propertyOrColumn, min, max);
+    }
+    public <R extends Comparable<? super R>> WhereBuilder<T> between(boolean condition, String propertyOrColumn, R min, R max) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.BETWEEN, min, max);
+    }
+    public WhereBuilder<T> between(String propertyOrColumn, SqlExpression<?> min, SqlExpression<?> max) {
+        return between(true, propertyOrColumn, min, max);
+    }
+    public WhereBuilder<T> between(boolean condition, String propertyOrColumn, SqlExpression<?> min, SqlExpression<?> max) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.BETWEEN, min, max);
     }
 
     private void appendCondition(LogicalOperator logOp, PropertyPath path, SqlOperator op, Object... vals) {
