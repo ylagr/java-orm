@@ -229,12 +229,12 @@ public abstract class AbstractDialect implements Dialect {
         }
 
         // 2. FROM
-        sql.append(" FROM ").append(quote(stmt.getRootTableName())).append(" ").append(stmt.getRootTableAlias());
+        sql.append(" FROM ").append(quote(stmt.getRootTableName())).append(" ").append(renderAliasDeclaration(stmt.getRootTableAlias()));
 
         // 3. JOINS
         for (TableJoin join : stmt.getJoins()) {
             sql.append(" ").append(join.getJoinType().getSql()).append(" ")
-                    .append(quote(join.getTableName())).append(" ").append(join.getTableAlias());
+                    .append(quote(join.getTableName())).append(" ").append(renderAliasDeclaration(join.getTableAlias()));
             if (!join.getOnConditions().isEmpty()) {
                 sql.append(" ON ");
                 renderConditions(join.getOnConditions(), sql, params);
@@ -330,7 +330,7 @@ public abstract class AbstractDialect implements Dialect {
             }
         }
 
-        renderWhereClause(stmt.getSystemConditions(), stmt.getWhereConditions(), sql, params);
+        renderWhereClause(stmt.getSystemConditions(), stmt.getWhereConditions(), sql, params, true);
 
         return new SqlAndParams(sql.toString(), params);
     }
@@ -342,7 +342,7 @@ public abstract class AbstractDialect implements Dialect {
 
         sql.append(quote(stmt.getTableName()));
 
-        renderWhereClause(stmt.getSystemConditions(), stmt.getWhereConditions(), sql, params);
+        renderWhereClause(stmt.getSystemConditions(), stmt.getWhereConditions(), sql, params, true);
 
         return new SqlAndParams(sql.toString(), params);
     }
@@ -386,6 +386,10 @@ public abstract class AbstractDialect implements Dialect {
     }
 
     protected void renderWhereClause(List<Condition> systemConditions, List<Condition> userConditions, StringBuilder sql, List<Object> params) {
+        renderWhereClause(systemConditions, userConditions, sql, params, false);
+    }
+
+    protected void renderWhereClause(List<Condition> systemConditions, List<Condition> userConditions, StringBuilder sql, List<Object> params, boolean ignoreTableAlias) {
         boolean hasSystem = systemConditions != null && !systemConditions.isEmpty();
         boolean hasUser = userConditions != null && !userConditions.isEmpty();
         if (!hasSystem && !hasUser) {
@@ -393,25 +397,37 @@ public abstract class AbstractDialect implements Dialect {
         }
         sql.append(" WHERE ");
         if (hasSystem && !hasUser) {
-            renderConditions(systemConditions, sql, params);
+            renderConditions(systemConditions, sql, params, ignoreTableAlias);
         } else if (!hasSystem && hasUser) {
-            renderConditions(userConditions, sql, params);
+            renderConditions(userConditions, sql, params, ignoreTableAlias);
         } else {
-            renderConditions(systemConditions, sql, params);
+            renderConditions(systemConditions, sql, params, ignoreTableAlias);
             sql.append(" AND (");
-            renderConditions(userConditions, sql, params);
+            renderConditions(userConditions, sql, params, ignoreTableAlias);
             sql.append(")");
         }
     }
 
     protected void renderConditions(List<Condition> conditions, StringBuilder sql, List<Object> params) {
+        renderConditions(conditions, sql, params, false);
+    }
+
+    protected void renderConditions(List<Condition> conditions, StringBuilder sql, List<Object> params, boolean ignoreTableAlias) {
         for (int i = 0; i < conditions.size(); i++) {
             Condition cond = conditions.get(i);
             if (i > 0) {
                 sql.append(" ").append(cond.getLogicalOperator().name()).append(" ");
             }
-            renderSingleCondition(cond, sql, params);
+            renderSingleCondition(cond, sql, params, ignoreTableAlias);
         }
+    }
+
+    protected String renderAliasDeclaration(String alias) {
+        if (alias == null || alias.isEmpty()) return "";
+        if (isSimpleAlias(alias)) {
+            return alias;
+        }
+        return quote(alias);
     }
 
     protected String renderTablePrefix(String alias) {
@@ -451,6 +467,10 @@ public abstract class AbstractDialect implements Dialect {
     }
 
     protected void renderSingleCondition(Condition cond, StringBuilder sql, List<Object> params) {
+        renderSingleCondition(cond, sql, params, false);
+    }
+
+    protected void renderSingleCondition(Condition cond, StringBuilder sql, List<Object> params, boolean ignoreTableAlias) {
         if (cond instanceof BinaryCondition) {
             BinaryCondition bc = (BinaryCondition) cond;
             SqlOperator op = bc.getOperator();
@@ -475,28 +495,29 @@ public abstract class AbstractDialect implements Dialect {
                 }
             }
 
+            String prefix = (!ignoreTableAlias && bc.getTableAlias() != null && !bc.getTableAlias().isEmpty()) ? renderTablePrefix(bc.getTableAlias()) : "";
             if (isOp(op, SqlOperator.IS_EMPTY)) {
-                String col = (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty() ? renderTablePrefix(bc.getTableAlias()) : "") + quote(bc.getColumnName());
+                String col = prefix + quote(bc.getColumnName());
                 sql.append("(").append(col).append(" IS NULL OR ").append(col).append(" = '')");
                 return;
             }
             if (isOp(op, SqlOperator.IS_NOT_EMPTY)) {
-                String col = (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty() ? renderTablePrefix(bc.getTableAlias()) : "") + quote(bc.getColumnName());
+                String col = prefix + quote(bc.getColumnName());
                 sql.append("(").append(col).append(" IS NOT NULL AND ").append(col).append(" <> '')");
                 return;
             }
             if (isOp(op, SqlOperator.IS_BLANK)) {
-                String col = (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty() ? renderTablePrefix(bc.getTableAlias()) : "") + quote(bc.getColumnName());
+                String col = prefix + quote(bc.getColumnName());
                 sql.append("(").append(col).append(" IS NULL OR ").append(col).append(" = '' OR LTRIM(").append(col).append(") = '')");
                 return;
             }
             if (isOp(op, SqlOperator.IS_NOT_BLANK)) {
-                String col = (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty() ? renderTablePrefix(bc.getTableAlias()) : "") + quote(bc.getColumnName());
+                String col = prefix + quote(bc.getColumnName());
                 sql.append("(").append(col).append(" IS NOT NULL AND ").append(col).append(" <> '' AND LTRIM(").append(col).append(") <> '')");
                 return;
             }
             if (isOp(op, SqlOperator.RANGE_CLOSED, SqlOperator.RANGE_OPEN, SqlOperator.RANGE_CLOSED_OPEN, SqlOperator.RANGE_OPEN_CLOSED)) {
-                String col = (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty() ? renderTablePrefix(bc.getTableAlias()) : "") + quote(bc.getColumnName());
+                String col = prefix + quote(bc.getColumnName());
                 String opLeft = isOp(op, SqlOperator.RANGE_CLOSED, SqlOperator.RANGE_CLOSED_OPEN) ? " >= ?" : " > ?";
                 String opRight = isOp(op, SqlOperator.RANGE_CLOSED, SqlOperator.RANGE_OPEN_CLOSED) ? " <= ?" : " < ?";
                 sql.append("(").append(col).append(opLeft).append(" AND ").append(col).append(opRight).append(")");
@@ -507,9 +528,7 @@ public abstract class AbstractDialect implements Dialect {
                 return;
             }
 
-            if (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty()) {
-                sql.append(renderTablePrefix(bc.getTableAlias()));
-            }
+            sql.append(prefix);
             sql.append(quote(bc.getColumnName())).append(" ");
 
             if (isOp(op, SqlOperator.EQ) && (firstVal == null || (values != null && values.length == 0))) {
@@ -584,11 +603,11 @@ public abstract class AbstractDialect implements Dialect {
             }
         } else if (cond instanceof ColumnEqualityCondition) {
             ColumnEqualityCondition cec = (ColumnEqualityCondition) cond;
-            if (cec.getLeftTableAlias() != null && !cec.getLeftTableAlias().isEmpty()) {
+            if (!ignoreTableAlias && cec.getLeftTableAlias() != null && !cec.getLeftTableAlias().isEmpty()) {
                 sql.append(renderTablePrefix(cec.getLeftTableAlias()));
             }
             sql.append(quote(cec.getLeftColumn())).append(" = ");
-            if (cec.getRightTableAlias() != null && !cec.getRightTableAlias().isEmpty()) {
+            if (!ignoreTableAlias && cec.getRightTableAlias() != null && !cec.getRightTableAlias().isEmpty()) {
                 sql.append(renderTablePrefix(cec.getRightTableAlias()));
             }
             sql.append(quote(cec.getRightColumn()));
@@ -600,7 +619,7 @@ public abstract class AbstractDialect implements Dialect {
         } else if (cond instanceof GroupCondition) {
             GroupCondition gc = (GroupCondition) cond;
             sql.append("(");
-            renderConditions(gc.getChildren(), sql, params);
+            renderConditions(gc.getChildren(), sql, params, ignoreTableAlias);
             sql.append(")");
         }
     }

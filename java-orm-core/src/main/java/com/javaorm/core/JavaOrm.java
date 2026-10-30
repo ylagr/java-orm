@@ -6,10 +6,13 @@ import com.javaorm.core.mutation.DeleteBuilder;
 import com.javaorm.core.mutation.InsertBuilder;
 import com.javaorm.core.mutation.UpdateBuilder;
 import com.javaorm.core.query.*;
+import com.javaorm.core.sql.SqlEnv;
+import com.javaorm.core.sql.SqlExecution;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * JavaOrm 核心门面与统一操作入口。
@@ -416,6 +419,35 @@ public class JavaOrm {
     public DataSource getDataSource() { return dataSource; }
     public Dialect getDialect() { return dialect; }
     public OrmConfig getConfig() { return config; }
+
+    /**
+     * 声明式 SQL 执行环境统一入口（SqlEnv DSL）：
+     * <pre>
+     * orm.sql(e -> {
+     *     Department parent = e.table(Department.class, "d_parent");
+     *     Department child  = e.table(Department.class, "d_child");
+     *     e.select(parent.getName(), child.getAge())
+     *      .from(parent)
+     *      .leftJoin(child).on(child.getParentId(), parent.getId())
+     *      .where().and(parent.getName()).eq("研发部")
+     *      .orderBy(child.getId()).desc();
+     * }).toList();
+     * </pre>
+     */
+    public SqlExecution sql(Consumer<SqlEnv> envConsumer) {
+        if (envConsumer == null) {
+            throw new IllegalArgumentException("SqlEnv consumer must not be null");
+        }
+        SqlEnv env = new SqlEnv(dataSource, dialect, config);
+        try {
+            envConsumer.accept(env);
+            return env.toExecution();
+        } finally {
+            com.javaorm.core.proxy.RecordingContext.clearRecording();
+            com.javaorm.core.proxy.RecordingContext.clearAliases();
+            com.javaorm.core.query.Query.resetAliasSeq();
+        }
+    }
 
     private static Dialect detectDialect(DataSource dataSource) {
         try (Connection conn = dataSource.getConnection()) {
