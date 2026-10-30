@@ -239,6 +239,10 @@ public class DeleteBuilder<T> {
         return execute();
     }
 
+    public int exec() {
+        return execute();
+    }
+
     public int execute() {
         try {
             if (printSqlOverride != null) {

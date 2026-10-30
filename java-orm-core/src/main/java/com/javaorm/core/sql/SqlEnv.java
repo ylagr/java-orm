@@ -269,9 +269,10 @@ public class SqlEnv {
 
     // ========== 3. UPDATE 管道入口与 UpdateBuilder 工厂 ==========
 
-    public SqlUpdateStream update(Object targetTable) {
+    @SuppressWarnings("unchecked")
+    public <T> SqlUpdateStream<T> update(T targetTable) {
         SqlTableInfo info = resolveTable(targetTable);
-        SqlUpdateStream stream = new SqlUpdateStream(this, info);
+        SqlUpdateStream<T> stream = new SqlUpdateStream<>(this, info);
         this.currentOperation = stream;
         return stream;
     }
@@ -288,9 +289,10 @@ public class SqlEnv {
 
     // ========== 4. DELETE 管道入口与 DeleteBuilder 工厂 ==========
 
-    public SqlDeleteStream delete(Object targetTable) {
+    @SuppressWarnings("unchecked")
+    public <T> SqlDeleteStream<T> delete(T targetTable) {
         SqlTableInfo info = resolveTable(targetTable);
-        SqlDeleteStream stream = new SqlDeleteStream(this, info);
+        SqlDeleteStream<T> stream = new SqlDeleteStream<>(this, info);
         this.currentOperation = stream;
         return stream;
     }

@@ -176,6 +176,13 @@ public class UpdateBuilder<T> {
         return this;
     }
 
+    public UpdateBuilder<T> set(boolean condition, Object propVal, Object value) {
+        if (condition) {
+            set(propVal, value);
+        }
+        return this;
+    }
+
     public UpdateBuilder<T> set(Object propVal, Object value) {
         PropertyPath path = RecordingContext.finishCurrent(entityClass);
         if (path == null) {
@@ -308,6 +315,10 @@ public class UpdateBuilder<T> {
     }
 
     public int executeRows() {
+        return execute();
+    }
+
+    public int exec() {
         return execute();
     }
 

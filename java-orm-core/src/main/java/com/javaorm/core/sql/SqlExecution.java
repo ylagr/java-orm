@@ -17,7 +17,7 @@ import java.util.Map;
  *
  * @param <T> 查询结果类型强类型约束
  */
-public class SqlExecution<T> {
+public class SqlExecution<T> implements TQuery<T> {
 
     private final SqlEnv env;
     private final Object operation;
@@ -38,10 +38,12 @@ public class SqlExecution<T> {
         return operation;
     }
 
+    @Override
     public SqlEnv getEnv() {
         return env;
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public Class<T> getResultClass() {
         if (resultClass != null) {
@@ -53,6 +55,7 @@ public class SqlExecution<T> {
         return null;
     }
 
+    @Override
     public SelectStatement getStatement() {
         if (operation instanceof TQuery<?>) {
             return ((TQuery<?>) operation).getStatement();
@@ -150,6 +153,7 @@ public class SqlExecution<T> {
     /**
      * 执行查询操作并返回强类型实体/DTO列表
      */
+    @Override
     @SuppressWarnings("unchecked")
     public <R> List<R> toList() {
         if (operation instanceof TQuery<?>) {
@@ -212,6 +216,7 @@ public class SqlExecution<T> {
     /**
      * 执行查询操作并返回 Map 字典列表
      */
+    @Override
     public List<Map<String, Object>> listMaps() {
         if (operation instanceof TQuery<?>) {
             return ((TQuery<?>) operation).listMaps();
@@ -228,6 +233,7 @@ public class SqlExecution<T> {
     /**
      * 执行查询操作并返回第一条记录，若无结果返回 null
      */
+    @Override
     @SuppressWarnings("unchecked")
     public <R> R firstOrNull() {
         if (operation instanceof TQuery<?>) {
@@ -294,6 +300,7 @@ public class SqlExecution<T> {
     /**
      * 查询匹配记录总数
      */
+    @Override
     public long count() {
         if (operation instanceof TQuery<?>) {
             return ((TQuery<?>) operation).count();
@@ -310,6 +317,7 @@ public class SqlExecution<T> {
     /**
      * 获取生成的 SQL 语句
      */
+    @Override
     public String toSql() {
         return toSqlAndParams().getSql();
     }
@@ -317,6 +325,7 @@ public class SqlExecution<T> {
     /**
      * 获取生成的 SQL 与参数
      */
+    @Override
     public SqlAndParams toSqlAndParams() {
         if (operation instanceof TQuery<?>) {
             return ((TQuery<?>) operation).toSqlAndParams();

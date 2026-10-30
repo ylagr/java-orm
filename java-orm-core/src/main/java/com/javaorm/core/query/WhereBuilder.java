@@ -159,6 +159,10 @@ public class WhereBuilder<T> implements TQuery<T> {
         return execute();
     }
 
+    public int exec() {
+        return execute();
+    }
+
     public Statement getRawStatement() {
         return statement != null ? statement : (rootQuery != null ? rootQuery.getStatement() : null);
     }

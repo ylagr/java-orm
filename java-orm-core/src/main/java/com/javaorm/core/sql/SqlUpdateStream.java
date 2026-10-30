@@ -1,80 +1,36 @@
 package com.javaorm.core.sql;
 
-import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.mutation.UpdateBuilder;
-import com.javaorm.core.query.WhereBuilder;
-
-import java.util.function.Consumer;
 
 /**
  * UPDATE 更新流式管道构建器。
- * 支持完整 SQL 语序：UPDATE -> SET -> WHERE -> .exec()。
+ * 直接继承成熟的 UpdateBuilder，遵循 KISS 原则，消除冗余字段与重复委托逻辑。
+ *
+ * @param <T> 实体类型
  */
-public class SqlUpdateStream {
+public class SqlUpdateStream<T> extends UpdateBuilder<T> {
 
-    private final SqlEnv env;
     private final SqlTableInfo tableInfo;
-    @SuppressWarnings("rawtypes")
-    private final UpdateBuilder updateBuilder;
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings("unchecked")
     public SqlUpdateStream(SqlEnv env, SqlTableInfo tableInfo) {
-        this.env = env;
+        super(env, (Class<T>) (tableInfo != null ? tableInfo.getEntityClass() : null));
         this.tableInfo = tableInfo;
-        this.updateBuilder = new UpdateBuilder(tableInfo.getEntityClass(), env.getDataSource(), env.getDialect(), env.getConfig());
     }
 
     public SqlTableInfo getTableInfo() {
         return tableInfo;
     }
 
-    @SuppressWarnings("unchecked")
-    public SqlUpdateStream set(Object property, Object value) {
-        updateBuilder.set(property, value);
+    @Override
+    public SqlUpdateStream<T> set(Object propVal, Object value) {
+        super.set(propVal, value);
         return this;
     }
 
-    public SqlUpdateStream set(boolean condition, Object property, Object value) {
-        if (condition) {
-            set(property, value);
-        }
-        return this;
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> WhereBuilder<T> where() {
-        return (WhereBuilder<T>) updateBuilder.where();
-    }
-
-    public SqlUpdateStream where(Consumer<WhereBuilder<?>> consumer) {
-        if (consumer != null) {
-            consumer.accept(where());
-        }
-        return this;
-    }
-
-    public int execute() {
-        return updateBuilder.execute();
-    }
-
-    public int exec() {
-        return execute();
-    }
-
-    public String toSql() {
-        return updateBuilder.toSql();
-    }
-
-    public SqlAndParams toSqlAndParams() {
-        return updateBuilder.toSqlAndParams();
-    }
-
-    public SqlUpdateStream printSql(Boolean print) {
-        if (print == null || print) {
-            updateBuilder.printSql();
-        } else {
-            updateBuilder.printSql(false);
-        }
+    @Override
+    public SqlUpdateStream<T> set(boolean condition, Object propVal, Object value) {
+        super.set(condition, propVal, value);
         return this;
     }
 }

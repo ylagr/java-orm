@@ -473,7 +473,7 @@ public class JavaOrm {
     }
 
     /**
-     * 声明式 SQL 执行环境统一入口（带返回值 lambda，支持直接 return e.select(...) / WhereBuilder / 目标实体类 Class<T> 等）：
+     * 声明式 SQL 执行环境统一强类型查询入口（带返回值 lambda，直接 return e.select(...) / WhereBuilder 等 TQuery<T> 实例）：
      * <pre>
      * List<Student> list = orm.sql(e -> {
      *     Student s = e.table(Student.class);
@@ -483,40 +483,14 @@ public class JavaOrm {
      * }).toList();
      * </pre>
      */
-    public <T> SqlExecution<T> sql(Function<SqlEnv, ?> envFunction) {
+    public <T> SqlExecution<T> sql(Function<SqlEnv, ? extends TQuery<T>> envFunction) {
         if (envFunction == null) {
             throw new IllegalArgumentException("SqlEnv function must not be null");
         }
         SqlEnv env = env();
         try {
-            Object returned = envFunction.apply(env);
+            TQuery<T> returned = envFunction.apply(env);
             return env.toExecutionFromReturn(returned);
-        } finally {
-            com.javaorm.core.proxy.RecordingContext.clearRecording();
-            com.javaorm.core.proxy.RecordingContext.clearAliases();
-            com.javaorm.core.query.Query.resetAliasSeq();
-        }
-    }
-
-    /**
-     * 声明式强类型查询执行入口：直接返回 TQuery<T>，让外部直接感知并推导结果类型 T：
-     * <pre>
-     * TQuery<Student> query = orm.query(e -> {
-     *     Student s = e.table(Student.class);
-     *     return e.select(s)
-     *             .where().and(s.getAge()).ge(22)
-     *             .orderBy(s.getId()).desc();
-     * });
-     * List<Student> list = query.toList();
-     * </pre>
-     */
-    public <T> TQuery<T> query(Function<SqlEnv, ? extends TQuery<T>> envFunction) {
-        if (envFunction == null) {
-            throw new IllegalArgumentException("SqlEnv function must not be null");
-        }
-        SqlEnv env = env();
-        try {
-            return envFunction.apply(env);
         } finally {
             com.javaorm.core.proxy.RecordingContext.clearRecording();
             com.javaorm.core.proxy.RecordingContext.clearAliases();

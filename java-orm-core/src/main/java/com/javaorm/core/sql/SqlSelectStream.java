@@ -208,10 +208,7 @@ public class SqlSelectStream<T> implements TQuery<T> {
     public WhereBuilder<T> where() {
         ensureQuery();
         Class<T> resClass = getResultClass();
-        Class<?> rootClass = query.getRootEntityClass() != null ? query.getRootEntityClass() : resClass;
-        WhereBuilder<T> wb = new WhereBuilder<>(env, query.getStatement(), (Class<T>) rootClass,
-                query.getStatement().getRootTableAlias(), query.getStatement()::addWhereCondition,
-                query, this::toList, null, query::toSqlAndParams, query::printSql);
+        WhereBuilder<T> wb = (WhereBuilder<T>) query.where();
         if (resClass != null) {
             wb.setResultClass(resClass);
         }
@@ -371,22 +368,9 @@ public class SqlSelectStream<T> implements TQuery<T> {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <R> List<R> toList(Class<R> targetClass) {
-        if (targetClass == null) {
-            throw new IllegalArgumentException("Target class must not be null");
-        }
         ensureQuery();
-        if (isFullEntitySelect && query != null && query.getRootEntityClass() == targetClass) {
-            return (List<R>) query.toList();
-        }
-        if (ColumnMetadata.isScalarType(targetClass)) {
-            return env.executeSelectScalarList(null, query.getStatement(), targetClass);
-        }
-        if (Map.class.isAssignableFrom(targetClass)) {
-            return (List<R>) env.executeSelectMaps(null, query.getStatement());
-        }
-        return env.executeSelectDtoList(null, query.getStatement(), targetClass);
+        return query.toList(targetClass);
     }
 
     @Override
@@ -402,24 +386,9 @@ public class SqlSelectStream<T> implements TQuery<T> {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <R> R firstOrNull(Class<R> targetClass) {
-        if (targetClass == null) {
-            throw new IllegalArgumentException("Target class must not be null");
-        }
         ensureQuery();
-        if (isFullEntitySelect && query != null && query.getRootEntityClass() == targetClass) {
-            return (R) query.firstOrNull();
-        }
-        if (ColumnMetadata.isScalarType(targetClass)) {
-            return env.executeSelectScalar(null, query.getStatement(), targetClass);
-        }
-        if (Map.class.isAssignableFrom(targetClass)) {
-            List<Map<String, Object>> maps = env.executeSelectMaps(null, query.getStatement());
-            return (maps != null && !maps.isEmpty()) ? (R) maps.get(0) : null;
-        }
-        List<R> list = toList(targetClass);
-        return (list != null && !list.isEmpty()) ? list.get(0) : null;
+        return query.firstOrNull(targetClass);
     }
 
     @Override
