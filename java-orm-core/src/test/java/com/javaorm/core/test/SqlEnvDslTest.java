@@ -425,4 +425,91 @@ public class SqlEnvDslTest {
             assertTrue(e.getMessage().contains("multi-table or untyped projection query"));
         }
     }
+
+    /**
+     * 12. 测试 orm.sql(e -> ... return entity.class).toList() 语法
+     */
+    @Test
+    public void testReturnEntityClassSyntax() {
+        // 1. 全实体查询：return Student.class
+        List<Student> fullStudents = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            e.select(s)
+             .where().and(s.getAge()).ge(22)
+             .orderBy(s.getId()).desc();
+            return Student.class;
+        }).toList();
+
+        assertEquals(2, fullStudents.size());
+        assertEquals("David", fullStudents.get(0).getStudentName());
+        assertEquals("Bob", fullStudents.get(1).getStudentName());
+
+        // 2. 自定义字段投影查询并映射至实体：return Student.class
+        List<Student> projectedStudents = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            e.select(s.getStudentName(), s.getAge())
+             .from(s)
+             .where().and(s.getAge()).ge(22)
+             .orderBy(s.getAge()).asc();
+            return Student.class;
+        }).toList();
+
+        assertEquals(2, projectedStudents.size());
+        assertEquals("Bob", projectedStudents.get(0).getStudentName());
+        assertEquals(Integer.valueOf(22), projectedStudents.get(0).getAge());
+        assertEquals("David", projectedStudents.get(1).getStudentName());
+        assertEquals(Integer.valueOf(25), projectedStudents.get(1).getAge());
+
+        // 3. 多表关联投影并映射至 DTO：return StudentDto.class
+        List<StudentDto> dtos = orm.sql(e -> {
+            Student s = e.table(Student.class, "s");
+            Teacher t = e.table(Teacher.class, "t");
+            e.select(s.getId(), s.getStudentName(), s.getAge())
+             .from(s)
+             .leftJoin(t).on(s.getTeacherId(), t.getId())
+             .where().and(s.getAge()).ge(22)
+             .orderBy(s.getAge()).asc();
+            return StudentDto.class;
+        }).toList();
+
+        assertEquals(2, dtos.size());
+        assertEquals("Bob", dtos.get(0).getStudentName());
+        assertEquals("David", dtos.get(1).getStudentName());
+
+        // 4. 单标量值查询：return String.class
+        List<String> names = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            e.select(s.getStudentName())
+             .from(s)
+             .where().and(s.getAge()).ge(22)
+             .orderBy(s.getAge()).asc();
+            return String.class;
+        }).toList();
+
+        assertEquals(2, names.size());
+        assertEquals("Bob", names.get(0));
+        assertEquals("David", names.get(1));
+
+        // 5. firstOrNull 配合 return 实体类
+        Student firstStudent = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            e.select(s)
+             .where().and(s.getId()).eq(2L);
+            return Student.class;
+        }).firstOrNull();
+
+        assertNotNull(firstStudent);
+        assertEquals("Bob", firstStudent.getStudentName());
+
+        // 6. firstOrNull 配合 return 标量类型
+        String firstName = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            e.select(s.getStudentName())
+             .from(s)
+             .where().and(s.getId()).eq(2L);
+            return String.class;
+        }).firstOrNull();
+
+        assertEquals("Bob", firstName);
+    }
 }

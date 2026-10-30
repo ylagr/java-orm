@@ -13,6 +13,7 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * JavaOrm 核心门面与统一操作入口。
@@ -464,6 +465,31 @@ public class JavaOrm {
         try {
             envConsumer.accept(env);
             return env.toExecution();
+        } finally {
+            com.javaorm.core.proxy.RecordingContext.clearRecording();
+            com.javaorm.core.proxy.RecordingContext.clearAliases();
+            com.javaorm.core.query.Query.resetAliasSeq();
+        }
+    }
+
+    /**
+     * 声明式 SQL 执行环境统一入口（带返回值 lambda，直接 return 目标实体/DTO类对象 Class<T>）：
+     * <pre>
+     * List<Student> list = orm.sql(e -> {
+     *     Student s = e.table(Student.class);
+     *     e.select(s.getStudentName(), s.getAge()).from(s);
+     *     return Student.class;
+     * }).toList();
+     * </pre>
+     */
+    public <T> SqlExecution<T> sql(Function<SqlEnv, Class<T>> envFunction) {
+        if (envFunction == null) {
+            throw new IllegalArgumentException("SqlEnv function must not be null");
+        }
+        SqlEnv env = env();
+        try {
+            Class<T> resultClass = envFunction.apply(env);
+            return env.toExecution(resultClass);
         } finally {
             com.javaorm.core.proxy.RecordingContext.clearRecording();
             com.javaorm.core.proxy.RecordingContext.clearAliases();

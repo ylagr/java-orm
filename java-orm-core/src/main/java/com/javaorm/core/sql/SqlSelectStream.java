@@ -344,6 +344,9 @@ public class SqlSelectStream {
             throw new IllegalArgumentException("Target class must not be null");
         }
         ensureQuery();
+        if (isFullEntitySelect && query != null && query.getRootEntityClass() == targetClass) {
+            return (List<R>) query.toList();
+        }
         if (ColumnMetadata.isScalarType(targetClass)) {
             return env.executeSelectScalarList(null, query.getStatement(), targetClass);
         }
@@ -370,6 +373,9 @@ public class SqlSelectStream {
             throw new IllegalArgumentException("Target class must not be null");
         }
         ensureQuery();
+        if (isFullEntitySelect && query != null && query.getRootEntityClass() == targetClass) {
+            return (R) query.firstOrNull();
+        }
         if (ColumnMetadata.isScalarType(targetClass)) {
             return env.executeSelectScalar(null, query.getStatement(), targetClass);
         }

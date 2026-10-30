@@ -114,6 +114,9 @@ public class SqlExecution<T> {
         if (operation instanceof Query<?>) {
             Query<?> q = (Query<?>) operation;
             if (resultClass != null) {
+                if (resultClass == q.getRootEntityClass()) {
+                    return (List<R>) q.toList();
+                }
                 if (ColumnMetadata.isScalarType(resultClass)) {
                     return (List<R>) env.executeSelectScalarList(null, q.getStatement(), resultClass);
                 }
@@ -176,6 +179,9 @@ public class SqlExecution<T> {
         if (operation instanceof Query<?>) {
             Query<?> q = (Query<?>) operation;
             if (resultClass != null) {
+                if (resultClass == q.getRootEntityClass()) {
+                    return (R) q.firstOrNull();
+                }
                 if (ColumnMetadata.isScalarType(resultClass)) {
                     return (R) env.executeSelectScalar(null, q.getStatement(), resultClass);
                 }
