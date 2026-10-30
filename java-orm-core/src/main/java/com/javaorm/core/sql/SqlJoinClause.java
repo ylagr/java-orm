@@ -23,10 +23,10 @@ public class SqlJoinClause<T> implements Query<T> {
 
     private final SqlSelectStream<T> selectStream;
     private final TableJoin tableJoin;
-    private final SqlTableInfo targetInfo;
+    private final SqlTableInfo<?> targetInfo;
     private boolean onConfigured = false;
 
-    public SqlJoinClause(SqlSelectStream<T> selectStream, TableJoin tableJoin, SqlTableInfo targetInfo) {
+    public SqlJoinClause(SqlSelectStream<T> selectStream, TableJoin tableJoin, SqlTableInfo<?> targetInfo) {
         this.selectStream = selectStream;
         this.tableJoin = tableJoin;
         this.targetInfo = targetInfo;

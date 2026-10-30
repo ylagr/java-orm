@@ -10,15 +10,14 @@ import com.javaorm.core.mutation.DeleteBuilder;
  */
 public class SqlDeleteStream<T> extends DeleteBuilder<T> {
 
-    private final SqlTableInfo tableInfo;
+    private final SqlTableInfo<T> tableInfo;
 
-    @SuppressWarnings("unchecked")
-    public SqlDeleteStream(SqlEnv env, SqlTableInfo tableInfo) {
-        super(env, (Class<T>) (tableInfo != null ? tableInfo.getEntityClass() : null));
+    public SqlDeleteStream(SqlEnv env, SqlTableInfo<T> tableInfo) {
+        super(env, tableInfo != null ? tableInfo.getEntityClass() : null);
         this.tableInfo = tableInfo;
     }
 
-    public SqlTableInfo getTableInfo() {
+    public SqlTableInfo<T> getTableInfo() {
         return tableInfo;
     }
 }

@@ -8,6 +8,8 @@ import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.H2Dialect;
 import com.javaorm.core.query.Cte;
 import com.javaorm.core.query.Query;
+import com.javaorm.core.sql.SqlEnv;
+import com.javaorm.core.sql.SqlTableInfo;
 import com.javaorm.core.test.entity.Student;
 import com.javaorm.core.test.entity.Teacher;
 import org.h2.jdbcx.JdbcDataSource;
@@ -144,7 +146,8 @@ public class SqlEnvDslTest {
         List<Student> list = orm.sql(e -> {
             Student s = e.table(Student.class);
             e.select(s)
-                    .where().and(s.getAge()).ge(22)
+                    .where()
+                    .and(s.getAge()).ge(22)
                     .orderBy(s.getId()).desc();
         }).toList();
 
@@ -612,4 +615,59 @@ public class SqlEnvDslTest {
         assertEquals(Student.class, joinQuery.getResultClass());
         assertTrue(joinQuery.toList().size() > 0);
     }
+
+    @Test
+    public void testStrongTypedFindTableInfoAndCallChain() {
+        orm.sql(e -> {
+            Student s = e.table(Student.class, "s");
+            Teacher t = e.table(Teacher.class, "t");
+
+            // 1. 测试入参强类型的 findTableInfo 查找方法
+            SqlTableInfo<Student> infoByProxy = e.findTableInfoByProxy(s);
+            assertNotNull(infoByProxy);
+            assertSame(s, infoByProxy.getProxy());
+            assertEquals(Student.class, infoByProxy.getEntityClass());
+            assertEquals("s", infoByProxy.getAlias());
+
+            SqlTableInfo<Student> infoByClass = e.findTableInfo(Student.class);
+            assertNotNull(infoByClass);
+            assertEquals(Student.class, infoByClass.getEntityClass());
+
+            SqlTableInfo<?> infoByAlias = e.findTableInfo("s");
+            assertNotNull(infoByAlias);
+            assertEquals("s", infoByAlias.getAlias());
+
+            // 2. 测试外部动态 Object 入参时的分发查找
+            Object dynamicProxy = s;
+            SqlTableInfo<?> infoFromDynamicProxy = e.findTableInfo(dynamicProxy);
+            assertNotNull(infoFromDynamicProxy);
+            assertEquals("s", infoFromDynamicProxy.getAlias());
+
+            Object dynamicClass = Student.class;
+            SqlTableInfo<?> infoFromDynamicClass = e.findTableInfo(dynamicClass);
+            assertNotNull(infoFromDynamicClass);
+            assertEquals(Student.class, infoFromDynamicClass.getEntityClass());
+
+            // 3. 测试入参强类型的 resolveTable 解析方法
+            SqlTableInfo<Student> resolvedProxy = e.resolveTableByProxy(s);
+            assertNotNull(resolvedProxy);
+            assertEquals("s", resolvedProxy.getAlias());
+
+            SqlTableInfo<Department> resolvedClass = e.resolveTable(Department.class);
+            assertNotNull(resolvedClass);
+            assertEquals(Department.class, resolvedClass.getEntityClass());
+
+            // 4. 测试 SqlSelectStream 中强类型的 from / join 方法调用链
+            Query<Student> queryWithTypedChain = e.select(s)
+                    .from(Student.class)
+                    .leftJoin(Teacher.class).on(s.getTeacherId(), t.getId())
+                    .where().and(s.getAge()).ge(20);
+
+            assertNotNull(queryWithTypedChain);
+            assertTrue(queryWithTypedChain.toList().size() > 0);
+
+            return queryWithTypedChain;
+        });
+    }
 }
+

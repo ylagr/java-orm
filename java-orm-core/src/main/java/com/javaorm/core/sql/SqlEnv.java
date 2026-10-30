@@ -43,10 +43,10 @@ public class SqlEnv {
     private Boolean printSqlOverride = null;
 
     private int aliasSequence = 0;
-    private final List<SqlTableInfo> registeredTables = new ArrayList<>();
-    private final Map<Object, SqlTableInfo> proxyMap = new IdentityHashMap<>();
-    private final Map<Class<?>, SqlTableInfo> classMap = new HashMap<>();
-    private final Map<String, SqlTableInfo> aliasMap = new HashMap<>();
+    private final List<SqlTableInfo<?>> registeredTables = new ArrayList<>();
+    private final Map<Object, SqlTableInfo<?>> proxyMap = new IdentityHashMap<>();
+    private final Map<Class<?>, SqlTableInfo<?>> classMap = new HashMap<>();
+    private final Map<String, SqlTableInfo<?>> aliasMap = new HashMap<>();
 
     private Object currentOperation;
 
@@ -126,7 +126,7 @@ public class SqlEnv {
         EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
         String tableName = meta != null ? meta.getTableName() : entityClass.getSimpleName();
 
-        SqlTableInfo info = new SqlTableInfo(proxy, entityClass, null, effectiveAlias, tableName);
+        SqlTableInfo<T> info = new SqlTableInfo<>(proxy, entityClass, null, effectiveAlias, tableName);
         registerTable(info);
         RecordingContext.registerProxyAlias(proxy, effectiveAlias);
         RecordingContext.registerAlias(entityClass, effectiveAlias);
@@ -155,7 +155,7 @@ public class SqlEnv {
         return aliasedCte;
     }
 
-    private void registerTable(SqlTableInfo info) {
+    private void registerTable(SqlTableInfo<?> info) {
         registeredTables.add(info);
         if (info.getProxy() != null) {
             proxyMap.put(info.getProxy(), info);
@@ -168,60 +168,143 @@ public class SqlEnv {
         }
     }
 
-    public SqlTableInfo findTableInfo(Object target) {
-        if (target == null) return null;
-        SqlTableInfo info = proxyMap.get(target);
-        if (info != null) return info;
-        if (target instanceof Class) {
-            return classMap.get(target);
-        }
-        if (target instanceof Cte) {
-            Cte<?> cte = (Cte<?>) target;
-            if (cte.getEffectiveAlias() != null) {
-                return aliasMap.get(cte.getEffectiveAlias().toLowerCase());
-            }
-        }
-        if (target instanceof String) {
-            return aliasMap.get(((String) target).toLowerCase());
+    /**
+     * 通过实体代理对象查找已注册表元信息
+     */
+    @SuppressWarnings("unchecked")
+    public <P> SqlTableInfo<P> findTableInfoByProxy(P proxy) {
+        if (proxy == null) return null;
+        return (SqlTableInfo<P>) proxyMap.get(proxy);
+    }
+
+    /**
+     * 通过实体 Class 查找已注册表元信息
+     */
+    @SuppressWarnings("unchecked")
+    public <E> SqlTableInfo<E> findTableInfo(Class<E> entityClass) {
+        if (entityClass == null) return null;
+        return (SqlTableInfo<E>) classMap.get(entityClass);
+    }
+
+    /**
+     * 通过 CTE 临时表查找已注册表元信息
+     */
+    @SuppressWarnings("unchecked")
+    public <E> SqlTableInfo<E> findTableInfo(Cte<E> cte) {
+        if (cte == null) return null;
+        if (cte.getEffectiveAlias() != null) {
+            return (SqlTableInfo<E>) aliasMap.get(cte.getEffectiveAlias().toLowerCase());
         }
         return null;
     }
 
-    public SqlTableInfo resolveTable(Object target) {
-        SqlTableInfo info = findTableInfo(target);
+    /**
+     * 通过别名或表名字符串查找已注册表元信息
+     */
+    public SqlTableInfo<?> findTableInfo(String aliasOrTableName) {
+        if (aliasOrTableName == null) return null;
+        return aliasMap.get(aliasOrTableName.toLowerCase());
+    }
+
+    /**
+     * 外部动态调用分发：入参为 Object，按实际类型分发至对应的强类型方法
+     */
+    public SqlTableInfo<?> findTableInfo(Object target) {
+        if (target == null) return null;
+        if (target instanceof Class<?>) {
+            return findTableInfo((Class<?>) target);
+        }
+        if (target instanceof Cte<?>) {
+            return findTableInfo((Cte<?>) target);
+        }
+        if (target instanceof String) {
+            return findTableInfo((String) target);
+        }
+        return findTableInfoByProxy(target);
+    }
+
+    /**
+     * 解析实体 Class（若未注册则动态生成表元信息并注册）
+     */
+    public <E> SqlTableInfo<E> resolveTable(Class<E> entityClass) {
+        if (entityClass == null) {
+            throw new IllegalArgumentException("Entity class cannot be null");
+        }
+        SqlTableInfo<E> info = findTableInfo(entityClass);
         if (info != null) {
             return info;
         }
-        if (target instanceof Class) {
-            @SuppressWarnings("unchecked")
-            Class<?> clazz = (Class<?>) target;
-            String alias = nextAlias();
-            EntityMetadata meta = EntityMetadataManager.get(clazz, config);
-            String tableName = meta != null ? meta.getTableName() : clazz.getSimpleName();
-            SqlTableInfo dynamicallyCreated = new SqlTableInfo(null, clazz, null, alias, tableName);
-            registerTable(dynamicallyCreated);
-            return dynamicallyCreated;
-        }
-        if (target instanceof Cte) {
-            Cte<?> cte = (Cte<?>) target;
-            String alias = cte.getEffectiveAlias() != null ? cte.getEffectiveAlias() : nextAlias();
-            SqlTableInfo dynamicallyCreated = new SqlTableInfo(cte, cte.getEntityClass(), cte, alias, cte.getName());
-            registerTable(dynamicallyCreated);
-            return dynamicallyCreated;
-        }
-        throw new IllegalArgumentException("Cannot resolve table from object: " + target);
+        String alias = nextAlias();
+        EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
+        String tableName = meta != null ? meta.getTableName() : entityClass.getSimpleName();
+        SqlTableInfo<E> dynamicallyCreated = new SqlTableInfo<>(null, entityClass, null, alias, tableName);
+        registerTable(dynamicallyCreated);
+        return dynamicallyCreated;
     }
 
-    public SqlTableInfo getFirstRegisteredTable() {
+    /**
+     * 解析 CTE 临时表（若未注册则动态生成表元信息并注册）
+     */
+    public <E> SqlTableInfo<E> resolveTable(Cte<E> cte) {
+        if (cte == null) {
+            throw new IllegalArgumentException("CTE cannot be null");
+        }
+        SqlTableInfo<E> info = findTableInfo(cte);
+        if (info != null) {
+            return info;
+        }
+        String alias = cte.getEffectiveAlias() != null ? cte.getEffectiveAlias() : nextAlias();
+        SqlTableInfo<E> dynamicallyCreated = new SqlTableInfo<>(cte, cte.getEntityClass(), cte, alias, cte.getName());
+        registerTable(dynamicallyCreated);
+        return dynamicallyCreated;
+    }
+
+    /**
+     * 解析实体代理对象
+     */
+    public <P> SqlTableInfo<P> resolveTableByProxy(P proxy) {
+        if (proxy == null) {
+            throw new IllegalArgumentException("Table proxy cannot be null");
+        }
+        SqlTableInfo<P> info = findTableInfoByProxy(proxy);
+        if (info != null) {
+            return info;
+        }
+        throw new IllegalArgumentException("Cannot resolve table from unregistered proxy: " + proxy);
+    }
+
+    /**
+     * 外部动态调用分发：入参为 Object，按实际类型分发至对应的强类型解析方法
+     */
+    public SqlTableInfo<?> resolveTable(Object target) {
+        if (target == null) {
+            throw new IllegalArgumentException("Target table cannot be null");
+        }
+        if (target instanceof Class<?>) {
+            return resolveTable((Class<?>) target);
+        }
+        if (target instanceof Cte<?>) {
+            return resolveTable((Cte<?>) target);
+        }
+        if (target instanceof String) {
+            SqlTableInfo<?> info = findTableInfo((String) target);
+            if (info != null) {
+                return info;
+            }
+            throw new IllegalArgumentException("Cannot resolve table from alias: " + target);
+        }
+        return resolveTableByProxy(target);
+    }
+
+    public SqlTableInfo<?> getFirstRegisteredTable() {
         return !registeredTables.isEmpty() ? registeredTables.get(0) : null;
     }
 
     // ========== 2. SELECT 管道入口与 Query 工厂 ==========
 
-    @SuppressWarnings("unchecked")
     public <T> SqlSelectStream<T> select(T tableProxy) {
-        SqlTableInfo info = findTableInfo(tableProxy);
-        Class<T> entityClass = info != null ? (Class<T>) info.getEntityClass() : null;
+        SqlTableInfo<T> info = findTableInfoByProxy(tableProxy);
+        Class<T> entityClass = info != null ? info.getEntityClass() : null;
         SqlSelectStream<T> stream = new SqlSelectStream<>(this, entityClass, new Object[]{tableProxy});
         this.currentOperation = stream;
         return stream;
@@ -233,7 +316,6 @@ public class SqlEnv {
         return stream;
     }
 
-    @SuppressWarnings("unchecked")
     public <T> SqlSelectStream<T> select(Object... expressions) {
         SqlSelectStream<T> stream = new SqlSelectStream<>(this, null, expressions);
         this.currentOperation = stream;
@@ -272,7 +354,14 @@ public class SqlEnv {
 
     @SuppressWarnings("unchecked")
     public <T> SqlUpdateStream<T> update(T targetTable) {
-        SqlTableInfo info = resolveTable(targetTable);
+        SqlTableInfo<T> info;
+        if (targetTable instanceof Class) {
+            info = resolveTable((Class<T>) targetTable);
+        } else if (targetTable instanceof Cte) {
+            info = resolveTable((Cte<T>) targetTable);
+        } else {
+            info = resolveTableByProxy(targetTable);
+        }
         SqlUpdateStream<T> stream = new SqlUpdateStream<>(this, info);
         this.currentOperation = stream;
         return stream;
@@ -292,7 +381,14 @@ public class SqlEnv {
 
     @SuppressWarnings("unchecked")
     public <T> SqlDeleteStream<T> delete(T targetTable) {
-        SqlTableInfo info = resolveTable(targetTable);
+        SqlTableInfo<T> info;
+        if (targetTable instanceof Class) {
+            info = resolveTable((Class<T>) targetTable);
+        } else if (targetTable instanceof Cte) {
+            info = resolveTable((Cte<T>) targetTable);
+        } else {
+            info = resolveTableByProxy(targetTable);
+        }
         SqlDeleteStream<T> stream = new SqlDeleteStream<>(this, info);
         this.currentOperation = stream;
         return stream;

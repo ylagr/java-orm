@@ -4,16 +4,18 @@ import com.javaorm.core.query.Cte;
 
 /**
  * SqlEnv 中已注册表/视图/CTE 的元信息载体。
+ *
+ * @param <T> 实体类型
  */
-public class SqlTableInfo {
+public class SqlTableInfo<T> {
 
     private final Object proxy;
-    private final Class<?> entityClass;
-    private final Cte<?> cte;
+    private final Class<T> entityClass;
+    private final Cte<T> cte;
     private final String alias;
     private final String tableName;
 
-    public SqlTableInfo(Object proxy, Class<?> entityClass, Cte<?> cte, String alias, String tableName) {
+    public SqlTableInfo(Object proxy, Class<T> entityClass, Cte<T> cte, String alias, String tableName) {
         this.proxy = proxy;
         this.entityClass = entityClass;
         this.cte = cte;
@@ -25,11 +27,11 @@ public class SqlTableInfo {
         return proxy;
     }
 
-    public Class<?> getEntityClass() {
+    public Class<T> getEntityClass() {
         return entityClass;
     }
 
-    public Cte<?> getCte() {
+    public Cte<T> getCte() {
         return cte;
     }
 

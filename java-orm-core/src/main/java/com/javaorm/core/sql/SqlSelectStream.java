@@ -51,15 +51,28 @@ public class SqlSelectStream<T> implements Query<T> {
             return;
         }
 
-        // 单参实体代理检查：如 e.select(s) 或 e.select(Student.class)
+        // 单参实体检查：如 e.select(s) 或 e.select(Student.class) 或 e.select(cte)
         if (rawExpressions.length == 1 && rawExpressions[0] != null) {
             Object first = rawExpressions[0];
-            SqlTableInfo info = env.findTableInfo(first);
-            if (info == null && first instanceof Class<?>) {
-                try {
-                    info = env.resolveTable(first);
-                } catch (Exception ignored) {
+            SqlTableInfo<?> info = null;
+            if (first instanceof Class<?>) {
+                info = env.findTableInfo((Class<?>) first);
+                if (info == null) {
+                    try {
+                        info = env.resolveTable((Class<?>) first);
+                    } catch (Exception ignored) {
+                    }
                 }
+            } else if (first instanceof Cte<?>) {
+                info = env.findTableInfo((Cte<?>) first);
+                if (info == null) {
+                    try {
+                        info = env.resolveTable((Cte<?>) first);
+                    } catch (Exception ignored) {
+                    }
+                }
+            } else {
+                info = env.findTableInfoByProxy(first);
             }
             if (info != null) {
                 this.candidateRootTable = first;
@@ -111,10 +124,43 @@ public class SqlSelectStream<T> implements Query<T> {
     }
 
     /**
-     * 指定查询数据源（主表 / FROM）
+     * 指定查询数据源（主表 / FROM） - 实体 Class
      */
-    public SqlSelectStream<T> from(Object rootTable) {
-        SqlTableInfo info = env.resolveTable(rootTable);
+    public <E> SqlSelectStream<T> from(Class<E> entityClass) {
+        SqlTableInfo<E> info = env.resolveTable(entityClass);
+        return applyFromTableInfo(info);
+    }
+
+    /**
+     * 指定查询数据源（主表 / FROM） - CTE 临时表
+     */
+    public <E> SqlSelectStream<T> from(Cte<E> cte) {
+        SqlTableInfo<E> info = env.resolveTable(cte);
+        return applyFromTableInfo(info);
+    }
+
+    /**
+     * 指定查询数据源（主表 / FROM） - 实体代理对象或动态对象
+     */
+    public <P> SqlSelectStream<T> from(P rootTable) {
+        if (rootTable instanceof Class<?>) {
+            return from((Class<?>) rootTable);
+        }
+        if (rootTable instanceof Cte<?>) {
+            return from((Cte<?>) rootTable);
+        }
+        if (rootTable instanceof String) {
+            SqlTableInfo<?> info = env.findTableInfo((String) rootTable);
+            if (info != null) {
+                return applyFromTableInfo(info);
+            }
+            throw new IllegalArgumentException("Cannot resolve table from alias: " + rootTable);
+        }
+        SqlTableInfo<P> info = env.resolveTableByProxy(rootTable);
+        return applyFromTableInfo(info);
+    }
+
+    private SqlSelectStream<T> applyFromTableInfo(SqlTableInfo<?> info) {
         if (info.isCte()) {
             this.query = new SelectBuilder<>(env, info.getCte());
         } else {
@@ -139,47 +185,102 @@ public class SqlSelectStream<T> implements Query<T> {
             from(candidateRootTable);
             return;
         }
-        SqlTableInfo firstTable = env.getFirstRegisteredTable();
+        SqlTableInfo<?> firstTable = env.getFirstRegisteredTable();
         if (firstTable != null) {
-            from(firstTable.getProxy() != null ? firstTable.getProxy() : firstTable.getEntityClass());
+            applyFromTableInfo(firstTable);
             return;
         }
         throw new IllegalStateException("Please specify the root table using .from(table) before configuring joins, where or orderBy.");
     }
 
-    // ========== JOIN 相关方法（支持首字母小写与通用别名） ==========
+    // ========== JOIN 相关方法（支持强类型重载、首字母小写与通用别名） ==========
 
-    public SqlJoinClause<T> leftJoin(Object targetTable) {
-        return createJoin(TableJoin.JoinType.LEFT_JOIN, targetTable);
+    public <E> SqlJoinClause<T> leftJoin(Class<E> entityClass) {
+        return createJoin(TableJoin.JoinType.LEFT_JOIN, env.resolveTable(entityClass));
     }
 
-    public SqlJoinClause<T> leftjoin(Object targetTable) {
+    public <E> SqlJoinClause<T> leftJoin(Cte<E> cte) {
+        return createJoin(TableJoin.JoinType.LEFT_JOIN, env.resolveTable(cte));
+    }
+
+    public <P> SqlJoinClause<T> leftJoin(P targetTable) {
+        return createJoin(TableJoin.JoinType.LEFT_JOIN, (Object) targetTable);
+    }
+
+    public <E> SqlJoinClause<T> leftjoin(Class<E> entityClass) {
+        return leftJoin(entityClass);
+    }
+
+    public <E> SqlJoinClause<T> leftjoin(Cte<E> cte) {
+        return leftJoin(cte);
+    }
+
+    public <P> SqlJoinClause<T> leftjoin(P targetTable) {
         return leftJoin(targetTable);
     }
 
-    public SqlJoinClause<T> innerJoin(Object targetTable) {
-        return createJoin(TableJoin.JoinType.INNER_JOIN, targetTable);
+    public <E> SqlJoinClause<T> innerJoin(Class<E> entityClass) {
+        return createJoin(TableJoin.JoinType.INNER_JOIN, env.resolveTable(entityClass));
     }
 
-    public SqlJoinClause<T> innerjoin(Object targetTable) {
+    public <E> SqlJoinClause<T> innerJoin(Cte<E> cte) {
+        return createJoin(TableJoin.JoinType.INNER_JOIN, env.resolveTable(cte));
+    }
+
+    public <P> SqlJoinClause<T> innerJoin(P targetTable) {
+        return createJoin(TableJoin.JoinType.INNER_JOIN, (Object) targetTable);
+    }
+
+    public <E> SqlJoinClause<T> innerjoin(Class<E> entityClass) {
+        return innerJoin(entityClass);
+    }
+
+    public <E> SqlJoinClause<T> innerjoin(Cte<E> cte) {
+        return innerJoin(cte);
+    }
+
+    public <P> SqlJoinClause<T> innerjoin(P targetTable) {
         return innerJoin(targetTable);
     }
 
-    public SqlJoinClause<T> join(Object targetTable) {
+    public <E> SqlJoinClause<T> join(Class<E> entityClass) {
+        return innerJoin(entityClass);
+    }
+
+    public <E> SqlJoinClause<T> join(Cte<E> cte) {
+        return innerJoin(cte);
+    }
+
+    public <P> SqlJoinClause<T> join(P targetTable) {
         return innerJoin(targetTable);
     }
 
-    public SqlJoinClause<T> rightJoin(Object targetTable) {
-        return createJoin(TableJoin.JoinType.RIGHT_JOIN, targetTable);
+    public <E> SqlJoinClause<T> rightJoin(Class<E> entityClass) {
+        return createJoin(TableJoin.JoinType.RIGHT_JOIN, env.resolveTable(entityClass));
     }
 
-    public SqlJoinClause<T> rightjoin(Object targetTable) {
+    public <E> SqlJoinClause<T> rightJoin(Cte<E> cte) {
+        return createJoin(TableJoin.JoinType.RIGHT_JOIN, env.resolveTable(cte));
+    }
+
+    public <P> SqlJoinClause<T> rightJoin(P targetTable) {
+        return createJoin(TableJoin.JoinType.RIGHT_JOIN, (Object) targetTable);
+    }
+
+    public <E> SqlJoinClause<T> rightjoin(Class<E> entityClass) {
+        return rightJoin(entityClass);
+    }
+
+    public <E> SqlJoinClause<T> rightjoin(Cte<E> cte) {
+        return rightJoin(cte);
+    }
+
+    public <P> SqlJoinClause<T> rightjoin(P targetTable) {
         return rightJoin(targetTable);
     }
 
-    private SqlJoinClause<T> createJoin(TableJoin.JoinType joinType, Object targetTable) {
+    private SqlJoinClause<T> createJoin(TableJoin.JoinType joinType, SqlTableInfo<?> targetInfo) {
         ensureQuery();
-        SqlTableInfo targetInfo = env.resolveTable(targetTable);
         TableJoin join;
         if (targetInfo.isCte()) {
             Cte<?> cte = targetInfo.getCte();
@@ -199,6 +300,23 @@ public class SqlSelectStream<T> implements Query<T> {
         }
         query.getStatement().addJoin(join);
         return new SqlJoinClause<>(this, join, targetInfo);
+    }
+
+    private SqlJoinClause<T> createJoin(TableJoin.JoinType joinType, Object targetTable) {
+        if (targetTable instanceof Class<?>) {
+            return createJoin(joinType, env.resolveTable((Class<?>) targetTable));
+        }
+        if (targetTable instanceof Cte<?>) {
+            return createJoin(joinType, env.resolveTable((Cte<?>) targetTable));
+        }
+        if (targetTable instanceof String) {
+            SqlTableInfo<?> info = env.findTableInfo((String) targetTable);
+            if (info != null) {
+                return createJoin(joinType, info);
+            }
+            throw new IllegalArgumentException("Cannot resolve table from alias: " + targetTable);
+        }
+        return createJoin(joinType, env.resolveTableByProxy(targetTable));
     }
 
     // ========== WHERE 条件相关方法 ==========
