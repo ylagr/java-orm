@@ -23,7 +23,7 @@ import java.util.function.Supplier;
  * 2. Lambda 表达式调用：w.and(s -> s.getAge()).gt(18)
  * 3. SQL 函数与表达式断言：w.and(min(s.getAge())).gt(18)
  */
-public class WhereBuilder<T> {
+public class WhereBuilder<T> implements TQuery<T> {
 
     @FunctionalInterface
     public interface BiWhereConsumer<T> {
@@ -40,6 +40,7 @@ public class WhereBuilder<T> {
     private final java.util.function.IntSupplier executeSupplier;
     private final Supplier<com.javaorm.core.dialect.SqlAndParams> sqlAndParamsSupplier;
     private final Consumer<Boolean> printSqlConsumer;
+    private Class<?> resultTypeClass;
 
     private LogicalOperator currentLogOp = LogicalOperator.AND;
     private Object currentLeftOperand = null;
@@ -122,6 +123,19 @@ public class WhereBuilder<T> {
 
     public SqlEnv getEnv() {
         return env;
+    }
+
+    public void setResultClass(Class<?> resultClass) {
+        this.resultTypeClass = resultClass;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Class<T> getResultClass() {
+        if (resultTypeClass != null) {
+            return (Class<T>) resultTypeClass;
+        }
+        return entityClass;
     }
 
     public Statement getAstStatement() {
@@ -2293,6 +2307,7 @@ public class WhereBuilder<T> {
         return ((Query<T>) rootQuery).unionAll(other);
     }
 
+    @Override
     public SelectStatement getStatement() {
         if (statement instanceof SelectStatement) {
             return (SelectStatement) statement;
@@ -2373,9 +2388,16 @@ public class WhereBuilder<T> {
         return (l != null && !l.isEmpty()) ? l.get(0) : null;
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public T firstOrNull() {
         return single();
+    }
+
+    @Override
+    public <R> R firstOrNull(Class<R> targetClass) {
+        List<R> list = toList(targetClass);
+        return (list != null && !list.isEmpty()) ? list.get(0) : null;
     }
 
     public long count() {
@@ -2448,9 +2470,35 @@ public class WhereBuilder<T> {
         return entityClass;
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public List<T> toList() {
         return (List<T>) list();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <R> List<R> toList(Class<R> targetClass) {
+        if (targetClass == null) {
+            throw new IllegalArgumentException("Target class must not be null");
+        }
+        if (rootQuery != null) {
+            return rootQuery.toList(targetClass);
+        }
+        if (env != null && statement instanceof SelectStatement) {
+            SelectStatement stmt = (SelectStatement) statement;
+            if (targetClass == entityClass) {
+                return (List<R>) env.executeSelectList(null, stmt, null, null);
+            }
+            if (com.javaorm.core.metadata.ColumnMetadata.isScalarType(targetClass)) {
+                return env.executeSelectScalarList(null, stmt, targetClass);
+            }
+            if (Map.class.isAssignableFrom(targetClass)) {
+                return (List<R>) env.executeSelectMaps(null, stmt);
+            }
+            return env.executeSelectDtoList(null, stmt, targetClass);
+        }
+        throw new UnsupportedOperationException("toList(Class) is not supported on this builder");
     }
 
     @SuppressWarnings("unchecked")

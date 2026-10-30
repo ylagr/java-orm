@@ -498,6 +498,32 @@ public class JavaOrm {
         }
     }
 
+    /**
+     * 声明式强类型查询执行入口：直接返回 TQuery<T>，让外部直接感知并推导结果类型 T：
+     * <pre>
+     * TQuery<Student> query = orm.query(e -> {
+     *     Student s = e.table(Student.class);
+     *     return e.select(s)
+     *             .where().and(s.getAge()).ge(22)
+     *             .orderBy(s.getId()).desc();
+     * });
+     * List<Student> list = query.toList();
+     * </pre>
+     */
+    public <T> TQuery<T> query(Function<SqlEnv, ? extends TQuery<T>> envFunction) {
+        if (envFunction == null) {
+            throw new IllegalArgumentException("SqlEnv function must not be null");
+        }
+        SqlEnv env = env();
+        try {
+            return envFunction.apply(env);
+        } finally {
+            com.javaorm.core.proxy.RecordingContext.clearRecording();
+            com.javaorm.core.proxy.RecordingContext.clearAliases();
+            com.javaorm.core.query.Query.resetAliasSeq();
+        }
+    }
+
     private static Dialect detectDialect(DataSource dataSource) {
         try (Connection conn = dataSource.getConnection()) {
             String prodName = conn.getMetaData().getDatabaseProductName();

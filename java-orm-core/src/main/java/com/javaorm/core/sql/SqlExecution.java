@@ -1,10 +1,12 @@
 package com.javaorm.core.sql;
 
+import com.javaorm.core.ast.SelectStatement;
 import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.metadata.ColumnMetadata;
 import com.javaorm.core.mutation.DeleteBuilder;
 import com.javaorm.core.mutation.UpdateBuilder;
 import com.javaorm.core.query.Query;
+import com.javaorm.core.query.TQuery;
 
 import java.util.List;
 import java.util.Map;
@@ -36,8 +38,51 @@ public class SqlExecution<T> {
         return operation;
     }
 
+    public SqlEnv getEnv() {
+        return env;
+    }
+
+    @SuppressWarnings("unchecked")
     public Class<T> getResultClass() {
-        return resultClass;
+        if (resultClass != null) {
+            return resultClass;
+        }
+        if (operation instanceof TQuery<?>) {
+            return ((TQuery<T>) operation).getResultClass();
+        }
+        return null;
+    }
+
+    public SelectStatement getStatement() {
+        if (operation instanceof TQuery<?>) {
+            return ((TQuery<?>) operation).getStatement();
+        }
+        if (operation instanceof SqlSelectStream<?>) {
+            return ((SqlSelectStream<?>) operation).getStatement();
+        }
+        if (operation instanceof Query<?>) {
+            return ((Query<?>) operation).getStatement();
+        }
+        return null;
+    }
+
+    /**
+     * 获取底层的强类型 TQuery 实例（如果当前操作是查询）
+     */
+    @SuppressWarnings("unchecked")
+    public <Q> TQuery<Q> asQuery() {
+        if (operation instanceof TQuery) {
+            return (TQuery<Q>) operation;
+        }
+        throw new IllegalStateException("Current operation is not a query: " + operation);
+    }
+
+    /**
+     * 别名方法：获取底层的强类型 TQuery 实例
+     */
+    @SuppressWarnings("unchecked")
+    public <Q> TQuery<Q> getQuery() {
+        return asQuery();
     }
 
     /**
@@ -59,8 +104,8 @@ public class SqlExecution<T> {
     }
 
     private void applyPrintSql() {
-        if (operation instanceof SqlSelectStream) {
-            ((SqlSelectStream) operation).printSql(printSqlOverride);
+        if (operation instanceof SqlSelectStream<?>) {
+            ((SqlSelectStream<?>) operation).printSql(printSqlOverride);
         } else if (operation instanceof SqlUpdateStream) {
             ((SqlUpdateStream) operation).printSql(printSqlOverride);
         } else if (operation instanceof SqlDeleteStream) {
@@ -96,7 +141,7 @@ public class SqlExecution<T> {
         if (operation instanceof com.javaorm.core.query.WhereBuilder<?>) {
             return ((com.javaorm.core.query.WhereBuilder<?>) operation).execute();
         }
-        if (operation instanceof SqlSelectStream || operation instanceof Query<?>) {
+        if (operation instanceof SqlSelectStream<?> || operation instanceof Query<?>) {
             throw new IllegalStateException("Cannot call exec() / execute() on a SELECT query. Please call .toList(), .listMaps(), or .firstOrNull() instead.");
         }
         throw new IllegalStateException("No valid SQL operation configured in SqlEnv. Please call e.select(), e.update(), or e.delete().");
@@ -107,12 +152,19 @@ public class SqlExecution<T> {
      */
     @SuppressWarnings("unchecked")
     public <R> List<R> toList() {
-        if (operation instanceof SqlSelectStream) {
-            SqlSelectStream selectStream = (SqlSelectStream) operation;
+        if (operation instanceof TQuery<?>) {
+            TQuery<?> tq = (TQuery<?>) operation;
+            if (resultClass != null && resultClass != tq.getResultClass()) {
+                return (List<R>) tq.toList(resultClass);
+            }
+            return (List<R>) tq.toList();
+        }
+        if (operation instanceof SqlSelectStream<?>) {
+            SqlSelectStream<?> selectStream = (SqlSelectStream<?>) operation;
             if (resultClass != null) {
                 return (List<R>) selectStream.toList(resultClass);
             }
-            return selectStream.toList();
+            return (List<R>) (List) selectStream.toList();
         }
         if (operation instanceof Query<?>) {
             Query<?> q = (Query<?>) operation;
@@ -138,8 +190,11 @@ public class SqlExecution<T> {
      */
     @SuppressWarnings("unchecked")
     public <R> List<R> toList(Class<R> targetClass) {
-        if (operation instanceof SqlSelectStream) {
-            return ((SqlSelectStream) operation).toList(targetClass);
+        if (operation instanceof TQuery<?>) {
+            return ((TQuery<?>) operation).toList(targetClass);
+        }
+        if (operation instanceof SqlSelectStream<?>) {
+            return ((SqlSelectStream<?>) operation).toList(targetClass);
         }
         if (operation instanceof Query<?>) {
             Query<?> q = (Query<?>) operation;
@@ -158,8 +213,11 @@ public class SqlExecution<T> {
      * 执行查询操作并返回 Map 字典列表
      */
     public List<Map<String, Object>> listMaps() {
-        if (operation instanceof SqlSelectStream) {
-            return ((SqlSelectStream) operation).listMaps();
+        if (operation instanceof TQuery<?>) {
+            return ((TQuery<?>) operation).listMaps();
+        }
+        if (operation instanceof SqlSelectStream<?>) {
+            return ((SqlSelectStream<?>) operation).listMaps();
         }
         if (operation instanceof Query<?>) {
             return ((Query<?>) operation).listMaps();
@@ -172,12 +230,19 @@ public class SqlExecution<T> {
      */
     @SuppressWarnings("unchecked")
     public <R> R firstOrNull() {
-        if (operation instanceof SqlSelectStream) {
-            SqlSelectStream selectStream = (SqlSelectStream) operation;
+        if (operation instanceof TQuery<?>) {
+            TQuery<?> tq = (TQuery<?>) operation;
+            if (resultClass != null && resultClass != tq.getResultClass()) {
+                return (R) tq.firstOrNull(resultClass);
+            }
+            return (R) tq.firstOrNull();
+        }
+        if (operation instanceof SqlSelectStream<?>) {
+            SqlSelectStream<?> selectStream = (SqlSelectStream<?>) operation;
             if (resultClass != null) {
                 return (R) selectStream.firstOrNull(resultClass);
             }
-            return selectStream.firstOrNull();
+            return (R) (Object) selectStream.firstOrNull();
         }
         if (operation instanceof Query<?>) {
             Query<?> q = (Query<?>) operation;
@@ -205,8 +270,11 @@ public class SqlExecution<T> {
      */
     @SuppressWarnings("unchecked")
     public <R> R firstOrNull(Class<R> targetClass) {
-        if (operation instanceof SqlSelectStream) {
-            return ((SqlSelectStream) operation).firstOrNull(targetClass);
+        if (operation instanceof TQuery<?>) {
+            return ((TQuery<?>) operation).firstOrNull(targetClass);
+        }
+        if (operation instanceof SqlSelectStream<?>) {
+            return ((SqlSelectStream<?>) operation).firstOrNull(targetClass);
         }
         if (operation instanceof Query<?>) {
             Query<?> q = (Query<?>) operation;
@@ -224,49 +292,37 @@ public class SqlExecution<T> {
     }
 
     /**
-     * 执行计数查询
+     * 查询匹配记录总数
      */
     public long count() {
-        if (operation instanceof SqlSelectStream) {
-            return ((SqlSelectStream) operation).count();
+        if (operation instanceof TQuery<?>) {
+            return ((TQuery<?>) operation).count();
+        }
+        if (operation instanceof SqlSelectStream<?>) {
+            return ((SqlSelectStream<?>) operation).count();
         }
         if (operation instanceof Query<?>) {
             return ((Query<?>) operation).count();
         }
-        throw new IllegalStateException("Cannot call count() on an UPDATE or DELETE operation. Please call .exec() instead.");
+        throw new IllegalStateException("Cannot call count() on an UPDATE or DELETE operation.");
     }
 
     /**
-     * 获取生成的完整 SQL 语句字符串
+     * 获取生成的 SQL 语句
      */
     public String toSql() {
-        if (operation instanceof SqlSelectStream) {
-            return ((SqlSelectStream) operation).toSql();
-        }
-        if (operation instanceof SqlUpdateStream) {
-            return ((SqlUpdateStream) operation).toSql();
-        }
-        if (operation instanceof SqlDeleteStream) {
-            return ((SqlDeleteStream) operation).toSql();
-        }
-        if (operation instanceof Query<?>) {
-            return ((Query<?>) operation).toSql();
-        }
-        if (operation instanceof UpdateBuilder<?>) {
-            return ((UpdateBuilder<?>) operation).toSql();
-        }
-        if (operation instanceof DeleteBuilder<?>) {
-            return ((DeleteBuilder<?>) operation).toSql();
-        }
-        throw new IllegalStateException("No valid SQL operation configured in SqlEnv.");
+        return toSqlAndParams().getSql();
     }
 
     /**
-     * 获取生成的完整 SQL 语句与绑定参数列表
+     * 获取生成的 SQL 与参数
      */
     public SqlAndParams toSqlAndParams() {
-        if (operation instanceof SqlSelectStream) {
-            return ((SqlSelectStream) operation).toSqlAndParams();
+        if (operation instanceof TQuery<?>) {
+            return ((TQuery<?>) operation).toSqlAndParams();
+        }
+        if (operation instanceof SqlSelectStream<?>) {
+            return ((SqlSelectStream<?>) operation).toSqlAndParams();
         }
         if (operation instanceof SqlUpdateStream) {
             return ((SqlUpdateStream) operation).toSqlAndParams();

@@ -3,28 +3,34 @@ package com.javaorm.core.sql;
 import com.javaorm.core.ast.BinaryCondition;
 import com.javaorm.core.ast.ColumnEqualityCondition;
 import com.javaorm.core.ast.ColumnExpression;
+import com.javaorm.core.ast.SelectStatement;
 import com.javaorm.core.ast.TableJoin;
+import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.operator.SqlOperator;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.RecordingContext;
 import com.javaorm.core.query.Query;
+import com.javaorm.core.query.TQuery;
 import com.javaorm.core.query.WhereBuilder;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
  * JOIN 子句构建节点。
  * 支持天然双属性关联：.on(child.getParentId(), parent.getId())，亦支持 lambda 高级配置。
+ *
+ * @param <T> 查询结果类型强类型约束
  */
-public class SqlJoinClause {
+public class SqlJoinClause<T> implements TQuery<T> {
 
-    private final SqlSelectStream selectStream;
+    private final SqlSelectStream<T> selectStream;
     private final TableJoin tableJoin;
     private final SqlTableInfo targetInfo;
     private boolean onConfigured = false;
 
-    public SqlJoinClause(SqlSelectStream selectStream, TableJoin tableJoin, SqlTableInfo targetInfo) {
+    public SqlJoinClause(SqlSelectStream<T> selectStream, TableJoin tableJoin, SqlTableInfo targetInfo) {
         this.selectStream = selectStream;
         this.tableJoin = tableJoin;
         this.targetInfo = targetInfo;
@@ -37,7 +43,7 @@ public class SqlJoinClause {
     /**
      * 声明等值关联条件：.on(child.getParentId(), parent.getId())
      */
-    public SqlSelectStream on(Object leftProp, Object rightProp) {
+    public SqlSelectStream<T> on(Object leftProp, Object rightProp) {
         List<PropertyPath> paths = RecordingContext.finishAll();
         if (paths.size() >= 2) {
             PropertyPath p1 = paths.get(paths.size() - 2);
@@ -60,7 +66,7 @@ public class SqlJoinClause {
     /**
      * 作用域 Lambda 关联条件配置
      */
-    public SqlSelectStream on(Consumer<WhereBuilder<?>> onConsumer) {
+    public SqlSelectStream<T> on(Consumer<WhereBuilder<?>> onConsumer) {
         if (onConsumer != null) {
             WhereBuilder<?> wb = new WhereBuilder<>(targetInfo.getEntityClass(), selectStream.getQuery(),
                     targetInfo.getAlias(), tableJoin::addOnCondition);
@@ -81,51 +87,108 @@ public class SqlJoinClause {
 
     // ========== 委托至 SqlSelectStream，支持省略 .on() 时直接继续链式调用 ==========
 
-    public SqlJoinClause leftJoin(Object targetTable) {
+    public SqlJoinClause<T> leftJoin(Object targetTable) {
         return selectStream.leftJoin(targetTable);
     }
 
-    public SqlJoinClause leftjoin(Object targetTable) {
+    public SqlJoinClause<T> leftjoin(Object targetTable) {
         return selectStream.leftjoin(targetTable);
     }
 
-    public SqlJoinClause innerJoin(Object targetTable) {
+    public SqlJoinClause<T> innerJoin(Object targetTable) {
         return selectStream.innerJoin(targetTable);
     }
 
-    public SqlJoinClause innerjoin(Object targetTable) {
+    public SqlJoinClause<T> innerjoin(Object targetTable) {
         return selectStream.innerjoin(targetTable);
     }
 
-    public SqlJoinClause rightJoin(Object targetTable) {
+    public SqlJoinClause<T> rightJoin(Object targetTable) {
         return selectStream.rightJoin(targetTable);
     }
 
-    public SqlJoinClause rightjoin(Object targetTable) {
+    public SqlJoinClause<T> rightjoin(Object targetTable) {
         return selectStream.rightjoin(targetTable);
     }
 
-    public <T> WhereBuilder<T> where() {
+    public WhereBuilder<T> where() {
         return selectStream.where();
     }
 
-    public SqlSelectStream where(Consumer<WhereBuilder<?>> consumer) {
+    public SqlSelectStream<T> where(Consumer<WhereBuilder<T>> consumer) {
         return selectStream.where(consumer);
     }
 
-    public SqlSelectStream orderBy(Object val) {
+    public SqlSelectStream<T> orderBy(Object val) {
         return selectStream.orderBy(val);
     }
 
-    public SqlSelectStream orderby(Object val) {
+    public SqlSelectStream<T> orderby(Object val) {
         return selectStream.orderby(val);
     }
 
-    public SqlSelectStream orderByAsc(Object val) {
+    public SqlSelectStream<T> orderByAsc(Object val) {
         return selectStream.orderByAsc(val);
     }
 
-    public SqlSelectStream orderByDesc(Object val) {
+    public SqlSelectStream<T> orderByDesc(Object val) {
         return selectStream.orderByDesc(val);
+    }
+
+    // ========== TQuery<T> 接口委托 ==========
+
+    @Override
+    public Class<T> getResultClass() {
+        return selectStream.getResultClass();
+    }
+
+    @Override
+    public SelectStatement getStatement() {
+        return selectStream.getStatement();
+    }
+
+    @Override
+    public SqlEnv getEnv() {
+        return selectStream.getEnv();
+    }
+
+    @Override
+    public List<T> toList() {
+        return selectStream.toList();
+    }
+
+    @Override
+    public <R> List<R> toList(Class<R> targetClass) {
+        return selectStream.toList(targetClass);
+    }
+
+    @Override
+    public T firstOrNull() {
+        return selectStream.firstOrNull();
+    }
+
+    @Override
+    public <R> R firstOrNull(Class<R> targetClass) {
+        return selectStream.firstOrNull(targetClass);
+    }
+
+    @Override
+    public List<Map<String, Object>> listMaps() {
+        return selectStream.listMaps();
+    }
+
+    @Override
+    public long count() {
+        return selectStream.count();
+    }
+
+    @Override
+    public String toSql() {
+        return selectStream.toSql();
+    }
+
+    @Override
+    public SqlAndParams toSqlAndParams() {
+        return selectStream.toSqlAndParams();
     }
 }

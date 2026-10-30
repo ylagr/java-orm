@@ -217,14 +217,24 @@ public class SqlEnv {
 
     // ========== 2. SELECT 管道入口与 Query 工厂 ==========
 
-    public SqlSelectStream select(Object... expressions) {
-        SqlSelectStream stream = new SqlSelectStream(this, null, expressions);
+    @SuppressWarnings("unchecked")
+    public <T> SqlSelectStream<T> select(T tableProxy) {
+        SqlTableInfo info = findTableInfo(tableProxy);
+        Class<T> entityClass = info != null ? (Class<T>) info.getEntityClass() : null;
+        SqlSelectStream<T> stream = new SqlSelectStream<>(this, entityClass, new Object[]{tableProxy});
         this.currentOperation = stream;
         return stream;
     }
 
-    public <DTO> SqlSelectStream select(Class<DTO> dtoClass, Object... expressions) {
-        SqlSelectStream stream = new SqlSelectStream(this, dtoClass, expressions);
+    public <DTO> SqlSelectStream<DTO> select(Class<DTO> dtoClass, Object... expressions) {
+        SqlSelectStream<DTO> stream = new SqlSelectStream<>(this, dtoClass, expressions);
+        this.currentOperation = stream;
+        return stream;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> SqlSelectStream<T> select(Object... expressions) {
+        SqlSelectStream<T> stream = new SqlSelectStream<>(this, null, expressions);
         this.currentOperation = stream;
         return stream;
     }
@@ -339,26 +349,31 @@ public class SqlEnv {
         }
         if (returned instanceof com.javaorm.core.query.WhereBuilder) {
             com.javaorm.core.query.WhereBuilder<?> wb = (com.javaorm.core.query.WhereBuilder<?>) returned;
-            if (currentOperation instanceof SqlSelectStream) {
-                Class<?> detected = ((SqlSelectStream) currentOperation).getResultClass();
-                if (detected == null) {
-                    detected = wb.getEntityClass();
-                }
-                return new SqlExecution<>(this, currentOperation, (Class<T>) detected);
-            }
             if (currentOperation instanceof SqlUpdateStream || currentOperation instanceof com.javaorm.core.mutation.UpdateBuilder) {
                 return new SqlExecution<>(this, currentOperation, null);
             }
             if (currentOperation instanceof SqlDeleteStream || currentOperation instanceof com.javaorm.core.mutation.DeleteBuilder) {
                 return new SqlExecution<>(this, currentOperation, null);
             }
+            if (currentOperation instanceof SqlSelectStream) {
+                Class<?> detected = ((SqlSelectStream<?>) currentOperation).getResultClass();
+                if (detected == null) {
+                    detected = wb.getEntityClass();
+                }
+                return new SqlExecution<>(this, currentOperation, (Class<T>) detected);
+            }
             com.javaorm.core.query.Query<?> q = wb.getRootQuery();
             Object op = q != null ? q : wb;
             Class<?> detected = wb.getEntityClass();
             return new SqlExecution<>(this, op, (Class<T>) detected);
         }
+        if (returned instanceof com.javaorm.core.query.TQuery) {
+            com.javaorm.core.query.TQuery<T> tq = (com.javaorm.core.query.TQuery<T>) returned;
+            this.currentOperation = tq;
+            return new SqlExecution<>(this, tq, tq.getResultClass());
+        }
         if (returned instanceof SqlSelectStream) {
-            SqlSelectStream selectStream = (SqlSelectStream) returned;
+            SqlSelectStream<?> selectStream = (SqlSelectStream<?>) returned;
             this.currentOperation = selectStream;
             return new SqlExecution<>(this, selectStream, (Class<T>) selectStream.getResultClass());
         }

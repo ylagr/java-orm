@@ -7,6 +7,7 @@ import com.javaorm.core.annotation.JoTable;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.H2Dialect;
 import com.javaorm.core.query.Cte;
+import com.javaorm.core.query.TQuery;
 import com.javaorm.core.test.entity.Student;
 import com.javaorm.core.test.entity.Teacher;
 import org.h2.jdbcx.JdbcDataSource;
@@ -570,5 +571,74 @@ public class SqlEnvDslTest {
                     .set(s.getAge(), 25)
                     .where().and(s.getId()).eq(4L);
         }).exec();
+    }
+
+    /**
+     * 14. 测试返回带泛型的 TQuery<T>，让外部直接感知结果类型
+     */
+    @Test
+    public void testReturnTQueryTypePerception() {
+        // 1. 验证链式返回为强类型 TQuery<Student>
+        TQuery<Student> query = orm.query(e -> {
+            Student s = e.table(Student.class);
+            return e.select(s)
+                    .where().and(s.getAge()).ge(22)
+                    .orderBy(s.getId()).desc();
+        });
+
+        assertNotNull(query);
+        assertEquals(Student.class, query.getResultClass());
+        assertEquals(2, query.count());
+
+        // 外部感知类型直接调用 toList() -> List<Student>
+        List<Student> students = query.toList();
+        assertEquals(2, students.size());
+        assertEquals("David", students.get(0).getStudentName());
+        assertEquals("Bob", students.get(1).getStudentName());
+
+        // 外部感知类型直接调用 firstOrNull() -> Student
+        Student firstStudent = query.firstOrNull();
+        assertNotNull(firstStudent);
+        assertEquals("David", firstStudent.getStudentName());
+
+        // 2. 验证 DTO 投影链式返回为强类型 TQuery<StudentDto>
+        TQuery<StudentDto> dtoQuery = orm.query(e -> {
+            Student s = e.table(Student.class, "s");
+            Teacher t = e.table(Teacher.class, "t");
+            return e.select(StudentDto.class, s.getId(), s.getStudentName(), s.getAge())
+                    .from(s)
+                    .leftJoin(t).on(s.getTeacherId(), t.getId())
+                    .where().and(s.getAge()).ge(22)
+                    .orderBy(s.getAge()).asc();
+        });
+
+        assertNotNull(dtoQuery);
+        assertEquals(StudentDto.class, dtoQuery.getResultClass());
+        List<StudentDto> dtos = dtoQuery.toList();
+        assertEquals(2, dtos.size());
+        assertEquals("Bob", dtos.get(0).getStudentName());
+        assertEquals("David", dtos.get(1).getStudentName());
+
+        // 3. 验证通过 orm.sql(...).asQuery() 亦可获得感知类型的 TQuery<Student>
+        TQuery<Student> sqlQuery = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            return e.select(s)
+                    .where().and(s.getId()).eq(2L);
+        }).asQuery();
+
+        assertNotNull(sqlQuery);
+        assertEquals(Student.class, sqlQuery.getResultClass());
+        Student bob = sqlQuery.firstOrNull();
+        assertNotNull(bob);
+        assertEquals("Bob", bob.getStudentName());
+
+        // 4. 验证 Join 子句节点本身也是强类型 TQuery<T>
+        TQuery<Student> joinQuery = orm.query(e -> {
+            Student s = e.table(Student.class, "s");
+            Teacher t = e.table(Teacher.class, "t");
+            return e.select(s).leftJoin(t).on(s.getTeacherId(), t.getId());
+        });
+        assertEquals(Student.class, joinQuery.getResultClass());
+        assertTrue(joinQuery.toList().size() > 0);
     }
 }

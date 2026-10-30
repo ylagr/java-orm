@@ -225,7 +225,7 @@ public abstract class AbstractDialect implements Dialect {
                 sql.append(stmt.getSelectColumns().get(i));
             }
         } else {
-            sql.append(stmt.getRootTableAlias()).append(".*");
+            sql.append(renderTablePrefix(stmt.getRootTableAlias())).append("*");
         }
 
         // 2. FROM

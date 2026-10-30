@@ -27,7 +27,7 @@ import java.util.function.Function;
 /**
  * 核心 Fluent 查询构建器。
  */
-public class Query<T> {
+public class Query<T> implements TQuery<T> {
 
     private final SqlEnv env;
     private final Class<T> rootEntityClass;
@@ -65,6 +65,11 @@ public class Query<T> {
 
     public SqlEnv getEnv() {
         return env;
+    }
+
+    @Override
+    public Class<T> getResultClass() {
+        return rootEntityClass;
     }
 
     public DataSource getDataSource() {
@@ -1062,6 +1067,24 @@ public class Query<T> {
         return list();
     }
 
+    @Override
+    @SuppressWarnings("unchecked")
+    public <R> List<R> toList(Class<R> targetClass) {
+        if (targetClass == null) {
+            throw new IllegalArgumentException("Target class must not be null");
+        }
+        if (targetClass == rootEntityClass) {
+            return (List<R>) toList();
+        }
+        if (ColumnMetadata.isScalarType(targetClass)) {
+            return env.executeSelectScalarList(null, statement, targetClass);
+        }
+        if (Map.class.isAssignableFrom(targetClass)) {
+            return (List<R>) env.executeSelectMaps(null, statement);
+        }
+        return env.executeSelectDtoList(null, statement, targetClass);
+    }
+
     public List<T> toList(Connection conn) {
         return list(conn);
     }
@@ -1099,6 +1122,12 @@ public class Query<T> {
 
     public T firstOrNull() {
         return single();
+    }
+
+    @Override
+    public <R> R firstOrNull(Class<R> targetClass) {
+        List<R> list = toList(targetClass);
+        return (list != null && !list.isEmpty()) ? list.get(0) : null;
     }
 
     public T singleOrNull() {
