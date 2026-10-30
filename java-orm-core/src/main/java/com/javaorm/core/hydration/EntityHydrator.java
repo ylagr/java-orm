@@ -82,6 +82,22 @@ public class EntityHydrator {
             curr = curr.getSuperclass();
         }
 
+        EntityMetadata entityMetadata = config != null ? com.javaorm.core.metadata.EntityMetadataManager.get(dtoClass, config) : com.javaorm.core.metadata.EntityMetadataManager.get(dtoClass);
+        if (entityMetadata != null) {
+            for (ColumnMetadata cm : entityMetadata.getColumns()) {
+                if (cm.getField() != null) {
+                    cm.getField().setAccessible(true);
+                    fieldMap.put(cm.getColumnName().toLowerCase(), cm.getField());
+                    fieldMap.put(cm.getColumnName().toLowerCase().replace("_", ""), cm.getField());
+                    fieldMap.put(cm.getPropertyName().toLowerCase(), cm.getField());
+                    fieldMap.put(cm.getPropertyName().toLowerCase().replace("_", ""), cm.getField());
+                }
+            }
+        }
+
+        java.lang.reflect.Constructor<DTO> ctor = dtoClass.getDeclaredConstructor();
+        ctor.setAccessible(true);
+
         try (PreparedStatement ps = prepareStatement(conn, sqlAndParams, dialect, stmt != null && !stmt.getCtes().isEmpty())) {
 
             try (ResultSet rs = ps.executeQuery()) {
@@ -89,7 +105,7 @@ public class EntityHydrator {
                 int colCount = rsmd.getColumnCount();
 
                 while (rs.next()) {
-                    DTO dto = dtoClass.getDeclaredConstructor().newInstance();
+                    DTO dto = ctor.newInstance();
                     for (int i = 1; i <= colCount; i++) {
                         String colLabel = rsmd.getColumnLabel(i);
                         if (colLabel == null || colLabel.isEmpty()) {

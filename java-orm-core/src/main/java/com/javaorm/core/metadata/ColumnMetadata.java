@@ -147,6 +147,20 @@ public class ColumnMetadata {
         return value;
     }
 
+    public static boolean isScalarType(Class<?> targetType) {
+        if (targetType == null) return false;
+        return targetType.isPrimitive()
+                || Number.class.isAssignableFrom(targetType)
+                || targetType == String.class
+                || targetType == Boolean.class
+                || targetType == Character.class
+                || java.util.Date.class.isAssignableFrom(targetType)
+                || java.time.temporal.Temporal.class.isAssignableFrom(targetType)
+                || targetType.isEnum()
+                || targetType == byte[].class
+                || targetType == Byte[].class;
+    }
+
     // Getters and Setters
     public String getPropertyName() { return propertyName; }
     public void setPropertyName(String propertyName) { this.propertyName = propertyName; }

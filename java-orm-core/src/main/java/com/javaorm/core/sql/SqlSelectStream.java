@@ -49,10 +49,15 @@ public class SqlSelectStream {
             return;
         }
 
-        // 单参实体代理检查：如 e.select(s)
+        // 单参实体代理检查：如 e.select(s) 或 e.select(Student.class)
         if (rawExpressions.length == 1 && rawExpressions[0] != null) {
             Object first = rawExpressions[0];
             SqlTableInfo info = env.findTableInfo(first);
+            if (info == null && first instanceof Class<?>) {
+                try {
+                    info = env.resolveTable(first);
+                } catch (Exception ignored) {}
+            }
             if (info != null) {
                 this.candidateRootTable = first;
                 this.isFullEntitySelect = true;
@@ -97,9 +102,9 @@ public class SqlSelectStream {
     public SqlSelectStream from(Object rootTable) {
         SqlTableInfo info = env.resolveTable(rootTable);
         if (info.isCte()) {
-            this.query = new Query<>(info.getCte(), env.getDataSource(), env.getDialect(), env.getConfig());
+            this.query = new Query<>(env, info.getCte());
         } else {
-            this.query = new Query<>(info.getEntityClass(), env.getDataSource(), env.getDialect(), env.getConfig(), info.getAlias());
+            this.query = new Query<>(env, info.getEntityClass(), info.getAlias());
         }
 
         if (!isFullEntitySelect && !projectExpressions.isEmpty()) {
@@ -259,24 +264,93 @@ public class SqlSelectStream {
 
     // ========== 终端查询操作委托 ==========
 
+    public Class<?> getResultClass() {
+        if (dtoClass != null) {
+            return dtoClass;
+        }
+        if (isFullEntitySelect && candidateRootTable != null) {
+            SqlTableInfo info = env.findTableInfo(candidateRootTable);
+            if (info != null && info.getEntityClass() != null) {
+                return info.getEntityClass();
+            }
+        }
+        return getSingleTableEntityClass();
+    }
+
+    public Class<?> getSingleTableEntityClass() {
+        if (projectExpressions.isEmpty()) {
+            if (candidateRootTable != null) {
+                SqlTableInfo info = env.findTableInfo(candidateRootTable);
+                return info != null ? info.getEntityClass() : null;
+            }
+            return null;
+        }
+        String singleAlias = null;
+        Class<?> singleClass = null;
+        for (SqlExpression expr : projectExpressions) {
+            if (expr instanceof ColumnExpression) {
+                ColumnExpression<?> ce = (ColumnExpression<?>) expr;
+                String ta = ce.getTableAlias();
+                PropertyPath pp = ce.getPath();
+                Class<?> ec = pp != null ? pp.getRootEntityClass() : null;
+                if (ta != null) {
+                    if (singleAlias == null) {
+                        singleAlias = ta;
+                    } else if (!singleAlias.equalsIgnoreCase(ta)) {
+                        return null; // 多表投影
+                    }
+                }
+                if (ec != null) {
+                    if (singleClass == null) {
+                        singleClass = ec;
+                    } else if (singleClass != ec) {
+                        return null; // 多实体投影
+                    }
+                }
+            }
+        }
+        if (singleClass != null) {
+            return singleClass;
+        }
+        if (candidateRootTable != null) {
+            SqlTableInfo info = env.findTableInfo(candidateRootTable);
+            return info != null ? info.getEntityClass() : null;
+        }
+        return null;
+    }
+
     @SuppressWarnings("unchecked")
     public <R> List<R> toList() {
         ensureQuery();
         if (dtoClass != null) {
-            return (List<R>) toList(dtoClass);
+            return toList((Class<R>) dtoClass);
         }
-        return (List<R>) query.toList();
+        if (isFullEntitySelect && candidateRootTable != null) {
+            return (List<R>) query.toList();
+        }
+        Class<?> singleClass = getSingleTableEntityClass();
+        if (singleClass != null) {
+            return toList((Class<R>) singleClass);
+        }
+        throw new IllegalStateException(
+                "Cannot call toList() on a multi-table or untyped projection query without specifying target class. " +
+                "Please specify target type via .toList(YourDto.class) or e.select(YourDto.class, ...), or use .listMaps() instead."
+        );
     }
 
+    @SuppressWarnings("unchecked")
     public <R> List<R> toList(Class<R> targetClass) {
-        ensureQuery();
-        try (Connection conn = env.getDataSource().getConnection()) {
-            return EntityHydrator.queryDtoList(
-                    conn, query.getStatement(), targetClass, env.getDialect(), query.getEffectiveConfig()
-            );
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to query list for " + targetClass.getName(), e);
+        if (targetClass == null) {
+            throw new IllegalArgumentException("Target class must not be null");
         }
+        ensureQuery();
+        if (ColumnMetadata.isScalarType(targetClass)) {
+            return env.executeSelectScalarList(null, query.getStatement(), targetClass);
+        }
+        if (Map.class.isAssignableFrom(targetClass)) {
+            return (List<R>) env.executeSelectMaps(null, query.getStatement());
+        }
+        return env.executeSelectDtoList(null, query.getStatement(), targetClass);
     }
 
     public List<Map<String, Object>> listMaps() {
@@ -286,14 +360,23 @@ public class SqlSelectStream {
 
     @SuppressWarnings("unchecked")
     public <R> R firstOrNull() {
-        ensureQuery();
-        if (dtoClass != null) {
-            return (R) firstOrNull(dtoClass);
-        }
-        return (R) query.firstOrNull();
+        List<R> list = toList();
+        return (list != null && !list.isEmpty()) ? list.get(0) : null;
     }
 
+    @SuppressWarnings("unchecked")
     public <R> R firstOrNull(Class<R> targetClass) {
+        if (targetClass == null) {
+            throw new IllegalArgumentException("Target class must not be null");
+        }
+        ensureQuery();
+        if (ColumnMetadata.isScalarType(targetClass)) {
+            return env.executeSelectScalar(null, query.getStatement(), targetClass);
+        }
+        if (Map.class.isAssignableFrom(targetClass)) {
+            List<Map<String, Object>> maps = env.executeSelectMaps(null, query.getStatement());
+            return (maps != null && !maps.isEmpty()) ? (R) maps.get(0) : null;
+        }
         List<R> list = toList(targetClass);
         return (list != null && !list.isEmpty()) ? list.get(0) : null;
     }

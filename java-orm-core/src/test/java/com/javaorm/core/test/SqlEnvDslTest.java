@@ -323,4 +323,106 @@ public class SqlEnvDslTest {
             assertTrue(e.getMessage().contains("Cannot call toList()"));
         }
     }
+
+    /**
+     * 11. 测试 toList() 强类型推导与类型安全判断
+     */
+    @Test
+    public void testStrongTypeJudgmentInToList() {
+        // 1. orm.sql(ResultClass.class, e -> ...) 强类型编译时 + 运行时绑定
+        List<StudentDto> dtoList = orm.sql(StudentDto.class, e -> {
+            Student s = e.table(Student.class);
+            e.select(s.getId(), s.getStudentName(), s.getAge())
+             .from(s)
+             .where().and(s.getAge()).ge(22)
+             .orderBy(s.getAge()).asc();
+        }).toList();
+        assertEquals(2, dtoList.size());
+        assertEquals("Bob", dtoList.get(0).getStudentName());
+        assertEquals("David", dtoList.get(1).getStudentName());
+
+        // 2. orm.sql(e -> ...).toList(TargetClass.class) 显式强类型映射
+        List<StudentDto> explicitDtoList = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            e.select(s.getId(), s.getStudentName(), s.getAge())
+             .from(s)
+             .where().and(s.getAge()).ge(22)
+             .orderBy(s.getAge()).asc();
+        }).toList(StudentDto.class);
+        assertEquals(2, explicitDtoList.size());
+        assertEquals("Bob", explicitDtoList.get(0).getStudentName());
+
+        // 3. 显式映射到包含 @JoColumn/@JoId 注解的实体类
+        List<Student> studentList = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            e.select(s.getId(), s.getStudentName(), s.getAge())
+             .from(s)
+             .where().and(s.getAge()).ge(22)
+             .orderBy(s.getAge()).asc();
+        }).toList(Student.class);
+        assertEquals(2, studentList.size());
+        assertEquals("Bob", studentList.get(0).getStudentName());
+
+        // 4. 单标量值强类型映射（String, Integer, Long 等）
+        List<String> names = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            e.select(s.getStudentName())
+             .from(s)
+             .where().and(s.getAge()).ge(22)
+             .orderBy(s.getAge()).asc();
+        }).toList(String.class);
+        assertEquals(2, names.size());
+        assertEquals("Bob", names.get(0));
+        assertEquals("David", names.get(1));
+
+        // 5. firstOrNull 标量与对象强类型映射
+        String firstName = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            e.select(s.getStudentName())
+             .from(s)
+             .where().and(s.getId()).eq(2L);
+        }).firstOrNull(String.class);
+        assertEquals("Bob", firstName);
+
+        StudentDto firstDto = orm.sql(StudentDto.class, e -> {
+            Student s = e.table(Student.class);
+            e.select(s.getId(), s.getStudentName(), s.getAge())
+             .from(s)
+             .where().and(s.getId()).eq(2L);
+        }).firstOrNull();
+        assertNotNull(firstDto);
+        assertEquals("Bob", firstDto.getStudentName());
+
+        // 6. Map 类型强类型映射
+        List<Map> maps = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            e.select(s.getId(), s.getStudentName()).from(s);
+        }).toList(Map.class);
+        assertFalse(maps.isEmpty());
+        assertNotNull(maps.get(0).get("STUDENT_NAME") != null ? maps.get(0).get("STUDENT_NAME") : maps.get(0).get("student_name"));
+
+        // 7. 单表投影未显式传 DTO 时自动推导单表实体类型
+        List<Student> autoInferred = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            e.select(s.getStudentName(), s.getAge())
+             .from(s)
+             .where().and(s.getId()).eq(1L);
+        }).toList();
+        assertEquals(1, autoInferred.size());
+        assertEquals("Alice", autoInferred.get(0).getStudentName());
+
+        // 8. 多表无目标类型投影调用 toList() 时触发强类型防呆安全校验抛出 IllegalStateException
+        try {
+            orm.sql(e -> {
+                Student s = e.table(Student.class, "s");
+                Teacher t = e.table(Teacher.class, "t");
+                e.select(s.getStudentName(), t.getTeacherName())
+                 .from(s)
+                 .leftJoin(t).on(s.getTeacherId(), t.getId());
+            }).toList();
+            fail("Multi-table projection without target class should throw IllegalStateException");
+        } catch (IllegalStateException e) {
+            assertTrue(e.getMessage().contains("multi-table or untyped projection query"));
+        }
+    }
 }

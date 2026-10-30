@@ -238,11 +238,23 @@ public class SqlEnv {
     }
 
     public <T> Query<T> createQuery(Class<T> entityClass) {
-        return new Query<>(this, entityClass);
+        Query<T> q = new Query<>(this, entityClass);
+        this.currentOperation = q;
+        return q;
     }
 
     public <T> Query<T> createQuery(Cte<T> cte) {
-        return new Query<>(this, cte);
+        Query<T> q = new Query<>(this, cte);
+        this.currentOperation = q;
+        return q;
+    }
+
+    public <T> com.javaorm.core.ast.ColumnExpression<T> col(T prop) {
+        return com.javaorm.core.SQL.col(prop);
+    }
+
+    public <T> com.javaorm.core.ast.ColumnExpression<T> col(String propertyOrColumn) {
+        return com.javaorm.core.SQL.col(propertyOrColumn);
     }
 
     // ========== 3. UPDATE 管道入口与 UpdateBuilder 工厂 ==========
@@ -259,7 +271,9 @@ public class SqlEnv {
     }
 
     public <T> UpdateBuilder<T> createUpdate(Class<T> entityClass) {
-        return new UpdateBuilder<>(this, entityClass);
+        UpdateBuilder<T> ub = new UpdateBuilder<>(this, entityClass);
+        this.currentOperation = ub;
+        return ub;
     }
 
     // ========== 4. DELETE 管道入口与 DeleteBuilder 工厂 ==========
@@ -276,7 +290,9 @@ public class SqlEnv {
     }
 
     public <T> DeleteBuilder<T> createDelete(Class<T> entityClass) {
-        return new DeleteBuilder<>(this, entityClass);
+        DeleteBuilder<T> db = new DeleteBuilder<>(this, entityClass);
+        this.currentOperation = db;
+        return db;
     }
 
     // ========== 4.5 INSERT 工厂 ==========
@@ -291,8 +307,20 @@ public class SqlEnv {
 
     // ========== 5. 输出统一执行门面 ==========
 
-    public SqlExecution toExecution() {
-        return new SqlExecution(this, currentOperation);
+    @SuppressWarnings("unchecked")
+    public <T> SqlExecution<T> toExecution() {
+        Class<?> detected = null;
+        if (currentOperation instanceof SqlSelectStream) {
+            detected = ((SqlSelectStream) currentOperation).getResultClass();
+        } else if (currentOperation instanceof Query<?>) {
+            detected = ((Query<?>) currentOperation).getRootMetadata() != null
+                    ? ((Query<?>) currentOperation).getRootMetadata().getEntityClass() : null;
+        }
+        return new SqlExecution<>(this, currentOperation, (Class<T>) detected);
+    }
+
+    public <T> SqlExecution<T> toExecution(Class<T> resultClass) {
+        return new SqlExecution<>(this, currentOperation, resultClass);
     }
 
     // ========== 6. 执行引擎方法（底层调度与生命周期管理） ==========
@@ -300,7 +328,7 @@ public class SqlEnv {
     public void logSql(SqlAndParams sqlAndParams, String prefix) {
         if (shouldPrintSql() && sqlAndParams != null) {
             String p = (prefix != null && !prefix.isEmpty()) ? "[" + prefix + "] " : "";
-            log.info("==> {}Preparing: {}", p, sqlAndParams.getSql());
+            log.info("==> {}Preparing:  {}", p, sqlAndParams.getSql());
             log.info("==> {}Parameters: {}", p, sqlAndParams.getParams());
         }
     }

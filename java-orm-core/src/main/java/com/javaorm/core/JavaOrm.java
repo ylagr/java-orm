@@ -441,7 +441,22 @@ public class JavaOrm {
      * }).toList();
      * </pre>
      */
-    public SqlExecution sql(Consumer<SqlEnv> envConsumer) {
+    public <T> SqlExecution<T> sql(Class<T> resultClass, Consumer<SqlEnv> envConsumer) {
+        if (envConsumer == null) {
+            throw new IllegalArgumentException("SqlEnv consumer must not be null");
+        }
+        SqlEnv env = env();
+        try {
+            envConsumer.accept(env);
+            return env.toExecution(resultClass);
+        } finally {
+            com.javaorm.core.proxy.RecordingContext.clearRecording();
+            com.javaorm.core.proxy.RecordingContext.clearAliases();
+            com.javaorm.core.query.Query.resetAliasSeq();
+        }
+    }
+
+    public <T> SqlExecution<T> sql(Consumer<SqlEnv> envConsumer) {
         if (envConsumer == null) {
             throw new IllegalArgumentException("SqlEnv consumer must not be null");
         }
