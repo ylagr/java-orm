@@ -4,9 +4,11 @@ import com.javaorm.core.ast.ExpressionCondition;
 import com.javaorm.core.ast.LogicalOperator;
 import com.javaorm.core.ast.OrderDirection;
 import com.javaorm.core.ast.SqlExpression;
+import com.javaorm.core.ast.SelectStatement;
 import com.javaorm.core.operator.PropertyOperator;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.RecordingContext;
+import com.javaorm.core.sql.SqlEnv;
 
 import java.util.List;
 import java.util.Map;
@@ -18,6 +20,8 @@ import java.util.function.Supplier;
  */
 public class HavingBuilder<T> {
 
+    private final SqlEnv env;
+    private final SelectStatement statement;
     private final Query<T> query;
     private final Supplier<List<?>> customListSupplier;
 
@@ -26,8 +30,22 @@ public class HavingBuilder<T> {
     }
 
     public HavingBuilder(Query<T> query, Supplier<List<?>> customListSupplier) {
+        this(query != null ? query.getEnv() : null, query != null ? query.getStatement() : null, query, customListSupplier);
+    }
+
+    public HavingBuilder(SqlEnv env, SelectStatement statement, Query<T> query, Supplier<List<?>> customListSupplier) {
+        this.env = env != null ? env : (query != null ? query.getEnv() : null);
+        this.statement = statement != null ? statement : (query != null ? query.getStatement() : null);
         this.query = query;
         this.customListSupplier = customListSupplier;
+    }
+
+    public SqlEnv getEnv() {
+        return env;
+    }
+
+    public SelectStatement getStatement() {
+        return statement;
     }
 
     public <R> PropertyOperator<HavingBuilder<T>, R> and(SqlExpression<R> expr) {

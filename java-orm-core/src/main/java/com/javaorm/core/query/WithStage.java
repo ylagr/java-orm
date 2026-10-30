@@ -3,6 +3,7 @@ package com.javaorm.core.query;
 import com.javaorm.core.ast.CteClause;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.Dialect;
+import com.javaorm.core.sql.SqlEnv;
 
 import javax.sql.DataSource;
 import java.util.ArrayList;
@@ -13,15 +14,21 @@ import java.util.List;
  */
 public class WithStage {
 
+    private final SqlEnv env;
     private final List<CteClause> ctes = new ArrayList<>();
     private final DataSource dataSource;
     private final Dialect dialect;
     private final OrmConfig config;
 
+    public WithStage(SqlEnv env) {
+        this.env = env != null ? env : new SqlEnv(null, null, null);
+        this.dataSource = this.env.getDataSource();
+        this.dialect = this.env.getDialect();
+        this.config = this.env.getConfig();
+    }
+
     public WithStage(DataSource dataSource, Dialect dialect, OrmConfig config) {
-        this.dataSource = dataSource;
-        this.dialect = dialect;
-        this.config = config;
+        this(new SqlEnv(dataSource, dialect, config));
     }
 
     public WithStage with(Cte<?> cte) {
@@ -52,7 +59,7 @@ public class WithStage {
     }
 
     public <T> Query<T> select(Class<T> entityClass) {
-        Query<T> query = new Query<>(entityClass, dataSource, dialect, config);
+        Query<T> query = new Query<>(env, entityClass);
         for (CteClause c : ctes) {
             query.getStatement().addCte(c);
         }
@@ -60,7 +67,7 @@ public class WithStage {
     }
 
     public <T> Query<T> select(Cte<T> cte) {
-        Query<T> query = new Query<>(cte, dataSource, dialect, config);
+        Query<T> query = new Query<>(env, cte);
         for (CteClause c : ctes) {
             boolean exists = false;
             for (CteClause existing : query.getStatement().getCtes()) {
@@ -82,7 +89,7 @@ public class WithStage {
         if (moreExpressions != null && moreExpressions.length > 0) {
             System.arraycopy(moreExpressions, 0, all, 1, moreExpressions.length);
         }
-        return new FromStageQuery(all, dataSource, dialect, config) {
+        return new FromStageQuery(env, all) {
             @Override
             public <T> Query<T> from(Class<T> entityClass) {
                 Query<T> q = super.from(entityClass);
@@ -118,7 +125,7 @@ public class WithStage {
         if (moreExpressions != null && moreExpressions.length > 0) {
             System.arraycopy(moreExpressions, 0, all, 1, moreExpressions.length);
         }
-        return new DtoFromStageQuery<DTO>(dtoClass, all, dataSource, dialect, config) {
+        return new DtoFromStageQuery<DTO>(env, dtoClass, all) {
             @Override
             public <T> DtoQuery<DTO, T> from(Class<T> entityClass) {
                 DtoQuery<DTO, T> q = super.from(entityClass);

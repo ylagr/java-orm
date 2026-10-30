@@ -3,7 +3,7 @@ package com.javaorm.core.ast;
 import java.util.ArrayList;
 import java.util.List;
 
-public class InsertStatement {
+public class InsertStatement implements Statement {
     private Class<?> entityClass;
     private String tableName;
     private final List<String> columns = new ArrayList<>();

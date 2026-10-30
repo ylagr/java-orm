@@ -3,7 +3,7 @@ package com.javaorm.core.ast;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DeleteStatement {
+public class DeleteStatement implements Statement {
     private Class<?> entityClass;
     private String tableName;
     private final List<Condition> systemConditions = new ArrayList<>();

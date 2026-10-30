@@ -15,6 +15,7 @@ import com.javaorm.core.proxy.ProxyFactory;
 import com.javaorm.core.proxy.RecordingContext;
 
 import com.javaorm.core.connection.ConnectionUtils;
+import com.javaorm.core.sql.SqlEnv;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -28,13 +29,14 @@ import java.util.function.Function;
  */
 public class Query<T> {
 
+    private final SqlEnv env;
+    private final DataSource dataSource;
+    private final Dialect dialect;
+    private final OrmConfig config;
     private final Class<T> rootEntityClass;
     private final EntityMetadata rootMetadata;
     private Cte<T> rootCte;
-    private final DataSource dataSource;
-    private Dialect dialect;
-    private final OrmConfig config;
-    private Boolean printSqlOverride = null;
+    private Dialect dialectOverride = null;
 
     private final SelectStatement statement;
     private final Map<String, String> relationJoinAliases = new LinkedHashMap<>();
@@ -64,50 +66,53 @@ public class Query<T> {
         RecordingContext.clearAliases();
     }
 
-    public Query(Class<T> rootEntityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
-        this(rootEntityClass, dataSource, dialect, config, true);
+    public SqlEnv getEnv() {
+        return env;
     }
 
-    public Query(Class<T> rootEntityClass, DataSource dataSource, Dialect dialect, OrmConfig config, boolean allocateAlias) {
+    public DataSource getDataSource() {
+        return env.getDataSource();
+    }
+
+    public Dialect getDialect() {
+        return dialectOverride != null ? dialectOverride : env.getDialect();
+    }
+
+    public OrmConfig getConfig() {
+        return env.getConfig();
+    }
+
+    public Query(SqlEnv env, Class<T> rootEntityClass) {
+        this(env, rootEntityClass, true);
+    }
+
+    public Query(SqlEnv env, Class<T> rootEntityClass, boolean allocateAlias) {
+        this.env = env != null ? env : new SqlEnv(null, null, null);
+        this.dataSource = this.env.getDataSource();
+        this.dialect = this.env.getDialect();
+        this.config = this.env.getConfig();
         this.rootEntityClass = rootEntityClass;
-        this.dataSource = dataSource;
-        this.dialect = dialect;
-        this.config = config;
-        this.rootMetadata = config != null ? config.getMetadata(rootEntityClass) : EntityMetadataManager.get(rootEntityClass, config);
+        this.rootMetadata = this.env.getConfig() != null ? this.env.getConfig().getMetadata(rootEntityClass) : EntityMetadataManager.get(rootEntityClass, this.env.getConfig());
 
         if (!allocateAlias) {
-            this.statement = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), null);
+            this.statement = new SelectStatement(rootEntityClass, rootMetadata != null ? rootMetadata.getTableName() : null, null);
             return;
         }
 
         String rootAlias = nextAlias();
-        this.statement = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), rootAlias);
+        this.statement = new SelectStatement(rootEntityClass, rootMetadata != null ? rootMetadata.getTableName() : null, rootAlias);
         RecordingContext.registerAlias(rootEntityClass, rootAlias);
 
-        // 默认自动注入逻辑删除系统过滤条件
-        if (rootMetadata.hasLogicDelete()) {
-            ColumnMetadata ld = rootMetadata.getLogicDeleteColumn();
-            statement.addSystemCondition(new BinaryCondition(rootAlias, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
-        }
-
-        // 默认自动注入多租户隔离系统过滤条件
-        if (rootMetadata.hasTenant()) {
-            ColumnMetadata tc = rootMetadata.getTenantColumn();
-            Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
-            if (tenantId != null) {
-                statement.addSystemCondition(new BinaryCondition(rootAlias, tc.getColumnName(), SqlOperator.EQ, tenantId));
-            } else if (config != null && config.isTenantStrict()) {
-                throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + rootEntityClass.getName());
-            }
-        }
+        injectSystemConditions(rootAlias);
     }
 
-    public Query(Class<T> rootEntityClass, DataSource dataSource, Dialect dialect, OrmConfig config, String rootAlias) {
+    public Query(SqlEnv env, Class<T> rootEntityClass, String rootAlias) {
+        this.env = env != null ? env : new SqlEnv(null, null, null);
+        this.dataSource = this.env.getDataSource();
+        this.dialect = this.env.getDialect();
+        this.config = this.env.getConfig();
         this.rootEntityClass = rootEntityClass;
-        this.dataSource = dataSource;
-        this.dialect = dialect;
-        this.config = config;
-        this.rootMetadata = config != null ? config.getMetadata(rootEntityClass) : EntityMetadataManager.get(rootEntityClass, config);
+        this.rootMetadata = this.env.getConfig() != null ? this.env.getConfig().getMetadata(rootEntityClass) : EntityMetadataManager.get(rootEntityClass, this.env.getConfig());
 
         if (rootAlias == null) {
             rootAlias = nextAlias();
@@ -121,42 +126,63 @@ public class Query<T> {
                 } catch (NumberFormatException ignored) {}
             }
         }
-        this.statement = new SelectStatement(rootEntityClass, rootMetadata.getTableName(), rootAlias);
+        this.statement = new SelectStatement(rootEntityClass, rootMetadata != null ? rootMetadata.getTableName() : null, rootAlias);
         RecordingContext.registerAlias(rootEntityClass, rootAlias);
 
-        // 默认自动注入逻辑删除系统过滤条件
-        if (rootMetadata.hasLogicDelete()) {
-            ColumnMetadata ld = rootMetadata.getLogicDeleteColumn();
-            statement.addSystemCondition(new BinaryCondition(rootAlias, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
-        }
-
-        // 默认自动注入多租户隔离系统过滤条件
-        if (rootMetadata.hasTenant()) {
-            ColumnMetadata tc = rootMetadata.getTenantColumn();
-            Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
-            if (tenantId != null) {
-                statement.addSystemCondition(new BinaryCondition(rootAlias, tc.getColumnName(), SqlOperator.EQ, tenantId));
-            } else if (config != null && config.isTenantStrict()) {
-                throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + rootEntityClass.getName());
-            }
-        }
+        injectSystemConditions(rootAlias);
     }
 
-    public Query(Cte<T> cte, DataSource dataSource, Dialect dialect, OrmConfig config) {
+    public Query(SqlEnv env, Cte<T> cte) {
         if (cte == null) {
             throw new IllegalArgumentException("CTE must not be null");
         }
+        this.env = env != null ? env : new SqlEnv(null, null, null);
+        this.dataSource = this.env.getDataSource();
+        this.dialect = this.env.getDialect();
+        this.config = this.env.getConfig();
         this.rootCte = cte;
         this.rootEntityClass = cte.getEntityClass();
-        this.dataSource = dataSource;
-        this.dialect = dialect;
-        this.config = config;
-        this.rootMetadata = rootEntityClass != null ? EntityMetadataManager.get(rootEntityClass, config) : null;
+        this.rootMetadata = rootEntityClass != null ? EntityMetadataManager.get(rootEntityClass, this.env.getConfig()) : null;
         String rootAlias = cte.getAlias() != null ? cte.getAlias() : nextAlias();
         this.statement = new SelectStatement(rootEntityClass, cte.getName(), rootAlias);
         this.statement.addCte(cte.toClause());
         if (rootEntityClass != null) {
             RecordingContext.registerAlias(rootEntityClass, rootAlias);
+        }
+    }
+
+    public Query(Class<T> rootEntityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        this(new SqlEnv(dataSource, dialect, config), rootEntityClass, true);
+    }
+
+    public Query(Class<T> rootEntityClass, DataSource dataSource, Dialect dialect, OrmConfig config, boolean allocateAlias) {
+        this(new SqlEnv(dataSource, dialect, config), rootEntityClass, allocateAlias);
+    }
+
+    public Query(Class<T> rootEntityClass, DataSource dataSource, Dialect dialect, OrmConfig config, String rootAlias) {
+        this(new SqlEnv(dataSource, dialect, config), rootEntityClass, rootAlias);
+    }
+
+    public Query(Cte<T> cte, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        this(new SqlEnv(dataSource, dialect, config), cte);
+    }
+
+    private void injectSystemConditions(String rootAlias) {
+        // 默认自动注入逻辑删除系统过滤条件
+        if (rootMetadata != null && rootMetadata.hasLogicDelete()) {
+            ColumnMetadata ld = rootMetadata.getLogicDeleteColumn();
+            statement.addSystemCondition(new BinaryCondition(rootAlias, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+        }
+
+        // 默认自动注入多租户隔离系统过滤条件
+        if (rootMetadata != null && rootMetadata.hasTenant()) {
+            ColumnMetadata tc = rootMetadata.getTenantColumn();
+            Object tenantId = env.getConfig() != null ? env.getConfig().getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+            if (tenantId != null) {
+                statement.addSystemCondition(new BinaryCondition(rootAlias, tc.getColumnName(), SqlOperator.EQ, tenantId));
+            } else if (env.getConfig() != null && env.getConfig().isTenantStrict()) {
+                throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + rootEntityClass.getName());
+            }
         }
     }
 
@@ -172,7 +198,7 @@ public class Query<T> {
      * 链式配置：本次执行按照当前全局配置决定是否打印 SQL
      */
     public Query<T> printSql() {
-        this.printSqlOverride = config.isPrintSql();
+        env.setPrintSql(env.getConfig() != null && env.getConfig().isPrintSql());
         return this;
     }
 
@@ -180,25 +206,16 @@ public class Query<T> {
      * 链式配置：本次执行强制指定是否打印 SQL（忽略全局配置）
      */
     public Query<T> printSql(boolean print) {
-        this.printSqlOverride = print;
+        env.setPrintSql(print);
         return this;
     }
 
     public OrmConfig getEffectiveConfig() {
-        if (printSqlOverride == null) {
-            return config;
-        }
-        OrmConfig effective = new OrmConfig();
-        effective.setNameConversion(config.getNameConversion());
-        effective.setDefaultLogicDeleteProperty(config.getDefaultLogicDeleteProperty());
-        effective.setDefaultLogicDeleteNormalValue(config.getDefaultLogicDeleteNormalValue());
-        effective.setDefaultLogicDeleteDeletedValue(config.getDefaultLogicDeleteDeletedValue());
-        effective.setPrintSql(printSqlOverride);
-        return effective;
+        return env.getEffectiveConfig();
     }
 
     public Query<T> setDialect(Dialect dialect) {
-        this.dialect = dialect;
+        this.dialectOverride = dialect;
         return this;
     }
 
@@ -206,7 +223,7 @@ public class Query<T> {
      * 随时获取当前生成的 SQL 及参数对象
      */
     public com.javaorm.core.dialect.SqlAndParams toSqlAndParams() {
-        return dialect.buildSelect(statement);
+        return getDialect().buildSelect(statement);
     }
 
     public com.javaorm.core.dialect.SqlAndParams toSqlAndParams(Dialect customDialect) {
@@ -1050,17 +1067,7 @@ public class Query<T> {
     }
 
     public List<T> list() {
-        Connection conn = null;
-        boolean isTx = false;
-        try {
-            conn = ConnectionUtils.getConnection(dataSource, config);
-            isTx = ConnectionUtils.isTransactionConnection(conn);
-            return list(conn);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute query list", e);
-        } finally {
-            if (!isTx) ConnectionUtils.closeConnection(conn);
-        }
+        return list(null);
     }
 
     public List<T> toList() {
@@ -1072,29 +1079,11 @@ public class Query<T> {
     }
 
     public List<T> list(Connection conn) {
-        try {
-            List<T> result = EntityHydrator.queryList(conn, statement, rootMetadata, dialect, getEffectiveConfig());
-            if (!includes.isEmpty() && !result.isEmpty()) {
-                IncludeProcessor.processIncludes(conn, result, rootMetadata, includes, dialect, getEffectiveConfig(), dataSource);
-            }
-            return result;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute query list", e);
-        }
+        return env.executeSelectList(conn, statement, rootMetadata, includes);
     }
 
     public List<Map<String, Object>> listMaps() {
-        Connection conn = null;
-        boolean isTx = false;
-        try {
-            conn = ConnectionUtils.getConnection(dataSource, config);
-            isTx = ConnectionUtils.isTransactionConnection(conn);
-            return EntityHydrator.queryMaps(conn, statement, dialect, getEffectiveConfig());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute listMaps query", e);
-        } finally {
-            if (!isTx) ConnectionUtils.closeConnection(conn);
-        }
+        return env.executeSelectMaps(null, statement);
     }
 
     public List<Map<String, Object>> maps() {
@@ -1107,31 +1096,11 @@ public class Query<T> {
 
     public <V> V fetchOne(Class<V> targetType) {
         statement.setLimit(1);
-        Connection conn = null;
-        boolean isTx = false;
-        try {
-            conn = ConnectionUtils.getConnection(dataSource, config);
-            isTx = ConnectionUtils.isTransactionConnection(conn);
-            return EntityHydrator.queryScalar(conn, statement, targetType, dialect, getEffectiveConfig());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch one scalar", e);
-        } finally {
-            if (!isTx) ConnectionUtils.closeConnection(conn);
-        }
+        return env.executeSelectScalar(null, statement, targetType);
     }
 
     public <V> List<V> fetchList(Class<V> targetType) {
-        Connection conn = null;
-        boolean isTx = false;
-        try {
-            conn = ConnectionUtils.getConnection(dataSource, config);
-            isTx = ConnectionUtils.isTransactionConnection(conn);
-            return EntityHydrator.queryScalarList(conn, statement, targetType, dialect, getEffectiveConfig());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch scalar list", e);
-        } finally {
-            if (!isTx) ConnectionUtils.closeConnection(conn);
-        }
+        return env.executeSelectScalarList(null, statement, targetType);
     }
 
     public T single() {
@@ -1149,92 +1118,7 @@ public class Query<T> {
     }
 
     public long count() {
-        boolean isComplex = statement.isDistinct()
-                || !statement.getGroupByExpressions().isEmpty()
-                || !statement.getHavingConditions().isEmpty()
-                || !statement.getUnions().isEmpty();
-
-        Connection conn = null;
-        boolean isTx = false;
-        try {
-            conn = ConnectionUtils.getConnection(dataSource, config);
-            isTx = ConnectionUtils.isTransactionConnection(conn);
-
-            if (!isComplex) {
-                SelectStatement countStmt = new SelectStatement(rootEntityClass, statement.getRootTableName(), statement.getRootTableAlias());
-                for (CteClause cte : statement.getCtes()) {
-                    countStmt.addCte(cte);
-                }
-                countStmt.addSelectColumn("COUNT(1)");
-                for (TableJoin join : statement.getJoins()) {
-                    countStmt.addJoin(join);
-                }
-                for (Condition cond : statement.getSystemConditions()) {
-                    countStmt.addSystemCondition(cond);
-                }
-                for (Condition cond : statement.getWhereConditions()) {
-                    countStmt.addWhereCondition(cond);
-                }
-                return EntityHydrator.queryCount(conn, countStmt, dialect, getEffectiveConfig());
-            } else {
-                // 复杂查询保留 DISTINCT / GROUP BY / HAVING / UNION 语义，忽略分页并以外层子查询包装计数
-                SelectStatement innerStmt = new SelectStatement(rootEntityClass, statement.getRootTableName(), statement.getRootTableAlias());
-                for (CteClause cte : statement.getCtes()) {
-                    innerStmt.addCte(cte);
-                }
-                innerStmt.setDistinct(statement.isDistinct());
-                for (SqlExpression expr : statement.getProjectExpressions()) {
-                    innerStmt.addProjectExpression(expr);
-                }
-                for (String col : statement.getSelectColumns()) {
-                    innerStmt.addSelectColumn(col);
-                }
-                if (!statement.getGroupByExpressions().isEmpty() && innerStmt.getProjectExpressions().isEmpty() && innerStmt.getSelectColumns().isEmpty()) {
-                    for (SqlExpression expr : statement.getGroupByExpressions()) {
-                        innerStmt.addProjectExpression(expr);
-                    }
-                }
-                for (TableJoin join : statement.getJoins()) {
-                    innerStmt.addJoin(join);
-                }
-                for (Condition cond : statement.getSystemConditions()) {
-                    innerStmt.addSystemCondition(cond);
-                }
-                for (Condition cond : statement.getWhereConditions()) {
-                    innerStmt.addWhereCondition(cond);
-                }
-                for (SqlExpression expr : statement.getGroupByExpressions()) {
-                    innerStmt.addGroupByExpression(expr);
-                }
-                for (Condition cond : statement.getHavingConditions()) {
-                    innerStmt.addHavingCondition(cond);
-                }
-                for (UnionClause u : statement.getUnions()) {
-                    innerStmt.addUnion(u);
-                }
-                // 分页 limit / offset 不参与 count 统计
-
-                com.javaorm.core.dialect.SqlAndParams countSqlAndParams;
-                if (!innerStmt.getCtes().isEmpty()) {
-                    com.javaorm.core.dialect.SqlAndParams withSql = dialect.buildSelect(innerStmt, true);
-                    com.javaorm.core.dialect.SqlAndParams innerWithoutCte = dialect.buildSelect(innerStmt, false);
-                    String sqlStr = withSql.getSql();
-                    int selectIdx = sqlStr.indexOf("SELECT ");
-                    String withPrefix = selectIdx > 0 ? sqlStr.substring(0, selectIdx) : "";
-                    String countSql = withPrefix + "SELECT COUNT(1) FROM (" + innerWithoutCte.getSql() + ") count_sub";
-                    countSqlAndParams = new com.javaorm.core.dialect.SqlAndParams(countSql, withSql.getParams());
-                } else {
-                    com.javaorm.core.dialect.SqlAndParams innerSql = dialect.buildSelect(innerStmt);
-                    String countSql = "SELECT COUNT(1) FROM (" + innerSql.getSql() + ") count_sub";
-                    countSqlAndParams = new com.javaorm.core.dialect.SqlAndParams(countSql, innerSql.getParams());
-                }
-                return EntityHydrator.queryCount(conn, countSqlAndParams, getEffectiveConfig(), !innerStmt.getCtes().isEmpty(), dialect);
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute count query", e);
-        } finally {
-            if (!isTx) ConnectionUtils.closeConnection(conn);
-        }
+        return env.executeSelectCount(null, statement, getDialect(), rootEntityClass);
     }
 
     // 内部路径解析器
@@ -1618,6 +1502,4 @@ public class Query<T> {
     }
 
     public SelectStatement getStatement() { return statement; }
-    public OrmConfig getConfig() { return config; }
-    public Dialect getDialect() { return dialect; }
 }

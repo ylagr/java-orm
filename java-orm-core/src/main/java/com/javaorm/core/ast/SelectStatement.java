@@ -3,7 +3,7 @@ package com.javaorm.core.ast;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SelectStatement {
+public class SelectStatement implements Statement {
     private Class<?> rootEntityClass;
     private String rootTableName;
     private String rootTableAlias = "t0";
@@ -38,8 +38,12 @@ public class SelectStatement {
     public void addUnion(UnionClause union) { unions.add(union); }
     public void addCte(CteClause cte) { if (cte != null) ctes.add(cte); }
 
+    @Override
+    public Class<?> getEntityClass() { return rootEntityClass; }
     public Class<?> getRootEntityClass() { return rootEntityClass; }
     public void setRootEntityClass(Class<?> rootEntityClass) { this.rootEntityClass = rootEntityClass; }
+    @Override
+    public String getTableName() { return rootTableName; }
     public String getRootTableName() { return rootTableName; }
     public void setRootTableName(String rootTableName) { this.rootTableName = rootTableName; }
     public String getRootTableAlias() { return rootTableAlias; }

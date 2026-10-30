@@ -6,6 +6,8 @@ import com.javaorm.core.dialect.Dialect;
 import com.javaorm.core.hydration.EntityHydrator;
 import com.javaorm.core.proxy.ProxyFactory;
 
+import com.javaorm.core.sql.SqlEnv;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.util.List;
@@ -23,6 +25,7 @@ import java.util.function.Function;
  */
 public class DtoQuery<DTO, T> {
 
+    private final SqlEnv env;
     private final Class<DTO> dtoClass;
     private final Class<T> entityClass;
     private final DataSource dataSource;
@@ -30,29 +33,43 @@ public class DtoQuery<DTO, T> {
     private final OrmConfig config;
     private final Query<T> underlyingQuery;
 
-    public DtoQuery(Class<DTO> dtoClass, Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
-        this(dtoClass, entityClass, dataSource, dialect, config, null);
-    }
-
-    public DtoQuery(Class<DTO> dtoClass, Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config, String rootAlias) {
+    public DtoQuery(SqlEnv env, Class<DTO> dtoClass, Class<T> entityClass, String rootAlias) {
+        this.env = env != null ? env : new SqlEnv(null, null, null);
         this.dtoClass = dtoClass;
         this.entityClass = entityClass;
-        this.dataSource = dataSource;
-        this.dialect = dialect;
-        this.config = config;
-        this.underlyingQuery = new Query<>(entityClass, dataSource, dialect, config, rootAlias);
+        this.dataSource = this.env.getDataSource();
+        this.dialect = this.env.getDialect();
+        this.config = this.env.getConfig();
+        this.underlyingQuery = new Query<>(this.env, entityClass, rootAlias);
     }
 
-    public DtoQuery(Class<DTO> dtoClass, Cte<T> cte, DataSource dataSource, Dialect dialect, OrmConfig config) {
+    public DtoQuery(SqlEnv env, Class<DTO> dtoClass, Cte<T> cte) {
         if (cte == null) {
             throw new IllegalArgumentException("CTE must not be null");
         }
+        this.env = env != null ? env : new SqlEnv(null, null, null);
         this.dtoClass = dtoClass;
         this.entityClass = cte.getEntityClass();
-        this.dataSource = dataSource;
-        this.dialect = dialect;
-        this.config = config;
-        this.underlyingQuery = new Query<>(cte, dataSource, dialect, config);
+        this.dataSource = this.env.getDataSource();
+        this.dialect = this.env.getDialect();
+        this.config = this.env.getConfig();
+        this.underlyingQuery = new Query<>(this.env, cte);
+    }
+
+    public DtoQuery(Class<DTO> dtoClass, Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        this(new SqlEnv(dataSource, dialect, config), dtoClass, entityClass, null);
+    }
+
+    public DtoQuery(Class<DTO> dtoClass, Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config, String rootAlias) {
+        this(new SqlEnv(dataSource, dialect, config), dtoClass, entityClass, rootAlias);
+    }
+
+    public DtoQuery(Class<DTO> dtoClass, Cte<T> cte, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        this(new SqlEnv(dataSource, dialect, config), dtoClass, cte);
+    }
+
+    public SqlEnv getEnv() {
+        return env != null ? env : (underlyingQuery != null ? underlyingQuery.getEnv() : null);
     }
 
     public T proxy() {
@@ -223,6 +240,9 @@ public class DtoQuery<DTO, T> {
     }
 
     public List<DTO> list() {
+        if (underlyingQuery != null && underlyingQuery.getEnv() != null) {
+            return underlyingQuery.getEnv().executeSelectDtoList(null, underlyingQuery.getStatement(), dtoClass);
+        }
         try (Connection conn = dataSource.getConnection()) {
             return EntityHydrator.queryDtoList(conn, underlyingQuery.getStatement(), dtoClass, dialect, underlyingQuery.getEffectiveConfig());
         } catch (Exception e) {

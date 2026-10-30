@@ -5,6 +5,8 @@ import com.javaorm.core.ast.OrderDirection;
 import com.javaorm.core.ast.SelectStatement;
 import com.javaorm.core.ast.SqlExpression;
 
+import com.javaorm.core.sql.SqlEnv;
+
 /**
  * ORDER BY 链式排序构造器。
  * 支持静态及动态指定排序方向（ASC / DESC），以及条件过滤排序（ascIf / descIf / sort(condition, isAsc)）。
@@ -12,6 +14,7 @@ import com.javaorm.core.ast.SqlExpression;
  * @param <TQuery> 所在上下文查询或构造器类型
  */
 public class OrderByBuilder<TQuery> {
+    private final SqlEnv env;
     private final TQuery query;
     private final SelectStatement statement;
     private String tableAlias;
@@ -19,6 +22,11 @@ public class OrderByBuilder<TQuery> {
     private SqlExpression<?> expression;
 
     public OrderByBuilder(TQuery query, SelectStatement statement, String tableAlias, String columnName) {
+        this(null, query, statement, tableAlias, columnName);
+    }
+
+    public OrderByBuilder(SqlEnv env, TQuery query, SelectStatement statement, String tableAlias, String columnName) {
+        this.env = env;
         this.query = query;
         this.statement = statement;
         this.tableAlias = tableAlias;
@@ -26,9 +34,22 @@ public class OrderByBuilder<TQuery> {
     }
 
     public OrderByBuilder(TQuery query, SelectStatement statement, SqlExpression<?> expression) {
+        this(null, query, statement, expression);
+    }
+
+    public OrderByBuilder(SqlEnv env, TQuery query, SelectStatement statement, SqlExpression<?> expression) {
+        this.env = env;
         this.query = query;
         this.statement = statement;
         this.expression = expression;
+    }
+
+    public SqlEnv getEnv() {
+        return env;
+    }
+
+    public SelectStatement getStatement() {
+        return statement;
     }
 
     /**

@@ -21,20 +21,28 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.Date;
 
+import com.javaorm.core.sql.SqlEnv;
+
 public class InsertBuilder<T> {
 
     private static final Logger log = LoggerFactory.getLogger(InsertBuilder.class);
 
+    private final SqlEnv env;
     private final T entity;
     private final DataSource dataSource;
     private final Dialect dialect;
     private final OrmConfig config;
 
-    public InsertBuilder(T entity, DataSource dataSource, Dialect dialect, OrmConfig config) {
+    public InsertBuilder(SqlEnv env, T entity) {
+        this.env = env != null ? env : new SqlEnv(null, null, null);
         this.entity = entity;
-        this.dataSource = dataSource;
-        this.dialect = dialect;
-        this.config = config;
+        this.dataSource = this.env.getDataSource();
+        this.dialect = this.env.getDialect();
+        this.config = this.env.getConfig();
+    }
+
+    public InsertBuilder(T entity, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        this(new SqlEnv(dataSource, dialect, config), entity);
     }
 
     @SuppressWarnings("unchecked")

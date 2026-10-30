@@ -5,7 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class UpdateStatement {
+public class UpdateStatement implements Statement {
     private Class<?> entityClass;
     private String tableName;
     private final Map<String, Object> setValues = new LinkedHashMap<>();

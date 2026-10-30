@@ -18,9 +18,9 @@ import com.javaorm.core.proxy.RecordingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.javaorm.core.connection.ConnectionUtils;
 import com.javaorm.core.query.Query;
 import com.javaorm.core.query.WhereBuilder;
+import com.javaorm.core.sql.SqlEnv;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -34,24 +34,59 @@ public class DeleteBuilder<T> {
 
     private static final Logger log = LoggerFactory.getLogger(DeleteBuilder.class);
 
+    private final SqlEnv env;
     private final Class<T> entityClass;
     private final EntityMetadata metadata;
-    private final DataSource dataSource;
-    private final Dialect dialect;
-    private final OrmConfig config;
     private Boolean printSqlOverride = null;
-    private final List<Condition> whereConditions = new ArrayList<>();
+    private final DeleteStatement statement;
     private boolean logicDeleteDisabled = false;
     private final Query<T> queryHelper;
 
-    public DeleteBuilder(Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
+    public DeleteBuilder(SqlEnv env, Class<T> entityClass) {
+        this.env = env != null ? env : new SqlEnv(null, null, null);
         this.entityClass = entityClass;
-        this.dataSource = dataSource;
-        this.dialect = dialect;
-        this.config = config;
-        this.metadata = EntityMetadataManager.get(entityClass, config);
-        this.queryHelper = new Query<>(entityClass, dataSource, dialect, config, false);
-        RecordingContext.registerAlias(entityClass, metadata.getTableName());
+        this.metadata = EntityMetadataManager.get(entityClass, this.env.getConfig());
+        this.statement = new DeleteStatement(entityClass, metadata != null ? metadata.getTableName() : null);
+        this.queryHelper = new Query<>(this.env, entityClass, false);
+        if (metadata != null) {
+            RecordingContext.registerAlias(entityClass, metadata.getTableName());
+        }
+    }
+
+    public DeleteBuilder(Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        this(new SqlEnv(dataSource, dialect, config), entityClass);
+    }
+
+    public SqlEnv getEnv() {
+        return env;
+    }
+
+    public DeleteStatement getStatement() {
+        return statement;
+    }
+
+    public DataSource getDataSource() {
+        return env.getDataSource();
+    }
+
+    public Dialect getDialect() {
+        return env.getDialect();
+    }
+
+    public OrmConfig getConfig() {
+        return env.getConfig();
+    }
+
+    public EntityMetadata getMetadata() {
+        return metadata;
+    }
+
+    public Class<T> getEntityClass() {
+        return entityClass;
+    }
+
+    public List<Condition> getWhereConditions() {
+        return statement.getWhereConditions();
     }
 
     public T proxy() {
@@ -59,12 +94,14 @@ public class DeleteBuilder<T> {
     }
 
     public DeleteBuilder<T> printSql() {
-        this.printSqlOverride = config.isPrintSql();
+        this.printSqlOverride = env.getConfig().isPrintSql();
+        env.setPrintSql(this.printSqlOverride);
         return this;
     }
 
     public DeleteBuilder<T> printSql(boolean print) {
         this.printSqlOverride = print;
+        env.setPrintSql(print);
         return this;
     }
 
@@ -74,13 +111,14 @@ public class DeleteBuilder<T> {
     }
 
     public SqlAndParams toSqlAndParams() {
-        return buildSqlAndParams(dialect);
+        return buildSqlAndParams(env.getDialect());
     }
 
     public SqlAndParams buildSqlAndParams(Dialect targetDialect) {
+        Dialect effDialect = targetDialect != null ? targetDialect : env.getDialect();
         ColumnMetadata tc = metadata.hasTenant() ? metadata.getTenantColumn() : null;
-        Object tenantId = (tc != null && config != null) ? config.getCurrentTenantId() : (tc != null ? com.javaorm.core.tenant.TenantContext.getTenantId() : null);
-        if (tc != null && tenantId == null && config != null && config.isTenantStrict()) {
+        Object tenantId = (tc != null && env.getConfig() != null) ? env.getConfig().getCurrentTenantId() : (tc != null ? com.javaorm.core.tenant.TenantContext.getTenantId() : null);
+        if (tc != null && tenantId == null && env.getConfig() != null && env.getConfig().isTenantStrict()) {
             throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
         }
 
@@ -88,23 +126,23 @@ public class DeleteBuilder<T> {
             ColumnMetadata ld = metadata.getLogicDeleteColumn();
             com.javaorm.core.ast.UpdateStatement updateStmt = new com.javaorm.core.ast.UpdateStatement(entityClass, metadata.getTableName());
             updateStmt.addSet(ld.getColumnName(), ld.getLogicDeleteDeletedValue());
-            for (Condition c : whereConditions) {
+            for (Condition c : statement.getWhereConditions()) {
                 updateStmt.addWhereCondition(c);
             }
             updateStmt.addSystemCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
             if (tc != null && tenantId != null) {
                 updateStmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
             }
-            return (targetDialect != null ? targetDialect : dialect).buildUpdate(updateStmt);
+            return effDialect.buildUpdate(updateStmt);
         }
         DeleteStatement stmt = new DeleteStatement(entityClass, metadata.getTableName());
-        for (Condition c : whereConditions) {
+        for (Condition c : statement.getWhereConditions()) {
             stmt.addWhereCondition(c);
         }
         if (tc != null && tenantId != null) {
             stmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
         }
-        return (targetDialect != null ? targetDialect : dialect).buildDelete(stmt);
+        return effDialect.buildDelete(stmt);
     }
 
     public String toSql() {
@@ -129,7 +167,7 @@ public class DeleteBuilder<T> {
     }
 
     public WhereBuilder<T> where() {
-        return new WhereBuilder<>(entityClass, queryHelper, null, whereConditions::add, null, this::execute, this::toSqlAndParams, val -> {
+        return new WhereBuilder<>(env, statement, entityClass, null, statement::addWhereCondition, queryHelper, null, this::execute, this::toSqlAndParams, val -> {
             if (val == null) this.printSql();
             else this.printSql(val);
         });
@@ -203,125 +241,60 @@ public class DeleteBuilder<T> {
 
     public int execute() {
         try {
+            if (printSqlOverride != null) {
+                env.setPrintSql(printSqlOverride);
+            }
             // 如果存在逻辑删除，自动重写为 UPDATE t SET is_deleted = 1 WHERE ...
-            if (metadata.hasLogicDelete() && !logicDeleteDisabled) {
-                ColumnMetadata ld = metadata.getLogicDeleteColumn();
-                return performLogicDelete(ld);
+            if (metadata != null && metadata.hasLogicDelete() && !logicDeleteDisabled) {
+                return env.executeLogicDelete(metadata, entityClass, statement.getWhereConditions());
             }
 
             // 物理删除
-            DeleteStatement stmt = new DeleteStatement(entityClass, metadata.getTableName());
-            for (Condition c : whereConditions) {
-                stmt.addWhereCondition(c);
-            }
-            if (metadata.hasTenant()) {
+            if (metadata != null && metadata.hasTenant()) {
                 ColumnMetadata tc = metadata.getTenantColumn();
-                Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+                Object tenantId = env.getConfig() != null ? env.getConfig().getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
                 if (tenantId != null) {
-                    stmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
-                } else if (config != null && config.isTenantStrict()) {
+                    statement.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
+                } else if (env.getConfig() != null && env.getConfig().isTenantStrict()) {
                     throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
                 }
             }
 
-            SqlAndParams sqlAndParams = dialect.buildDelete(stmt);
-            boolean shouldPrint = (printSqlOverride != null) ? printSqlOverride : config.isPrintSql();
-            if (shouldPrint) {
-                log.info("==>  Preparing: {}", sqlAndParams.getSql());
-                log.info("==> Parameters: {}", sqlAndParams.getParams());
-            }
-
-            Connection conn = null;
-            boolean isTx = false;
-            try {
-                conn = ConnectionUtils.getConnection(dataSource, config);
-                isTx = ConnectionUtils.isTransactionConnection(conn);
-                try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-                    for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                        ps.setObject(i + 1, sqlAndParams.getParams().get(i));
-                    }
-                    return ps.executeUpdate();
-                }
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to execute delete statement", e);
-            } finally {
-                if (!isTx) ConnectionUtils.closeConnection(conn);
-            }
+            return env.executeDelete(statement);
         } finally {
             Query.resetAliasSeq();
         }
     }
 
-    private int performLogicDelete(ColumnMetadata ld) {
-        return executeLogicDeleteUpdate(ld);
-    }
-
-    private int executeLogicDeleteUpdate(ColumnMetadata ld) {
-        com.javaorm.core.ast.UpdateStatement updateStmt = new com.javaorm.core.ast.UpdateStatement(entityClass, metadata.getTableName());
-        updateStmt.addSet(ld.getColumnName(), ld.getLogicDeleteDeletedValue());
-
-        // 叠加用户传入的 where 条件
-        for (Condition c : whereConditions) {
-            updateStmt.addWhereCondition(c);
-        }
-        // 系统条件：且仅删除未删除状态的数据，并注入租户隔离
-        updateStmt.addSystemCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
-        if (metadata.hasTenant()) {
-            ColumnMetadata tc = metadata.getTenantColumn();
-            Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
-            if (tenantId != null) {
-                updateStmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
-            } else if (config != null && config.isTenantStrict()) {
-                throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
-            }
-        }
-
-        SqlAndParams sqlAndParams = dialect.buildUpdate(updateStmt);
-        boolean shouldPrint = (printSqlOverride != null) ? printSqlOverride : config.isPrintSql();
-        if (shouldPrint) {
-            log.info("==> [LogicDelete] Preparing: {}", sqlAndParams.getSql());
-            log.info("==> [LogicDelete] Parameters: {}", sqlAndParams.getParams());
-        }
-
-        Connection conn = null;
-        boolean isTx = false;
-        try {
-            conn = ConnectionUtils.getConnection(dataSource, config);
-            isTx = ConnectionUtils.isTransactionConnection(conn);
-            try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-                for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                    ps.setObject(i + 1, sqlAndParams.getParams().get(i));
-                }
-                return ps.executeUpdate();
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute logic delete statement", e);
-        } finally {
-            if (!isTx) ConnectionUtils.closeConnection(conn);
-        }
-    }
-
     public static <E> int deleteEntity(E entity, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        return deleteEntity(entity, new SqlEnv(dataSource, dialect, config));
+    }
+
+    public static <E> int deleteEntity(E entity, SqlEnv env) {
         if (entity == null) return 0;
         @SuppressWarnings("unchecked")
         Class<E> clazz = (Class<E>) entity.getClass();
-        EntityMetadata meta = EntityMetadataManager.get(clazz, config);
+        EntityMetadata meta = EntityMetadataManager.get(clazz, env.getConfig());
 
         if (meta.getIdColumn() == null) {
             throw new IllegalStateException("Entity " + clazz.getName() + " does not have a primary key for delete");
         }
 
         Object idVal = meta.getIdColumn().getValue(entity);
-        return deleteById(clazz, idVal, dataSource, dialect, config);
+        return deleteById(clazz, idVal, env);
     }
 
     public static <E> int deleteById(Class<E> clazz, Object idVal, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        return deleteById(clazz, idVal, new SqlEnv(dataSource, dialect, config));
+    }
+
+    public static <E> int deleteById(Class<E> clazz, Object idVal, SqlEnv env) {
         if (idVal == null) {
             throw new IllegalArgumentException("Primary key value is null for delete");
         }
-        EntityMetadata meta = EntityMetadataManager.get(clazz, config);
-        DeleteBuilder<E> builder = new DeleteBuilder<>(clazz, dataSource, dialect, config);
-        builder.whereConditions.add(new BinaryCondition(null, meta.getIdColumn().getColumnName(), SqlOperator.EQ, idVal));
+        EntityMetadata meta = EntityMetadataManager.get(clazz, env.getConfig());
+        DeleteBuilder<E> builder = new DeleteBuilder<>(env, clazz);
+        builder.statement.addWhereCondition(new BinaryCondition(null, meta.getIdColumn().getColumnName(), SqlOperator.EQ, idVal));
         return builder.execute();
     }
 

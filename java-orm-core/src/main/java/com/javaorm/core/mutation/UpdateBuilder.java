@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import com.javaorm.core.connection.ConnectionUtils;
 import com.javaorm.core.query.Query;
 import com.javaorm.core.query.WhereBuilder;
+import com.javaorm.core.sql.SqlEnv;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -33,41 +34,77 @@ public class UpdateBuilder<T> {
 
     private static final Logger log = LoggerFactory.getLogger(UpdateBuilder.class);
 
-    private final Class<T> entityClass;
-    private final EntityMetadata metadata;
+    private final SqlEnv env;
     private final DataSource dataSource;
     private final Dialect dialect;
     private final OrmConfig config;
+    private final Class<T> entityClass;
+    private final EntityMetadata metadata;
     private Boolean printSqlOverride = null;
     private final UpdateStatement statement;
     private final Query<T> queryHelper;
 
-    public UpdateBuilder(Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
+    public UpdateBuilder(SqlEnv env, Class<T> entityClass) {
+        this.env = env != null ? env : new SqlEnv(null, null, null);
+        this.dataSource = this.env.getDataSource();
+        this.dialect = this.env.getDialect();
+        this.config = this.env.getConfig();
         this.entityClass = entityClass;
-        this.dataSource = dataSource;
-        this.dialect = dialect;
-        this.config = config;
-        this.metadata = EntityMetadataManager.get(entityClass, config);
-        this.statement = new UpdateStatement(entityClass, metadata.getTableName());
-        this.queryHelper = new Query<>(entityClass, dataSource, dialect, config, false);
-        RecordingContext.registerAlias(entityClass, metadata.getTableName());
+        this.metadata = EntityMetadataManager.get(entityClass, this.config);
+        this.statement = new UpdateStatement(entityClass, metadata != null ? metadata.getTableName() : null);
+        this.queryHelper = new Query<>(this.env, entityClass, false);
+        if (metadata != null) {
+            RecordingContext.registerAlias(entityClass, metadata.getTableName());
+        }
 
         // 自动注入逻辑删除保护（避免误更新已删除记录）
-        if (metadata.hasLogicDelete()) {
+        if (metadata != null && metadata.hasLogicDelete()) {
             ColumnMetadata ld = metadata.getLogicDeleteColumn();
             statement.addSystemCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
         }
 
         // 自动注入多租户隔离保护
-        if (metadata.hasTenant()) {
+        if (metadata != null && metadata.hasTenant()) {
             ColumnMetadata tc = metadata.getTenantColumn();
-            Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+            Object tenantId = this.config != null ? this.config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
             if (tenantId != null) {
                 statement.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
-            } else if (config != null && config.isTenantStrict()) {
+            } else if (this.config != null && this.config.isTenantStrict()) {
                 throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
             }
         }
+    }
+
+    public UpdateBuilder(Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
+        this(new SqlEnv(dataSource, dialect, config), entityClass);
+    }
+
+    public SqlEnv getEnv() {
+        return env;
+    }
+
+    public DataSource getDataSource() {
+        return dataSource;
+    }
+
+    public Dialect getDialect() {
+        return dialect;
+    }
+
+    public OrmConfig getConfig() {
+        return config;
+    }
+
+    public EntityMetadata getMetadata() {
+        return metadata;
+    }
+
+    public Class<T> getEntityClass() {
+        return entityClass;
+    }
+
+    public UpdateStatement getStatement() {
+        return statement;
     }
 
     public T proxy() {
@@ -85,7 +122,7 @@ public class UpdateBuilder<T> {
     }
 
     public SqlAndParams toSqlAndParams() {
-        return dialect.buildUpdate(statement);
+        return getDialect().buildUpdate(statement);
     }
 
     public String toSql() {
@@ -177,7 +214,7 @@ public class UpdateBuilder<T> {
     }
 
     public WhereBuilder<T> where() {
-        return new WhereBuilder<>(entityClass, queryHelper, null, statement::addWhereCondition, null, this::execute, this::toSqlAndParams, val -> {
+        return new WhereBuilder<>(env, statement, entityClass, null, statement::addWhereCondition, queryHelper, null, this::execute, this::toSqlAndParams, val -> {
             if (val == null) this.printSql();
             else this.printSql(val);
         });
@@ -284,38 +321,21 @@ public class UpdateBuilder<T> {
         if (statement.getSetValues().isEmpty()) {
             return 0;
         }
-
-        SqlAndParams sqlAndParams = toSqlAndParams();
-        boolean shouldPrint = (printSqlOverride != null) ? printSqlOverride : config.isPrintSql();
-        if (shouldPrint) {
-            log.info("==>  Preparing: {}", sqlAndParams.getSql());
-            log.info("==> Parameters: {}", sqlAndParams.getParams());
+        if (printSqlOverride != null) {
+            env.setPrintSql(printSqlOverride);
         }
-
-        Connection conn = null;
-        boolean isTx = false;
-        try {
-            conn = ConnectionUtils.getConnection(dataSource, config);
-            isTx = ConnectionUtils.isTransactionConnection(conn);
-            try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-                for (int i = 0; i < sqlAndParams.getParams().size(); i++) {
-                    ps.setObject(i + 1, sqlAndParams.getParams().get(i));
-                }
-                return ps.executeUpdate();
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute update statement", e);
-        } finally {
-            if (!isTx) ConnectionUtils.closeConnection(conn);
-            Query.resetAliasSeq();
-        }
+        return env.executeUpdate(statement);
     }
 
     public static <E> int updateEntity(E entity, DataSource dataSource, Dialect dialect, OrmConfig config, boolean selective) {
+        return updateEntity(entity, new SqlEnv(dataSource, dialect, config), selective);
+    }
+
+    public static <E> int updateEntity(E entity, SqlEnv env, boolean selective) {
         if (entity == null) return 0;
         @SuppressWarnings("unchecked")
         Class<E> clazz = (Class<E>) entity.getClass();
-        EntityMetadata meta = EntityMetadataManager.get(clazz, config);
+        EntityMetadata meta = EntityMetadataManager.get(clazz, env.getConfig());
 
         if (meta.getIdColumn() == null) {
             throw new IllegalStateException("Entity " + clazz.getName() + " does not have a primary key for update");
@@ -326,7 +346,7 @@ public class UpdateBuilder<T> {
             throw new IllegalArgumentException("Primary key value is null for entity update");
         }
 
-        UpdateBuilder<E> builder = new UpdateBuilder<>(clazz, dataSource, dialect, config);
+        UpdateBuilder<E> builder = new UpdateBuilder<>(env, clazz);
         for (ColumnMetadata col : meta.getColumns()) {
             if (col.isPrimaryKey() || col.isIgnored()) {
                 continue;

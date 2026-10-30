@@ -7,6 +7,7 @@ import com.javaorm.core.operator.SqlOperator;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.ProxyFactory;
 import com.javaorm.core.proxy.RecordingContext;
+import com.javaorm.core.sql.SqlEnv;
 
 import java.util.Collection;
 import java.util.List;
@@ -29,6 +30,8 @@ public class WhereBuilder<T> {
         void accept(WhereBuilder<T> w, T s);
     }
 
+    private final SqlEnv env;
+    private final Statement statement;
     private final Class<T> entityClass;
     private final Query<?> rootQuery;
     private String scopeAlias;
@@ -44,44 +47,70 @@ public class WhereBuilder<T> {
     @SuppressWarnings("rawtypes")
     private final PropertyOperator reusableOperator;
 
+    public WhereBuilder(SqlEnv env, Statement statement, Class<T> entityClass) {
+        this(env, statement, entityClass, null, statement != null ? statement::addWhereCondition : null, null, null, null, null, null);
+    }
+
+    public WhereBuilder(SqlEnv env, Statement statement, Class<T> entityClass, String scopeAlias, Consumer<Condition> conditionReceiver) {
+        this(env, statement, entityClass, scopeAlias, conditionReceiver, null, null, null, null, null);
+    }
+
     public WhereBuilder(Query<T> query) {
         this(query, null);
     }
 
     @SuppressWarnings("unchecked")
     public WhereBuilder(Query<T> query, Supplier<List<?>> customListSupplier) {
-        this((Class<T>) query.getStatement().getRootEntityClass(), query, query.getStatement().getRootTableAlias(),
-                query.getStatement()::addWhereCondition, customListSupplier, null,
-                query::toSqlAndParams, val -> { if (val == null) query.printSql(); else query.printSql(val); });
+        this(query.getEnv(), query.getStatement(), (Class<T>) query.getStatement().getRootEntityClass(),
+                query.getStatement().getRootTableAlias(), query.getStatement()::addWhereCondition, query,
+                customListSupplier, null, query::toSqlAndParams, val -> { if (val == null) query.printSql(); else query.printSql(val); });
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias) {
-        this(entityClass, rootQuery, scopeAlias, rootQuery.getStatement()::addWhereCondition, null, null, null, null);
+        this(rootQuery != null ? rootQuery.getEnv() : null, rootQuery != null ? rootQuery.getStatement() : null,
+                entityClass, scopeAlias, rootQuery != null ? rootQuery.getStatement()::addWhereCondition : null,
+                rootQuery, null, null, null, null);
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver) {
-        this(entityClass, rootQuery, scopeAlias, conditionReceiver, null, null, null, null);
+        this(rootQuery != null ? rootQuery.getEnv() : null, rootQuery != null ? rootQuery.getStatement() : null,
+                entityClass, scopeAlias, conditionReceiver, rootQuery, null, null, null, null);
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver, java.util.function.IntSupplier executeSupplier) {
-        this(entityClass, rootQuery, scopeAlias, conditionReceiver, null, executeSupplier, null, null);
+        this(rootQuery != null ? rootQuery.getEnv() : null, rootQuery != null ? rootQuery.getStatement() : null,
+                entityClass, scopeAlias, conditionReceiver, rootQuery, null, executeSupplier, null, null);
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver, Supplier<List<?>> customListSupplier) {
-        this(entityClass, rootQuery, scopeAlias, conditionReceiver, customListSupplier, null, null, null);
+        this(rootQuery != null ? rootQuery.getEnv() : null, rootQuery != null ? rootQuery.getStatement() : null,
+                entityClass, scopeAlias, conditionReceiver, rootQuery, customListSupplier, null, null, null);
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver, Supplier<List<?>> customListSupplier, java.util.function.IntSupplier executeSupplier) {
-        this(entityClass, rootQuery, scopeAlias, conditionReceiver, customListSupplier, executeSupplier, null, null);
+        this(rootQuery != null ? rootQuery.getEnv() : null, rootQuery != null ? rootQuery.getStatement() : null,
+                entityClass, scopeAlias, conditionReceiver, rootQuery, customListSupplier, executeSupplier, null, null);
     }
 
     public WhereBuilder(Class<T> entityClass, Query<?> rootQuery, String scopeAlias, Consumer<Condition> conditionReceiver,
                         Supplier<List<?>> customListSupplier, java.util.function.IntSupplier executeSupplier,
                         Supplier<com.javaorm.core.dialect.SqlAndParams> sqlAndParamsSupplier, Consumer<Boolean> printSqlConsumer) {
+        this(rootQuery != null ? rootQuery.getEnv() : null, rootQuery != null ? rootQuery.getStatement() : null,
+                entityClass, scopeAlias, conditionReceiver, rootQuery, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
+    }
+
+    public WhereBuilder(SqlEnv env, Statement statement, Class<T> entityClass, String scopeAlias,
+                        Consumer<Condition> conditionReceiver, Query<?> rootQuery,
+                        Supplier<List<?>> customListSupplier, java.util.function.IntSupplier executeSupplier,
+                        Supplier<com.javaorm.core.dialect.SqlAndParams> sqlAndParamsSupplier, Consumer<Boolean> printSqlConsumer) {
+        this.env = env != null ? env : (rootQuery != null ? rootQuery.getEnv() : null);
+        this.statement = statement != null ? statement : (rootQuery != null ? rootQuery.getStatement() : null);
         this.entityClass = entityClass;
         this.rootQuery = rootQuery;
         this.scopeAlias = scopeAlias;
-        this.conditionReceiver = conditionReceiver;
+        this.conditionReceiver = conditionReceiver != null ? conditionReceiver
+                : (this.statement != null ? this.statement::addWhereCondition
+                : (rootQuery != null ? rootQuery.getStatement()::addWhereCondition : c -> {}));
         this.customListSupplier = customListSupplier;
         this.executeSupplier = executeSupplier;
         this.sqlAndParamsSupplier = sqlAndParamsSupplier;
@@ -91,11 +120,33 @@ public class WhereBuilder<T> {
         });
     }
 
+    public SqlEnv getEnv() {
+        return env;
+    }
+
+    public Statement getAstStatement() {
+        return statement;
+    }
+
     public int execute() {
         if (executeSupplier != null) {
             return executeSupplier.getAsInt();
         }
+        if (env != null && statement instanceof UpdateStatement) {
+            return env.executeUpdate((UpdateStatement) statement);
+        }
+        if (env != null && statement instanceof DeleteStatement) {
+            return env.executeDelete((DeleteStatement) statement);
+        }
         throw new UnsupportedOperationException("execute() is only available on UPDATE and DELETE operations");
+    }
+
+    public int executeRows() {
+        return execute();
+    }
+
+    public Statement getRawStatement() {
+        return statement != null ? statement : (rootQuery != null ? rootQuery.getStatement() : null);
     }
 
     /**
@@ -641,7 +692,7 @@ public class WhereBuilder<T> {
             return this;
         }
         GroupCondition group = new GroupCondition(LogicalOperator.AND);
-        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
+        WhereBuilder<T> sub = new WhereBuilder<>(env, statement, entityClass, scopeAlias, group::addCondition, rootQuery, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub);
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
@@ -658,7 +709,7 @@ public class WhereBuilder<T> {
             return this;
         }
         GroupCondition group = new GroupCondition(LogicalOperator.AND);
-        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
+        WhereBuilder<T> sub = new WhereBuilder<>(env, statement, entityClass, scopeAlias, group::addCondition, rootQuery, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub, sub.proxy());
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
@@ -675,7 +726,7 @@ public class WhereBuilder<T> {
             return this;
         }
         GroupCondition group = new GroupCondition(LogicalOperator.OR);
-        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
+        WhereBuilder<T> sub = new WhereBuilder<>(env, statement, entityClass, scopeAlias, group::addCondition, rootQuery, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub);
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
@@ -692,7 +743,7 @@ public class WhereBuilder<T> {
             return this;
         }
         GroupCondition group = new GroupCondition(LogicalOperator.OR);
-        WhereBuilder<T> sub = new WhereBuilder<>(entityClass, rootQuery, scopeAlias, group::addCondition, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
+        WhereBuilder<T> sub = new WhereBuilder<>(env, statement, entityClass, scopeAlias, group::addCondition, rootQuery, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub, sub.proxy());
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
@@ -2243,7 +2294,10 @@ public class WhereBuilder<T> {
     }
 
     public SelectStatement getStatement() {
-        return rootQuery.getStatement();
+        if (statement instanceof SelectStatement) {
+            return (SelectStatement) statement;
+        }
+        return rootQuery != null ? rootQuery.getStatement() : null;
     }
 
     @SuppressWarnings("unchecked")
@@ -2266,37 +2320,72 @@ public class WhereBuilder<T> {
         if (customListSupplier != null) {
             return (List<E>) customListSupplier.get();
         }
-        return (List<E>) rootQuery.list();
+        if (rootQuery != null) {
+            return (List<E>) rootQuery.list();
+        }
+        if (env != null && statement instanceof SelectStatement) {
+            return (List<E>) env.executeSelectList(null, (SelectStatement) statement, null, null);
+        }
+        throw new UnsupportedOperationException("list() is not supported on this builder");
     }
 
     public List<Map<String, Object>> listMaps() {
-        return rootQuery.listMaps();
+        if (rootQuery != null) {
+            return rootQuery.listMaps();
+        }
+        if (env != null && statement instanceof SelectStatement) {
+            return env.executeSelectMaps(null, (SelectStatement) statement);
+        }
+        throw new UnsupportedOperationException("listMaps() is not supported on this builder");
     }
 
     public List<Map<String, Object>> maps() {
-        return rootQuery.listMaps();
+        return listMaps();
     }
 
     public <V> V fetchOne(Class<V> targetType) {
-        return rootQuery.fetchOne(targetType);
+        if (rootQuery != null) {
+            return rootQuery.fetchOne(targetType);
+        }
+        if (env != null && statement instanceof SelectStatement) {
+            ((SelectStatement) statement).setLimit(1);
+            return env.executeSelectScalar(null, (SelectStatement) statement, targetType);
+        }
+        throw new UnsupportedOperationException("fetchOne() is not supported on this builder");
     }
 
     public <V> List<V> fetchList(Class<V> targetType) {
-        return rootQuery.fetchList(targetType);
+        if (rootQuery != null) {
+            return rootQuery.fetchList(targetType);
+        }
+        if (env != null && statement instanceof SelectStatement) {
+            return env.executeSelectScalarList(null, (SelectStatement) statement, targetType);
+        }
+        throw new UnsupportedOperationException("fetchList() is not supported on this builder");
     }
 
     @SuppressWarnings("unchecked")
     public T single() {
-        return (T) rootQuery.single();
+        if (rootQuery != null) {
+            return (T) rootQuery.single();
+        }
+        List<T> l = list();
+        return (l != null && !l.isEmpty()) ? l.get(0) : null;
     }
 
     @SuppressWarnings("unchecked")
     public T firstOrNull() {
-        return (T) rootQuery.firstOrNull();
+        return single();
     }
 
     public long count() {
-        return rootQuery.count();
+        if (rootQuery != null) {
+            return rootQuery.count();
+        }
+        if (env != null && statement instanceof SelectStatement) {
+            return env.executeSelectCount(null, (SelectStatement) statement, env.getDialect(), entityClass);
+        }
+        throw new UnsupportedOperationException("count() is not supported on this builder");
     }
 
     public com.javaorm.core.dialect.SqlAndParams toSqlAndParams() {
@@ -2305,6 +2394,15 @@ public class WhereBuilder<T> {
         }
         if (rootQuery != null) {
             return rootQuery.toSqlAndParams();
+        }
+        if (env != null && statement != null) {
+            if (statement instanceof SelectStatement) {
+                return env.getDialect().buildSelect((SelectStatement) statement);
+            } else if (statement instanceof UpdateStatement) {
+                return env.getDialect().buildUpdate((UpdateStatement) statement);
+            } else if (statement instanceof DeleteStatement) {
+                return env.getDialect().buildDelete((DeleteStatement) statement);
+            }
         }
         throw new UnsupportedOperationException("toSqlAndParams() is not supported on this builder");
     }
@@ -2323,12 +2421,7 @@ public class WhereBuilder<T> {
     }
 
     public WhereBuilder<T> printSql() {
-        if (printSqlConsumer != null) {
-            printSqlConsumer.accept(null);
-        } else if (rootQuery != null) {
-            rootQuery.printSql();
-        }
-        return this;
+        return printSql(true);
     }
 
     public WhereBuilder<T> printSql(boolean print) {
@@ -2336,6 +2429,8 @@ public class WhereBuilder<T> {
             printSqlConsumer.accept(print);
         } else if (rootQuery != null) {
             rootQuery.printSql(print);
+        } else if (env != null) {
+            env.setPrintSql(print);
         }
         return this;
     }

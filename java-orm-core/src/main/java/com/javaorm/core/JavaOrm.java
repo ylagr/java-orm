@@ -121,7 +121,7 @@ public class JavaOrm {
      * 开启流式查询：orm.select(Student.class).where().and(s -> s.getAge()).gt(18)...
      */
     public <T> Query<T> select(Class<T> entityClass) {
-        return new Query<>(entityClass, dataSource, dialect, config);
+        return env().createQuery(entityClass);
     }
 
     /**
@@ -135,7 +135,7 @@ public class JavaOrm {
      * 开启 CTE 强类型流式查询：orm.select(cte).where()...
      */
     public <T> Query<T> select(Cte<T> cte) {
-        return new Query<>(cte, dataSource, dialect, config);
+        return env().createQuery(cte);
     }
 
     /**
@@ -204,18 +204,25 @@ public class JavaOrm {
     }
 
     /**
+     * 获取统一的 SQL 声明式环境上下文
+     */
+    public SqlEnv env() {
+        return new SqlEnv(dataSource, dialect, config);
+    }
+
+    /**
      * 以 WITH 子句起始构建主查询
      */
     public WithStage with(Cte<?> cte) {
-        return new WithStage(dataSource, dialect, config).with(cte);
+        return new WithStage(env()).with(cte);
     }
 
     public WithStage with(String name, Object query) {
-        return new WithStage(dataSource, dialect, config).with(name, query);
+        return new WithStage(env()).with(name, query);
     }
 
     public WithStage withRecursive(String name, Object query) {
-        return new WithStage(dataSource, dialect, config).withRecursive(name, query);
+        return new WithStage(env()).withRecursive(name, query);
     }
 
     /**
@@ -227,7 +234,7 @@ public class JavaOrm {
         if (moreExpressions != null && moreExpressions.length > 0) {
             System.arraycopy(moreExpressions, 0, all, 1, moreExpressions.length);
         }
-        return new FromStageQuery(all, dataSource, dialect, config);
+        return new FromStageQuery(env(), all);
     }
 
     /**
@@ -239,7 +246,7 @@ public class JavaOrm {
         if (moreExpressions != null && moreExpressions.length > 0) {
             System.arraycopy(moreExpressions, 0, all, 1, moreExpressions.length);
         }
-        return new DtoFromStageQuery<>(dtoClass, all, dataSource, dialect, config);
+        return new DtoFromStageQuery<>(env(), dtoClass, all);
     }
 
     /**
@@ -247,7 +254,7 @@ public class JavaOrm {
      */
     public <T> int insert(T entity) {
         try {
-            return new InsertBuilder<>(entity, dataSource, dialect, config).execute();
+            return env().createInsert(entity).execute();
         } finally {
             com.javaorm.core.query.Query.resetAliasSeq();
         }
@@ -269,7 +276,7 @@ public class JavaOrm {
      * 开启实体插入构造器
      */
     public <T> InsertBuilder<T> insertable(T entity) {
-        return new InsertBuilder<>(entity, dataSource, dialect, config);
+        return env().createInsert(entity);
     }
 
     /**
@@ -277,7 +284,7 @@ public class JavaOrm {
      */
     public <T> int update(T entity) {
         try {
-            return UpdateBuilder.updateEntity(entity, dataSource, dialect, config, true);
+            return UpdateBuilder.updateEntity(entity, env(), true);
         } finally {
             com.javaorm.core.query.Query.resetAliasSeq();
         }
@@ -300,7 +307,7 @@ public class JavaOrm {
      */
     public <T> int updateAllColumns(T entity) {
         try {
-            return UpdateBuilder.updateEntity(entity, dataSource, dialect, config, false);
+            return UpdateBuilder.updateEntity(entity, env(), false);
         } finally {
             com.javaorm.core.query.Query.resetAliasSeq();
         }
@@ -310,7 +317,7 @@ public class JavaOrm {
      * 开启流式条件更新：orm.update(Student.class).set(s -> s.getAge(), 20).where()...
      */
     public <T> UpdateBuilder<T> update(Class<T> entityClass) {
-        return new UpdateBuilder<>(entityClass, dataSource, dialect, config);
+        return env().createUpdate(entityClass);
     }
 
     /**
@@ -343,7 +350,7 @@ public class JavaOrm {
      */
     public <T> int delete(T entity) {
         try {
-            return DeleteBuilder.deleteEntity(entity, dataSource, dialect, config);
+            return DeleteBuilder.deleteEntity(entity, env());
         } finally {
             com.javaorm.core.query.Query.resetAliasSeq();
         }
@@ -354,7 +361,7 @@ public class JavaOrm {
      */
     public <T> int deleteById(Class<T> entityClass, Object id) {
         try {
-            return DeleteBuilder.deleteById(entityClass, id, dataSource, dialect, config);
+            return DeleteBuilder.deleteById(entityClass, id, env());
         } finally {
             com.javaorm.core.query.Query.resetAliasSeq();
         }
@@ -364,7 +371,7 @@ public class JavaOrm {
      * 开启流式条件删除：orm.delete(Student.class).where().and(s -> s.getAge()).lt(10)...
      */
     public <T> DeleteBuilder<T> delete(Class<T> entityClass) {
-        return new DeleteBuilder<>(entityClass, dataSource, dialect, config);
+        return env().createDelete(entityClass);
     }
 
     /**
@@ -438,7 +445,7 @@ public class JavaOrm {
         if (envConsumer == null) {
             throw new IllegalArgumentException("SqlEnv consumer must not be null");
         }
-        SqlEnv env = new SqlEnv(dataSource, dialect, config);
+        SqlEnv env = env();
         try {
             envConsumer.accept(env);
             return env.toExecution();
