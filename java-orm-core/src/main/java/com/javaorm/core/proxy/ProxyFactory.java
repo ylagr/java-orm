@@ -36,30 +36,35 @@ public class ProxyFactory {
         }
     }
 
+    private static final Map<String, Object> ALIAS_PROXY_CACHE = new ConcurrentHashMap<>();
+
     @SuppressWarnings("unchecked")
     public static <T> T createProxy(Class<T> entityClass, String alias) {
         if (entityClass == null) {
             return null;
         }
-        T singleton = getProxy(entityClass);
-        if (alias == null) {
-            return singleton;
+        if (alias == null || alias.trim().isEmpty()) {
+            return getProxy(entityClass);
         }
 
-        T newInstance;
-        if (singleton instanceof ProxyInstanceFactory) {
-            // 纯接口多态虚方法分发调用 createNew()，0 反射！
-            newInstance = ((ProxyInstanceFactory<T>) singleton).createNew();
-        } else {
-            try {
-                newInstance = (T) singleton.getClass().getDeclaredConstructor().newInstance();
-            } catch (Exception e) {
-                newInstance = singleton;
+        String cacheKey = entityClass.getName() + "#" + alias.trim();
+        return (T) ALIAS_PROXY_CACHE.computeIfAbsent(cacheKey, k -> {
+            T singleton = getProxy(entityClass);
+            T newInstance;
+            if (singleton instanceof ProxyInstanceFactory) {
+                // 仅首次生成该别名代理时创建一次，之后永久全局复用，0 GC 分配！
+                newInstance = ((ProxyInstanceFactory<T>) singleton).createNew();
+            } else {
+                try {
+                    newInstance = (T) singleton.getClass().getDeclaredConstructor().newInstance();
+                } catch (Exception e) {
+                    newInstance = singleton;
+                }
             }
-        }
-
-        RecordingContext.registerProxyAlias(newInstance, alias);
-        return newInstance;
+            // 全局一次性绑定别名，避免每轮查询重复向 ThreadLocal 注册
+            RecordingContext.registerGlobalProxyAlias(newInstance, alias.trim());
+            return newInstance;
+        });
     }
 
     @SuppressWarnings("unchecked")

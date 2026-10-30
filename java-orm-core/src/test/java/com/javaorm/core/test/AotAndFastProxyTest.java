@@ -37,10 +37,12 @@ public class AotAndFastProxyTest {
         assertNotNull(s);
         assertTrue("生成的代理类必须实现 ProxyInstanceFactory 接口", s instanceof ProxyInstanceFactory);
 
-        // 2. 接口分发调用 createNew()，生成带别名的新代理对象（0 反射）
+        // 2. 接口分发调用 createNew()，生成带别名的新代理对象（0 反射，且同一别名全局单例复用）
         Student aliasStudent = ProxyFactory.createProxy(Student.class, "s_alias");
         assertNotNull(aliasStudent);
-        assertNotSame("带别名的代理必须是新实例", s, aliasStudent);
+        assertNotSame("带别名的代理必须与默认单例不同", s, aliasStudent);
+        Student aliasStudent2 = ProxyFactory.createProxy(Student.class, "s_alias");
+        assertSame("同一别名全局单例复用，0 GC 分配", aliasStudent, aliasStudent2);
 
         // 3. 测试常规叶子属性录制
         RecordingContext.start(Student.class);

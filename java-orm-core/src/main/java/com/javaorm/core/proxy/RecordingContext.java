@@ -12,6 +12,7 @@ public class RecordingContext {
     private static final ThreadLocal<PropertyPath> CURRENT_PATH = new ThreadLocal<>();
     private static final ThreadLocal<Map<Class<?>, String>> ACTIVE_ALIASES = ThreadLocal.withInitial(HashMap::new);
     private static final ThreadLocal<Map<Object, String>> PROXY_ALIASES = ThreadLocal.withInitial(IdentityHashMap::new);
+    private static final Map<Object, String> GLOBAL_PROXY_ALIASES = new java.util.concurrent.ConcurrentHashMap<>();
 
     public static void start(Class<?> rootEntityClass) {
         clearRecording(rootEntityClass);
@@ -58,8 +59,19 @@ public class RecordingContext {
         }
     }
 
+    public static void registerGlobalProxyAlias(Object proxy, String alias) {
+        if (proxy != null && alias != null) {
+            GLOBAL_PROXY_ALIASES.put(proxy, alias);
+        }
+    }
+
     public static String getProxyAlias(Object proxy) {
-        return proxy != null ? PROXY_ALIASES.get().get(proxy) : null;
+        if (proxy == null) return null;
+        String global = GLOBAL_PROXY_ALIASES.get(proxy);
+        if (global != null) {
+            return global;
+        }
+        return PROXY_ALIASES.get().get(proxy);
     }
 
     public static void clearAliases() {
