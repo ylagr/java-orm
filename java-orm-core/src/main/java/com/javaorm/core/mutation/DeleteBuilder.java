@@ -41,6 +41,7 @@ public class DeleteBuilder<T> {
     private final OrmConfig config;
     private Boolean printSqlOverride = null;
     private final List<Condition> whereConditions = new ArrayList<>();
+    private boolean logicDeleteDisabled = false;
     private final Query<T> queryHelper;
 
     public DeleteBuilder(Class<T> entityClass, DataSource dataSource, Dialect dialect, OrmConfig config) {
@@ -67,14 +68,23 @@ public class DeleteBuilder<T> {
         return this;
     }
 
+    public DeleteBuilder<T> disableLogicDelete() {
+        this.logicDeleteDisabled = true;
+        return this;
+    }
+
     public SqlAndParams toSqlAndParams() {
+        return buildSqlAndParams(dialect);
+    }
+
+    public SqlAndParams buildSqlAndParams(Dialect targetDialect) {
         ColumnMetadata tc = metadata.hasTenant() ? metadata.getTenantColumn() : null;
         Object tenantId = (tc != null && config != null) ? config.getCurrentTenantId() : (tc != null ? com.javaorm.core.tenant.TenantContext.getTenantId() : null);
         if (tc != null && tenantId == null && config != null && config.isTenantStrict()) {
             throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
         }
 
-        if (metadata.hasLogicDelete()) {
+        if (metadata.hasLogicDelete() && !logicDeleteDisabled) {
             ColumnMetadata ld = metadata.getLogicDeleteColumn();
             com.javaorm.core.ast.UpdateStatement updateStmt = new com.javaorm.core.ast.UpdateStatement(entityClass, metadata.getTableName());
             updateStmt.addSet(ld.getColumnName(), ld.getLogicDeleteDeletedValue());
@@ -85,7 +95,7 @@ public class DeleteBuilder<T> {
             if (tc != null && tenantId != null) {
                 updateStmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
             }
-            return dialect.buildUpdate(updateStmt);
+            return (targetDialect != null ? targetDialect : dialect).buildUpdate(updateStmt);
         }
         DeleteStatement stmt = new DeleteStatement(entityClass, metadata.getTableName());
         for (Condition c : whereConditions) {
@@ -94,11 +104,23 @@ public class DeleteBuilder<T> {
         if (tc != null && tenantId != null) {
             stmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
         }
-        return dialect.buildDelete(stmt);
+        return (targetDialect != null ? targetDialect : dialect).buildDelete(stmt);
     }
 
     public String toSql() {
         return toSqlAndParams().getSql();
+    }
+
+    public String toSQL() {
+        return toSql();
+    }
+
+    public String toSql(Dialect customDialect) {
+        return buildSqlAndParams(customDialect).getSql();
+    }
+
+    public String toSQL(Dialect customDialect) {
+        return toSql(customDialect);
     }
 
     @Override
@@ -118,16 +140,71 @@ public class DeleteBuilder<T> {
         return this;
     }
 
+    public DeleteBuilder<T> where(boolean condition, Consumer<WhereBuilder<T>> consumer) {
+        if (condition && consumer != null) {
+            consumer.accept(where());
+        }
+        return this;
+    }
+
     public DeleteBuilder<T> where(WhereBuilder.BiWhereConsumer<T> consumer) {
         WhereBuilder<T> w = where();
         consumer.accept(w, proxy());
         return this;
     }
 
+    public DeleteBuilder<T> where(boolean condition, WhereBuilder.BiWhereConsumer<T> consumer) {
+        if (condition && consumer != null) {
+            WhereBuilder<T> w = where();
+            consumer.accept(w, proxy());
+        }
+        return this;
+    }
+
+    public DeleteBuilder<T> whereById(Object id) {
+        return whereById(true, id);
+    }
+
+    public DeleteBuilder<T> whereById(boolean condition, Object id) {
+        if (!condition) return this;
+        ColumnMetadata idCol = metadata != null ? metadata.getIdColumn() : null;
+        String idProp = idCol != null ? idCol.getPropertyName() : "id";
+        where().and(idProp).eq(id);
+        return this;
+    }
+
+    public DeleteBuilder<T> whereByIds(java.util.Collection<?> ids) {
+        return whereByIds(true, ids);
+    }
+
+    public DeleteBuilder<T> whereByIds(boolean condition, java.util.Collection<?> ids) {
+        if (!condition) return this;
+        ColumnMetadata idCol = metadata != null ? metadata.getIdColumn() : null;
+        String idProp = idCol != null ? idCol.getPropertyName() : "id";
+        where().and(idProp).in((java.util.Collection) ids);
+        return this;
+    }
+
+    public final DeleteBuilder<T> whereByIds(Object... ids) {
+        if (ids != null && ids.length == 1 && ids[0] instanceof java.util.Collection) {
+            return whereByIds((java.util.Collection<?>) ids[0]);
+        }
+        return whereByIds(ids != null ? java.util.Arrays.asList(ids) : java.util.Collections.emptyList());
+    }
+
+    public final DeleteBuilder<T> whereByIds(boolean condition, Object... ids) {
+        if (!condition) return this;
+        return whereByIds(ids);
+    }
+
+    public int executeRows() {
+        return execute();
+    }
+
     public int execute() {
         try {
             // 如果存在逻辑删除，自动重写为 UPDATE t SET is_deleted = 1 WHERE ...
-            if (metadata.hasLogicDelete()) {
+            if (metadata.hasLogicDelete() && !logicDeleteDisabled) {
                 ColumnMetadata ld = metadata.getLogicDeleteColumn();
                 return performLogicDelete(ld);
             }

@@ -457,11 +457,52 @@ public abstract class AbstractDialect implements Dialect {
             Object[] values = bc.getValues();
             Object firstVal = (values != null && values.length > 0) ? values[0] : null;
 
-            if (isOp(op, SqlOperator.IN, SqlOperator.NOT_IN) && firstVal instanceof Collection && ((Collection<?>) firstVal).isEmpty()) {
-                if (isOp(op, SqlOperator.IN)) {
-                    sql.append("1 = 0");
-                } else {
-                    sql.append("1 = 1");
+            if (isOp(op, SqlOperator.IN, SqlOperator.NOT_IN)) {
+                boolean isEmpty = (values == null || values.length == 0);
+                if (!isEmpty && firstVal instanceof Collection && ((Collection<?>) firstVal).isEmpty()) {
+                    isEmpty = true;
+                }
+                if (!isEmpty && firstVal != null && firstVal.getClass().isArray() && java.lang.reflect.Array.getLength(firstVal) == 0) {
+                    isEmpty = true;
+                }
+                if (isEmpty) {
+                    if (isOp(op, SqlOperator.IN)) {
+                        sql.append("1 = 2");
+                    } else {
+                        sql.append("1 = 1");
+                    }
+                    return;
+                }
+            }
+
+            if (isOp(op, SqlOperator.IS_EMPTY)) {
+                String col = (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty() ? renderTablePrefix(bc.getTableAlias()) : "") + quote(bc.getColumnName());
+                sql.append("(").append(col).append(" IS NULL OR ").append(col).append(" = '')");
+                return;
+            }
+            if (isOp(op, SqlOperator.IS_NOT_EMPTY)) {
+                String col = (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty() ? renderTablePrefix(bc.getTableAlias()) : "") + quote(bc.getColumnName());
+                sql.append("(").append(col).append(" IS NOT NULL AND ").append(col).append(" <> '')");
+                return;
+            }
+            if (isOp(op, SqlOperator.IS_BLANK)) {
+                String col = (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty() ? renderTablePrefix(bc.getTableAlias()) : "") + quote(bc.getColumnName());
+                sql.append("(").append(col).append(" IS NULL OR ").append(col).append(" = '' OR LTRIM(").append(col).append(") = '')");
+                return;
+            }
+            if (isOp(op, SqlOperator.IS_NOT_BLANK)) {
+                String col = (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty() ? renderTablePrefix(bc.getTableAlias()) : "") + quote(bc.getColumnName());
+                sql.append("(").append(col).append(" IS NOT NULL AND ").append(col).append(" <> '' AND LTRIM(").append(col).append(") <> '')");
+                return;
+            }
+            if (isOp(op, SqlOperator.RANGE_CLOSED, SqlOperator.RANGE_OPEN, SqlOperator.RANGE_CLOSED_OPEN, SqlOperator.RANGE_OPEN_CLOSED)) {
+                String col = (bc.getTableAlias() != null && !bc.getTableAlias().isEmpty() ? renderTablePrefix(bc.getTableAlias()) : "") + quote(bc.getColumnName());
+                String opLeft = isOp(op, SqlOperator.RANGE_CLOSED, SqlOperator.RANGE_CLOSED_OPEN) ? " >= ?" : " > ?";
+                String opRight = isOp(op, SqlOperator.RANGE_CLOSED, SqlOperator.RANGE_OPEN_CLOSED) ? " <= ?" : " < ?";
+                sql.append("(").append(col).append(opLeft).append(" AND ").append(col).append(opRight).append(")");
+                if (values != null && values.length >= 2) {
+                    params.add(values[0]);
+                    params.add(values[1]);
                 }
                 return;
             }
@@ -484,6 +525,58 @@ public abstract class AbstractDialect implements Dialect {
             renderOperatorValues(op, bc.getValues(), sql, params);
         } else if (cond instanceof ExpressionCondition) {
             ExpressionCondition ec = (ExpressionCondition) cond;
+            SqlOperator op = ec.getOperator();
+            Object[] values = ec.getValues();
+            Object firstVal = (values != null && values.length > 0) ? values[0] : null;
+            if (op != null && isOp(op, SqlOperator.IN, SqlOperator.NOT_IN)) {
+                boolean isEmpty = (values == null || values.length == 0);
+                if (!isEmpty && firstVal instanceof Collection && ((Collection<?>) firstVal).isEmpty()) {
+                    isEmpty = true;
+                }
+                if (!isEmpty && firstVal != null && firstVal.getClass().isArray() && java.lang.reflect.Array.getLength(firstVal) == 0) {
+                    isEmpty = true;
+                }
+                if (isEmpty) {
+                    if (isOp(op, SqlOperator.IN)) {
+                        sql.append("1 = 2");
+                    } else {
+                        sql.append("1 = 1");
+                    }
+                    return;
+                }
+            }
+            if (op != null && isOp(op, SqlOperator.IS_EMPTY, SqlOperator.IS_NOT_EMPTY, SqlOperator.IS_BLANK, SqlOperator.IS_NOT_BLANK)) {
+                StringBuilder exprSql = new StringBuilder();
+                List<Object> exprParams = new ArrayList<>();
+                renderExpression(ec.getExpression(), exprSql, exprParams);
+                String exprStr = exprSql.toString();
+                if (isOp(op, SqlOperator.IS_EMPTY)) {
+                    sql.append("(").append(exprStr).append(" IS NULL OR ").append(exprStr).append(" = '')");
+                } else if (isOp(op, SqlOperator.IS_NOT_EMPTY)) {
+                    sql.append("(").append(exprStr).append(" IS NOT NULL AND ").append(exprStr).append(" <> '')");
+                } else if (isOp(op, SqlOperator.IS_BLANK)) {
+                    sql.append("(").append(exprStr).append(" IS NULL OR ").append(exprStr).append(" = '' OR LTRIM(").append(exprStr).append(") = '')");
+                } else {
+                    sql.append("(").append(exprStr).append(" IS NOT NULL AND ").append(exprStr).append(" <> '' AND LTRIM(").append(exprStr).append(") <> '')");
+                }
+                params.addAll(exprParams);
+                params.addAll(exprParams);
+                return;
+            }
+            if (op != null && isOp(op, SqlOperator.RANGE_CLOSED, SqlOperator.RANGE_OPEN, SqlOperator.RANGE_CLOSED_OPEN, SqlOperator.RANGE_OPEN_CLOSED)) {
+                StringBuilder exprSql = new StringBuilder();
+                List<Object> exprParams = new ArrayList<>();
+                renderExpression(ec.getExpression(), exprSql, exprParams);
+                String exprStr = exprSql.toString();
+                String opLeft = isOp(op, SqlOperator.RANGE_CLOSED, SqlOperator.RANGE_CLOSED_OPEN) ? " >= ?" : " > ?";
+                String opRight = isOp(op, SqlOperator.RANGE_CLOSED, SqlOperator.RANGE_OPEN_CLOSED) ? " <= ?" : " < ?";
+                sql.append("(").append(exprStr).append(opLeft).append(" AND ").append(exprStr).append(opRight).append(")");
+                params.addAll(exprParams);
+                if (values != null && values.length > 0) params.add(values[0]);
+                params.addAll(exprParams);
+                if (values != null && values.length > 1) params.add(values[1]);
+                return;
+            }
             renderExpression(ec.getExpression(), sql, params);
             if (ec.getOperator() != null) {
                 sql.append(" ").append(renderOperator(ec.getOperator()));

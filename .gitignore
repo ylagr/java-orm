@@ -5,3 +5,6 @@ target/
 *.iml
 .vscode/
 *.db
+temp/
+.temp*
+*easy-query*

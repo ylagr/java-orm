@@ -16,7 +16,15 @@ public enum BuiltinSqlOperator implements SqlOperator {
     NOT_IN("NOT IN"),
     IS_NULL("IS NULL"),
     IS_NOT_NULL("IS NOT NULL"),
-    BETWEEN("BETWEEN");
+    BETWEEN("BETWEEN"),
+    IS_EMPTY("IS EMPTY"),
+    IS_NOT_EMPTY("IS NOT EMPTY"),
+    IS_BLANK("IS BLANK"),
+    IS_NOT_BLANK("IS NOT BLANK"),
+    RANGE_CLOSED("RANGE_CLOSED"),
+    RANGE_OPEN("RANGE_OPEN"),
+    RANGE_CLOSED_OPEN("RANGE_CLOSED_OPEN"),
+    RANGE_OPEN_CLOSED("RANGE_OPEN_CLOSED");
 
     private final String sql;
 

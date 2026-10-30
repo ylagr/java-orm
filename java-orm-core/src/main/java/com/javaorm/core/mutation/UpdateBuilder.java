@@ -92,6 +92,18 @@ public class UpdateBuilder<T> {
         return toSqlAndParams().getSql();
     }
 
+    public String toSQL() {
+        return toSql();
+    }
+
+    public String toSql(Dialect customDialect) {
+        return (customDialect != null ? customDialect : dialect).buildUpdate(statement).getSql();
+    }
+
+    public String toSQL(Dialect customDialect) {
+        return toSql(customDialect);
+    }
+
     @Override
     public String toString() {
         return toSql();
@@ -176,10 +188,96 @@ public class UpdateBuilder<T> {
         return this;
     }
 
+    public UpdateBuilder<T> where(boolean condition, Consumer<WhereBuilder<T>> consumer) {
+        if (condition && consumer != null) {
+            consumer.accept(where());
+        }
+        return this;
+    }
+
     public UpdateBuilder<T> where(WhereBuilder.BiWhereConsumer<T> consumer) {
         WhereBuilder<T> w = where();
         consumer.accept(w, proxy());
         return this;
+    }
+
+    public UpdateBuilder<T> where(boolean condition, WhereBuilder.BiWhereConsumer<T> consumer) {
+        if (condition && consumer != null) {
+            WhereBuilder<T> w = where();
+            consumer.accept(w, proxy());
+        }
+        return this;
+    }
+
+    public UpdateBuilder<T> whereById(Object id) {
+        return whereById(true, id);
+    }
+
+    public UpdateBuilder<T> whereById(boolean condition, Object id) {
+        if (!condition) return this;
+        ColumnMetadata idCol = metadata != null ? metadata.getIdColumn() : null;
+        String idProp = idCol != null ? idCol.getPropertyName() : "id";
+        where().and(idProp).eq(id);
+        return this;
+    }
+
+    public UpdateBuilder<T> whereByIds(java.util.Collection<?> ids) {
+        return whereByIds(true, ids);
+    }
+
+    public UpdateBuilder<T> whereByIds(boolean condition, java.util.Collection<?> ids) {
+        if (!condition) return this;
+        ColumnMetadata idCol = metadata != null ? metadata.getIdColumn() : null;
+        String idProp = idCol != null ? idCol.getPropertyName() : "id";
+        where().and(idProp).in((java.util.Collection) ids);
+        return this;
+    }
+
+    public final UpdateBuilder<T> whereByIds(Object... ids) {
+        if (ids != null && ids.length == 1 && ids[0] instanceof java.util.Collection) {
+            return whereByIds((java.util.Collection<?>) ids[0]);
+        }
+        return whereByIds(ids != null ? java.util.Arrays.asList(ids) : java.util.Collections.emptyList());
+    }
+
+    public final UpdateBuilder<T> whereByIds(boolean condition, Object... ids) {
+        if (!condition) return this;
+        return whereByIds(ids);
+    }
+
+    public UpdateBuilder<T> disableLogicDelete() {
+        statement.getSystemConditions().removeIf(c -> {
+            if (c instanceof BinaryCondition) {
+                BinaryCondition bc = (BinaryCondition) c;
+                ColumnMetadata ld = metadata != null ? metadata.getLogicDeleteColumn() : null;
+                return ld != null && ld.getColumnName().equalsIgnoreCase(bc.getColumnName());
+            }
+            return false;
+        });
+        return this;
+    }
+
+    public UpdateBuilder<T> setColumns(T entity) {
+        return setColumns(entity, true);
+    }
+
+    public UpdateBuilder<T> setColumns(T entity, boolean selective) {
+        if (entity == null) return this;
+        for (ColumnMetadata col : metadata.getColumns()) {
+            if (col.isPrimaryKey() || col.isIgnored()) {
+                continue;
+            }
+            Object val = col.getValue(entity);
+            if (selective && val == null) {
+                continue;
+            }
+            statement.addSet(col.getColumnName(), val);
+        }
+        return this;
+    }
+
+    public int executeRows() {
+        return execute();
     }
 
     public int execute() {

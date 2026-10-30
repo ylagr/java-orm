@@ -529,6 +529,210 @@ public class PropertyOperator<TQuery, R> {
         return query;
     }
 
+    public TQuery likeMatchLeft(boolean condition, String value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return likeMatchLeft(value);
+    }
+
+    public TQuery likeMatchLeft(String value) {
+        return like(value + "%");
+    }
+
+    public TQuery likeMatchRight(boolean condition, String value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return likeMatchRight(value);
+    }
+
+    public TQuery likeMatchRight(String value) {
+        return like("%" + value);
+    }
+
+    public TQuery notLikeMatchLeft(boolean condition, String value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return notLikeMatchLeft(value);
+    }
+
+    public TQuery notLikeMatchLeft(String value) {
+        return notLike(value + "%");
+    }
+
+    public TQuery notLikeMatchRight(boolean condition, String value) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return notLikeMatchRight(value);
+    }
+
+    public TQuery notLikeMatchRight(String value) {
+        return notLike("%" + value);
+    }
+
+    public TQuery isEmpty(boolean condition) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return isEmpty();
+    }
+
+    public TQuery isEmpty() {
+        appender.append(SqlOperator.IS_EMPTY);
+        return query;
+    }
+
+    public TQuery isNotEmpty(boolean condition) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return isNotEmpty();
+    }
+
+    public TQuery isNotEmpty() {
+        appender.append(SqlOperator.IS_NOT_EMPTY);
+        return query;
+    }
+
+    public TQuery isBlank(boolean condition) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return isBlank();
+    }
+
+    public TQuery isBlank() {
+        appender.append(SqlOperator.IS_BLANK);
+        return query;
+    }
+
+    public TQuery isNotBlank(boolean condition) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        return isNotBlank();
+    }
+
+    public TQuery isNotBlank() {
+        appender.append(SqlOperator.IS_NOT_BLANK);
+        return query;
+    }
+
+    public TQuery rangeClosed(boolean condition, boolean condLeft, R left, boolean condRight, R right) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        boolean hasLeft = condLeft && left != null;
+        boolean hasRight = condRight && right != null;
+        if (hasLeft && hasRight) {
+            appender.append(SqlOperator.RANGE_CLOSED, left, right);
+        } else if (hasLeft) {
+            ge(left);
+        } else if (hasRight) {
+            le(right);
+        }
+        return query;
+    }
+
+    public TQuery rangeClosed(boolean condLeft, R left, boolean condRight, R right) {
+        return rangeClosed(true, condLeft, left, condRight, right);
+    }
+
+    public TQuery rangeClosed(boolean condition, R left, R right) {
+        return rangeClosed(condition, true, left, true, right);
+    }
+
+    public TQuery rangeClosed(R left, R right) {
+        return rangeClosed(true, true, left, true, right);
+    }
+
+    public TQuery rangeOpen(boolean condition, boolean condLeft, R left, boolean condRight, R right) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        boolean hasLeft = condLeft && left != null;
+        boolean hasRight = condRight && right != null;
+        if (hasLeft && hasRight) {
+            appender.append(SqlOperator.RANGE_OPEN, left, right);
+        } else if (hasLeft) {
+            gt(left);
+        } else if (hasRight) {
+            lt(right);
+        }
+        return query;
+    }
+
+    public TQuery rangeOpen(boolean condLeft, R left, boolean condRight, R right) {
+        return rangeOpen(true, condLeft, left, condRight, right);
+    }
+
+    public TQuery rangeOpen(boolean condition, R left, R right) {
+        return rangeOpen(condition, true, left, true, right);
+    }
+
+    public TQuery rangeOpen(R left, R right) {
+        return rangeOpen(true, true, left, true, right);
+    }
+
+    public TQuery rangeClosedOpen(boolean condition, boolean condLeft, R left, boolean condRight, R right) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        boolean hasLeft = condLeft && left != null;
+        boolean hasRight = condRight && right != null;
+        if (hasLeft && hasRight) {
+            appender.append(SqlOperator.RANGE_CLOSED_OPEN, left, right);
+        } else if (hasLeft) {
+            ge(left);
+        } else if (hasRight) {
+            lt(right);
+        }
+        return query;
+    }
+
+    public TQuery rangeClosedOpen(boolean condLeft, R left, boolean condRight, R right) {
+        return rangeClosedOpen(true, condLeft, left, condRight, right);
+    }
+
+    public TQuery rangeClosedOpen(boolean condition, R left, R right) {
+        return rangeClosedOpen(condition, true, left, true, right);
+    }
+
+    public TQuery rangeClosedOpen(R left, R right) {
+        return rangeClosedOpen(true, true, left, true, right);
+    }
+
+    public TQuery rangeOpenClosed(boolean condition, boolean condLeft, R left, boolean condRight, R right) {
+        if (!checkCondition(condition)) {
+            return query;
+        }
+        boolean hasLeft = condLeft && left != null;
+        boolean hasRight = condRight && right != null;
+        if (hasLeft && hasRight) {
+            appender.append(SqlOperator.RANGE_OPEN_CLOSED, left, right);
+        } else if (hasLeft) {
+            gt(left);
+        } else if (hasRight) {
+            le(right);
+        }
+        return query;
+    }
+
+    public TQuery rangeOpenClosed(boolean condLeft, R left, boolean condRight, R right) {
+        return rangeOpenClosed(true, condLeft, left, condRight, right);
+    }
+
+    public TQuery rangeOpenClosed(boolean condition, R left, R right) {
+        return rangeOpenClosed(condition, true, left, true, right);
+    }
+
+    public TQuery rangeOpenClosed(R left, R right) {
+        return rangeOpenClosed(true, true, left, true, right);
+    }
+
     public TQuery isNull(boolean condition) {
         if (!checkCondition(condition)) {
             return query;

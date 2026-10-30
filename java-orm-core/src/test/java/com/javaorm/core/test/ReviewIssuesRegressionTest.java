@@ -252,9 +252,9 @@ public class ReviewIssuesRegressionTest {
         assertTrue("ne(null) must render IS NOT NULL: " + sp2.getSql(), sp2.getSql().contains("\"age\" IS NOT NULL"));
         assertEquals(1, sp2.getParams().size());
 
-        // 3. 空集合 IN 渲染为 1 = 0
+        // 3. 空集合 IN 渲染为 1 = 2 (或 1 = 0)
         SqlAndParams sp3 = orm.select(Student.class).where().and(Student::getAge).in(Collections.emptyList()).toSqlAndParams();
-        assertTrue("Empty IN must render 1 = 0: " + sp3.getSql(), sp3.getSql().contains("1 = 0"));
+        assertTrue("Empty IN must render false (1 = 2 or 1 = 0): " + sp3.getSql(), sp3.getSql().contains("1 = 2") || sp3.getSql().contains("1 = 0"));
         assertEquals(1, sp3.getParams().size());
 
         // 4. 空集合 NOT IN 渲染为 1 = 1

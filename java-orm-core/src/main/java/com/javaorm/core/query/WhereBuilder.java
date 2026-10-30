@@ -112,6 +112,99 @@ public class WhereBuilder<T> {
         return this;
     }
 
+    public WhereBuilder<T> whereById(Object id) {
+        return whereById(true, id);
+    }
+
+    public WhereBuilder<T> whereById(boolean condition, Object id) {
+        if (!condition) return this;
+        com.javaorm.core.metadata.EntityMetadata meta = entityClass != null ? com.javaorm.core.metadata.EntityMetadataManager.get(entityClass) : null;
+        com.javaorm.core.metadata.ColumnMetadata idCol = meta != null ? meta.getIdColumn() : null;
+        String idProp = idCol != null ? idCol.getPropertyName() : "id";
+        and(idProp).eq(id);
+        return this;
+    }
+
+    public WhereBuilder<T> whereByIds(Collection<?> ids) {
+        return whereByIds(true, ids);
+    }
+
+    public WhereBuilder<T> whereByIds(boolean condition, Collection<?> ids) {
+        if (!condition) return this;
+        com.javaorm.core.metadata.EntityMetadata meta = entityClass != null ? com.javaorm.core.metadata.EntityMetadataManager.get(entityClass) : null;
+        com.javaorm.core.metadata.ColumnMetadata idCol = meta != null ? meta.getIdColumn() : null;
+        String idProp = idCol != null ? idCol.getPropertyName() : "id";
+        and(idProp).in((Collection) ids);
+        return this;
+    }
+
+    public final WhereBuilder<T> whereByIds(Object... ids) {
+        if (ids != null && ids.length == 1 && ids[0] instanceof Collection) {
+            return whereByIds((Collection<?>) ids[0]);
+        }
+        return whereByIds(ids != null ? java.util.Arrays.asList(ids) : java.util.Collections.emptyList());
+    }
+
+    public final WhereBuilder<T> whereByIds(boolean condition, Object... ids) {
+        if (!condition) return this;
+        return whereByIds(ids);
+    }
+
+    public WhereBuilder<T> whereObject(Object request) {
+        return whereObject(true, request);
+    }
+
+    public WhereBuilder<T> whereObject(boolean condition, Object request) {
+        if (!condition || request == null) {
+            return this;
+        }
+        com.javaorm.core.metadata.EntityMetadata meta = entityClass != null ? com.javaorm.core.metadata.EntityMetadataManager.get(entityClass) : null;
+        java.lang.reflect.Field[] fields = request.getClass().getDeclaredFields();
+        for (java.lang.reflect.Field field : fields) {
+            field.setAccessible(true);
+            try {
+                Object val = field.get(request);
+                if (val == null) continue;
+                if (val instanceof String && ((String) val).trim().isEmpty()) continue;
+                if (val instanceof Collection && ((Collection<?>) val).isEmpty()) continue;
+
+                com.javaorm.core.annotation.JoWhereCondition ann = field.getAnnotation(com.javaorm.core.annotation.JoWhereCondition.class);
+                String targetProp = (ann != null && !ann.propName().isEmpty()) ? ann.propName() : field.getName();
+                if (meta != null && meta.getColumnByProperty(targetProp) == null && meta.getColumnByDbName(targetProp) == null) {
+                    continue;
+                }
+
+                com.javaorm.core.annotation.JoWhereCondition.Condition condType = ann != null ? ann.type() : com.javaorm.core.annotation.JoWhereCondition.Condition.EQ;
+                switch (condType) {
+                    case EQ: and(targetProp).eq(val); break;
+                    case NE: and(targetProp).ne(val); break;
+                    case GT: and(targetProp).gt(val); break;
+                    case GE:
+                    case RANGE_LEFT_CLOSED: and(targetProp).ge(val); break;
+                    case RANGE_LEFT_OPEN: and(targetProp).gt(val); break;
+                    case LT: and(targetProp).lt(val); break;
+                    case LE:
+                    case RANGE_RIGHT_CLOSED: and(targetProp).le(val); break;
+                    case RANGE_RIGHT_OPEN: and(targetProp).lt(val); break;
+                    case LIKE: and(targetProp).like(val.toString()); break;
+                    case LIKE_MATCH_LEFT: and(targetProp).likeMatchLeft(val.toString()); break;
+                    case LIKE_MATCH_RIGHT: and(targetProp).likeMatchRight(val.toString()); break;
+                    case NOT_LIKE: and(targetProp).notLike(val.toString()); break;
+                    case IN:
+                        if (val instanceof Collection) and(targetProp).in((Collection) val);
+                        else and(targetProp).eq(val);
+                        break;
+                    case NOT_IN:
+                        if (val instanceof Collection) and(targetProp).notIn((Collection) val);
+                        else and(targetProp).ne(val);
+                        break;
+                    default: and(targetProp).eq(val); break;
+                }
+            } catch (Exception ignored) {}
+        }
+        return this;
+    }
+
     public void cancelCurrentCondition() {
         this.currentLogOp = LogicalOperator.AND;
         this.currentLeftOperand = null;

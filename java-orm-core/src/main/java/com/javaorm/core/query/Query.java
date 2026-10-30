@@ -224,6 +224,14 @@ public class Query<T> {
         return toSqlAndParams(customDialect).getSql();
     }
 
+    public String toSQL() {
+        return toSql();
+    }
+
+    public String toSQL(Dialect customDialect) {
+        return toSql(customDialect);
+    }
+
     @Override
     public String toString() {
         return toSql();
@@ -363,12 +371,87 @@ public class Query<T> {
         return this;
     }
 
+    public Query<T> where(boolean condition, Consumer<WhereBuilder<T>> consumer) {
+        if (condition && consumer != null) {
+            consumer.accept(where());
+        }
+        return this;
+    }
+
     /**
      * 双参数作用域 WHERE 块：orm.select(Student.class).where((w, s) -> { w.and(s.getAge()).gt(18); })
      */
     public Query<T> where(WhereBuilder.BiWhereConsumer<T> consumer) {
         WhereBuilder<T> w = where();
         consumer.accept(w, w.proxy());
+        return this;
+    }
+
+    public Query<T> where(boolean condition, WhereBuilder.BiWhereConsumer<T> consumer) {
+        if (condition && consumer != null) {
+            WhereBuilder<T> w = where();
+            consumer.accept(w, w.proxy());
+        }
+        return this;
+    }
+
+    public Query<T> whereById(Object id) {
+        return whereById(true, id);
+    }
+
+    public Query<T> whereById(boolean condition, Object id) {
+        if (!condition) return this;
+        ColumnMetadata idCol = rootMetadata != null ? rootMetadata.getIdColumn() : null;
+        String idProp = idCol != null ? idCol.getPropertyName() : "id";
+        where().eq(idProp, id);
+        return this;
+    }
+
+    public Query<T> whereByIds(Collection<?> ids) {
+        return whereByIds(true, ids);
+    }
+
+    public Query<T> whereByIds(boolean condition, Collection<?> ids) {
+        if (!condition) return this;
+        ColumnMetadata idCol = rootMetadata != null ? rootMetadata.getIdColumn() : null;
+        String idProp = idCol != null ? idCol.getPropertyName() : "id";
+        where().in(idProp, (Collection) ids);
+        return this;
+    }
+
+    @SafeVarargs
+    public final Query<T> whereByIds(Object... ids) {
+        if (ids != null && ids.length == 1 && ids[0] instanceof Collection) {
+            return whereByIds((Collection<?>) ids[0]);
+        }
+        return whereByIds(ids != null ? Arrays.asList(ids) : Collections.emptyList());
+    }
+
+    @SafeVarargs
+    public final Query<T> whereByIds(boolean condition, Object... ids) {
+        if (!condition) return this;
+        return whereByIds(ids);
+    }
+
+    public Query<T> whereObject(Object request) {
+        return whereObject(true, request);
+    }
+
+    public Query<T> whereObject(boolean condition, Object request) {
+        if (!condition || request == null) return this;
+        where(w -> w.whereObject(request));
+        return this;
+    }
+
+    public Query<T> disableLogicDelete() {
+        statement.getSystemConditions().removeIf(c -> {
+            if (c instanceof BinaryCondition) {
+                BinaryCondition bc = (BinaryCondition) c;
+                ColumnMetadata ld = rootMetadata != null ? rootMetadata.getLogicDeleteColumn() : null;
+                return ld != null && ld.getColumnName().equalsIgnoreCase(bc.getColumnName());
+            }
+            return false;
+        });
         return this;
     }
 
@@ -546,9 +629,31 @@ public class Query<T> {
         return this;
     }
 
+    private boolean isAliasUsed(String alias) {
+        if (alias == null) return false;
+        if (statement != null && alias.equalsIgnoreCase(statement.getRootTableAlias())) return true;
+        if (statement != null) {
+            for (TableJoin join : statement.getJoins()) {
+                if (alias.equalsIgnoreCase(join.getTableAlias())) return true;
+            }
+        }
+        return false;
+    }
+
+    private String obtainJoinAlias(Class<?> entityClass) {
+        String joinAlias = (entityClass != null) ? RecordingContext.getAlias(entityClass) : null;
+        if (joinAlias == null || isAliasUsed(joinAlias)) {
+            joinAlias = nextAlias();
+            if (entityClass != null) {
+                RecordingContext.registerAlias(entityClass, joinAlias);
+            }
+        }
+        return joinAlias;
+    }
+
     // --- CTE 连接支持 ---
     public <TJoin> JoinBuilder<T, TJoin> leftJoin(Cte<TJoin> cte) {
-        String joinAlias = nextAlias();
+        String joinAlias = obtainJoinAlias(cte != null ? cte.getEntityClass() : null);
         return new JoinBuilder<>(this, TableJoin.JoinType.LEFT_JOIN, cte.getName(), cte.getEntityClass(), joinAlias, cte);
     }
 
@@ -557,7 +662,7 @@ public class Query<T> {
     }
 
     public <TJoin> JoinBuilder<T, TJoin> innerJoin(Cte<TJoin> cte) {
-        String joinAlias = nextAlias();
+        String joinAlias = obtainJoinAlias(cte != null ? cte.getEntityClass() : null);
         return new JoinBuilder<>(this, TableJoin.JoinType.INNER_JOIN, cte.getName(), cte.getEntityClass(), joinAlias, cte);
     }
 
@@ -566,7 +671,7 @@ public class Query<T> {
     }
 
     public <TJoin> JoinBuilder<T, TJoin> rightJoin(Cte<TJoin> cte) {
-        String joinAlias = nextAlias();
+        String joinAlias = obtainJoinAlias(cte != null ? cte.getEntityClass() : null);
         return new JoinBuilder<>(this, TableJoin.JoinType.RIGHT_JOIN, cte.getName(), cte.getEntityClass(), joinAlias, cte);
     }
 
@@ -577,7 +682,7 @@ public class Query<T> {
     // --- 实体表连接支持 ---
     public <TJoin> JoinBuilder<T, TJoin> leftJoin(Class<TJoin> entityClass) {
         EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
-        String joinAlias = nextAlias();
+        String joinAlias = obtainJoinAlias(entityClass);
         return new JoinBuilder<>(this, TableJoin.JoinType.LEFT_JOIN, meta.getTableName(), entityClass, joinAlias, null);
     }
 
@@ -587,7 +692,7 @@ public class Query<T> {
 
     public <TJoin> JoinBuilder<T, TJoin> innerJoin(Class<TJoin> entityClass) {
         EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
-        String joinAlias = nextAlias();
+        String joinAlias = obtainJoinAlias(entityClass);
         return new JoinBuilder<>(this, TableJoin.JoinType.INNER_JOIN, meta.getTableName(), entityClass, joinAlias, null);
     }
 
@@ -597,7 +702,7 @@ public class Query<T> {
 
     public <TJoin> JoinBuilder<T, TJoin> rightJoin(Class<TJoin> entityClass) {
         EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
-        String joinAlias = nextAlias();
+        String joinAlias = obtainJoinAlias(entityClass);
         return new JoinBuilder<>(this, TableJoin.JoinType.RIGHT_JOIN, meta.getTableName(), entityClass, joinAlias, null);
     }
 
@@ -906,6 +1011,23 @@ public class Query<T> {
         return this;
     }
 
+    public com.javaorm.core.pagination.PageResult<T> toPageResult(int pageNum, int pageSize) {
+        long total = count();
+        page(pageNum, pageSize);
+        List<T> data = (total > 0) ? list() : Collections.<T>emptyList();
+        return new com.javaorm.core.pagination.PageResult<>(total, data, pageNum, pageSize);
+    }
+
+    public com.javaorm.core.pagination.PageResult<T> toPageResult() {
+        int limit = statement.getLimit();
+        int offset = statement.getOffset();
+        int pageSize = limit > 0 ? limit : 20;
+        int pageNum = offset > 0 ? (offset / pageSize + 1) : 1;
+        long total = count();
+        List<T> data = (total > 0) ? list() : Collections.<T>emptyList();
+        return new com.javaorm.core.pagination.PageResult<>(total, data, pageNum, pageSize);
+    }
+
     public Query<T> limit(int limit) {
         statement.setLimit(limit);
         return this;
@@ -1019,6 +1141,10 @@ public class Query<T> {
     }
 
     public T firstOrNull() {
+        return single();
+    }
+
+    public T singleOrNull() {
         return single();
     }
 

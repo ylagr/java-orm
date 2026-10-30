@@ -623,6 +623,39 @@ public class SQL {
         return new FunctionExpression<>(BuiltinSqlFunction.CONCAT_WS, toExpressions(all));
     }
 
+    /**
+     * 格式化字符串拼接，如 stringFormat("编号:{0}, 类型:{1}", card.getCode(), card.getType())
+     * 解析占位符并交由底层 CONCAT 处理。
+     */
+    public static FunctionExpression<String> stringFormat(String pattern, Object... args) {
+        if (pattern == null) {
+            return concat("");
+        }
+        if (args == null || args.length == 0 || !pattern.contains("{")) {
+            return concat(pattern);
+        }
+        List<Object> parts = new ArrayList<>();
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile("\\{(\\d+)\\}");
+        java.util.regex.Matcher m = p.matcher(pattern);
+        int lastEnd = 0;
+        while (m.find()) {
+            if (m.start() > lastEnd) {
+                parts.add(pattern.substring(lastEnd, m.start()));
+            }
+            int idx = Integer.parseInt(m.group(1));
+            if (idx >= 0 && idx < args.length) {
+                parts.add(args[idx]);
+            } else {
+                parts.add(m.group(0));
+            }
+            lastEnd = m.end();
+        }
+        if (lastEnd < pattern.length()) {
+            parts.add(pattern.substring(lastEnd));
+        }
+        return new FunctionExpression<>(BuiltinSqlFunction.CONCAT, toExpressions(parts.toArray()));
+    }
+
     public static <T extends CharSequence> FunctionExpression<String> subString(T prop, int start, int len) {
         return new FunctionExpression<>(BuiltinSqlFunction.SUBSTRING, toExpression(prop), start, len);
     }
@@ -970,6 +1003,10 @@ public class SQL {
     }
 
     public static <T> FunctionExpression<T> nvl(T prop, T def) {
+        return ifNull(prop, def);
+    }
+
+    public static <T> FunctionExpression<T> nullOrDefault(T prop, T def) {
         return ifNull(prop, def);
     }
 

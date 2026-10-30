@@ -302,6 +302,18 @@ public class DtoQuery<DTO, T> {
         return this;
     }
 
+    public String toSQL() {
+        return underlyingQuery.toSQL();
+    }
+
+    public String toSql(Dialect customDialect) {
+        return underlyingQuery.toSql(customDialect);
+    }
+
+    public String toSQL(Dialect customDialect) {
+        return underlyingQuery.toSQL(customDialect);
+    }
+
     public DTO single() {
         underlyingQuery.limit(1);
         List<DTO> list = list();
@@ -310,6 +322,27 @@ public class DtoQuery<DTO, T> {
 
     public DTO firstOrNull() {
         return single();
+    }
+
+    public DTO singleOrNull() {
+        return single();
+    }
+
+    public com.javaorm.core.pagination.PageResult<DTO> toPageResult(int pageNum, int pageSize) {
+        long total = underlyingQuery.count();
+        page(pageNum, pageSize);
+        List<DTO> data = (total > 0) ? list() : java.util.Collections.<DTO>emptyList();
+        return new com.javaorm.core.pagination.PageResult<>(total, data, pageNum, pageSize);
+    }
+
+    public com.javaorm.core.pagination.PageResult<DTO> toPageResult() {
+        int limit = getStatement().getLimit();
+        int offset = getStatement().getOffset();
+        int pageSize = limit > 0 ? limit : 20;
+        int pageNum = offset > 0 ? (offset / pageSize + 1) : 1;
+        long total = underlyingQuery.count();
+        List<DTO> data = (total > 0) ? list() : java.util.Collections.<DTO>emptyList();
+        return new com.javaorm.core.pagination.PageResult<>(total, data, pageNum, pageSize);
     }
 
     public List<Map<String, Object>> listMaps() {

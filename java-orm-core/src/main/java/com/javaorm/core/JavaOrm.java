@@ -122,6 +122,13 @@ public class JavaOrm {
     }
 
     /**
+     * 开启流式查询别名（等价于 select(entityClass)）
+     */
+    public <T> Query<T> queryable(Class<T> entityClass) {
+        return select(entityClass);
+    }
+
+    /**
      * 开启 CTE 强类型流式查询：orm.select(cte).where()...
      */
     public <T> Query<T> select(Cte<T> cte) {
@@ -244,6 +251,25 @@ public class JavaOrm {
     }
 
     /**
+     * 批量实体插入
+     */
+    public <T> int insert(java.util.Collection<T> entities) {
+        if (entities == null || entities.isEmpty()) return 0;
+        int sum = 0;
+        for (T entity : entities) {
+            sum += insert(entity);
+        }
+        return sum;
+    }
+
+    /**
+     * 开启实体插入构造器
+     */
+    public <T> InsertBuilder<T> insertable(T entity) {
+        return new InsertBuilder<>(entity, dataSource, dialect, config);
+    }
+
+    /**
      * 实体级选择性更新（按主键更新非 null 属性）
      */
     public <T> int update(T entity) {
@@ -252,6 +278,18 @@ public class JavaOrm {
         } finally {
             com.javaorm.core.query.Query.resetAliasSeq();
         }
+    }
+
+    /**
+     * 批量实体更新
+     */
+    public <T> int update(java.util.Collection<T> entities) {
+        if (entities == null || entities.isEmpty()) return 0;
+        int sum = 0;
+        for (T entity : entities) {
+            sum += update(entity);
+        }
+        return sum;
     }
 
     /**
@@ -270,6 +308,31 @@ public class JavaOrm {
      */
     public <T> UpdateBuilder<T> update(Class<T> entityClass) {
         return new UpdateBuilder<>(entityClass, dataSource, dialect, config);
+    }
+
+    /**
+     * 别名方法：updatable 等价于 update
+     */
+    public <T> UpdateBuilder<T> updatable(Class<T> entityClass) {
+        return update(entityClass);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> UpdateBuilder<T> updatable(T entity) {
+        if (entity == null) {
+            throw new IllegalArgumentException("Entity must not be null");
+        }
+        Class<T> clazz = (Class<T>) entity.getClass();
+        com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(clazz, config);
+        UpdateBuilder<T> builder = update(clazz);
+        builder.setColumns(entity);
+        if (meta.getIdColumn() != null) {
+            Object idVal = meta.getIdColumn().getValue(entity);
+            if (idVal != null) {
+                builder.whereById(idVal);
+            }
+        }
+        return builder;
     }
 
     /**
@@ -299,6 +362,55 @@ public class JavaOrm {
      */
     public <T> DeleteBuilder<T> delete(Class<T> entityClass) {
         return new DeleteBuilder<>(entityClass, dataSource, dialect, config);
+    }
+
+    /**
+     * 别名方法：deletable 等价于 delete
+     */
+    public <T> DeleteBuilder<T> deletable(Class<T> entityClass) {
+        return delete(entityClass);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> DeleteBuilder<T> deletable(T entity) {
+        if (entity == null) {
+            throw new IllegalArgumentException("Entity must not be null");
+        }
+        Class<T> clazz = (Class<T>) entity.getClass();
+        com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(clazz, config);
+        DeleteBuilder<T> builder = delete(clazz);
+        if (meta.getIdColumn() != null) {
+            Object idVal = meta.getIdColumn().getValue(entity);
+            if (idVal != null) {
+                builder.whereById(idVal);
+            }
+        }
+        return builder;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> DeleteBuilder<T> deletable(java.util.Collection<T> entities) {
+        if (entities == null || entities.isEmpty()) {
+            throw new IllegalArgumentException("Entities must not be empty");
+        }
+        T first = entities.iterator().next();
+        Class<T> clazz = (Class<T>) first.getClass();
+        com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(clazz, config);
+        DeleteBuilder<T> builder = delete(clazz);
+        if (meta.getIdColumn() != null) {
+            java.util.List<Object> ids = new java.util.ArrayList<>();
+            for (T e : entities) {
+                Object idVal = meta.getIdColumn().getValue(e);
+                if (idVal != null) ids.add(idVal);
+            }
+            builder.whereByIds(ids);
+        }
+        return builder;
+    }
+
+    public <T> int delete(java.util.Collection<T> entities) {
+        if (entities == null || entities.isEmpty()) return 0;
+        return deletable(entities).execute();
     }
 
     public DataSource getDataSource() { return dataSource; }

@@ -32,6 +32,14 @@ public interface SqlOperator {
     SqlOperator IS_NULL = BuiltinSqlOperator.IS_NULL;
     SqlOperator IS_NOT_NULL = BuiltinSqlOperator.IS_NOT_NULL;
     SqlOperator BETWEEN = BuiltinSqlOperator.BETWEEN;
+    SqlOperator IS_EMPTY = BuiltinSqlOperator.IS_EMPTY;
+    SqlOperator IS_NOT_EMPTY = BuiltinSqlOperator.IS_NOT_EMPTY;
+    SqlOperator IS_BLANK = BuiltinSqlOperator.IS_BLANK;
+    SqlOperator IS_NOT_BLANK = BuiltinSqlOperator.IS_NOT_BLANK;
+    SqlOperator RANGE_CLOSED = BuiltinSqlOperator.RANGE_CLOSED;
+    SqlOperator RANGE_OPEN = BuiltinSqlOperator.RANGE_OPEN;
+    SqlOperator RANGE_CLOSED_OPEN = BuiltinSqlOperator.RANGE_CLOSED_OPEN;
+    SqlOperator RANGE_OPEN_CLOSED = BuiltinSqlOperator.RANGE_OPEN_CLOSED;
 
     /**
      * 根据 SQL 符号或名称动态获取或创建 SqlOperator。
