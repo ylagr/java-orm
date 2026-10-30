@@ -93,6 +93,9 @@ public class SqlExecution<T> {
         if (operation instanceof DeleteBuilder<?>) {
             return ((DeleteBuilder<?>) operation).execute();
         }
+        if (operation instanceof com.javaorm.core.query.WhereBuilder<?>) {
+            return ((com.javaorm.core.query.WhereBuilder<?>) operation).execute();
+        }
         if (operation instanceof SqlSelectStream || operation instanceof Query<?>) {
             throw new IllegalStateException("Cannot call exec() / execute() on a SELECT query. Please call .toList(), .listMaps(), or .firstOrNull() instead.");
         }

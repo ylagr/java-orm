@@ -512,4 +512,63 @@ public class SqlEnvDslTest {
 
         assertEquals("Bob", firstName);
     }
+
+    /**
+     * 13. 测试 return e.select(s).where().and(...).orderBy(...).desc() 管道直接返回语法
+     */
+    @Test
+    public void testReturnQueryPipelineDirectly() {
+        // 1. 用户要求语法：return e.select(s).where().and(s.getAge()).ge(22).orderBy(s.getId()).desc();
+        List<Student> list = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            return e.select(s)
+                    .where().and(s.getAge()).ge(22)
+                    .orderBy(s.getId()).desc();
+        }).toList();
+
+        assertEquals(2, list.size());
+        assertEquals("David", list.get(0).getStudentName());
+        assertEquals("Bob", list.get(1).getStudentName());
+
+        // 2. return e.select(s).where()... 配合 firstOrNull()
+        Student first = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            return e.select(s)
+                    .where().and(s.getId()).eq(2L);
+        }).firstOrNull();
+
+        assertNotNull(first);
+        assertEquals("Bob", first.getStudentName());
+
+        // 3. return e.select(StudentDto.class, ...).from(s).where()...
+        List<StudentDto> dtos = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            return e.select(StudentDto.class, s.getId(), s.getStudentName(), s.getAge())
+                    .from(s)
+                    .where().and(s.getAge()).ge(22)
+                    .orderBy(s.getAge()).asc();
+        }).toList();
+
+        assertEquals(2, dtos.size());
+        assertEquals("Bob", dtos.get(0).getStudentName());
+        assertEquals("David", dtos.get(1).getStudentName());
+
+        // 4. return e.update(s).set(...).where()... 配合 .exec()
+        int updated = orm.sql(e -> {
+            Student s = e.table(Student.class);
+            return e.update(s)
+                    .set(s.getAge(), 26)
+                    .where().and(s.getId()).eq(4L); // David
+        }).exec();
+
+        assertEquals(1, updated);
+
+        // 还原数据
+        orm.sql(e -> {
+            Student s = e.table(Student.class);
+            return e.update(s)
+                    .set(s.getAge(), 25)
+                    .where().and(s.getId()).eq(4L);
+        }).exec();
+    }
 }

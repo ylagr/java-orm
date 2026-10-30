@@ -52,6 +52,10 @@ public class OrderByBuilder<TQuery> {
         return statement;
     }
 
+    public TQuery getQuery() {
+        return query;
+    }
+
     /**
      * 升序排序 ASC
      */

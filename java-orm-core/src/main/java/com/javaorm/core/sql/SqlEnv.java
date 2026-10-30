@@ -323,6 +323,74 @@ public class SqlEnv {
         return new SqlExecution<>(this, currentOperation, resultClass);
     }
 
+    @SuppressWarnings("unchecked")
+    public <T> SqlExecution<T> toExecutionFromReturn(Object returned) {
+        if (returned == null) {
+            return toExecution();
+        }
+        if (returned instanceof SqlExecution) {
+            return (SqlExecution<T>) returned;
+        }
+        if (returned instanceof Class) {
+            return toExecution((Class<T>) returned);
+        }
+        if (returned instanceof com.javaorm.core.query.OrderByBuilder) {
+            return toExecutionFromReturn(((com.javaorm.core.query.OrderByBuilder<?>) returned).asc());
+        }
+        if (returned instanceof com.javaorm.core.query.WhereBuilder) {
+            com.javaorm.core.query.WhereBuilder<?> wb = (com.javaorm.core.query.WhereBuilder<?>) returned;
+            if (currentOperation instanceof SqlSelectStream) {
+                Class<?> detected = ((SqlSelectStream) currentOperation).getResultClass();
+                if (detected == null) {
+                    detected = wb.getEntityClass();
+                }
+                return new SqlExecution<>(this, currentOperation, (Class<T>) detected);
+            }
+            if (currentOperation instanceof SqlUpdateStream || currentOperation instanceof com.javaorm.core.mutation.UpdateBuilder) {
+                return new SqlExecution<>(this, currentOperation, null);
+            }
+            if (currentOperation instanceof SqlDeleteStream || currentOperation instanceof com.javaorm.core.mutation.DeleteBuilder) {
+                return new SqlExecution<>(this, currentOperation, null);
+            }
+            com.javaorm.core.query.Query<?> q = wb.getRootQuery();
+            Object op = q != null ? q : wb;
+            Class<?> detected = wb.getEntityClass();
+            return new SqlExecution<>(this, op, (Class<T>) detected);
+        }
+        if (returned instanceof SqlSelectStream) {
+            SqlSelectStream selectStream = (SqlSelectStream) returned;
+            this.currentOperation = selectStream;
+            return new SqlExecution<>(this, selectStream, (Class<T>) selectStream.getResultClass());
+        }
+        if (returned instanceof com.javaorm.core.query.Query) {
+            com.javaorm.core.query.Query<?> q = (com.javaorm.core.query.Query<?>) returned;
+            this.currentOperation = q;
+            Class<?> detected = q.getRootEntityClass();
+            return new SqlExecution<>(this, q, (Class<T>) detected);
+        }
+        if (returned instanceof com.javaorm.core.mutation.UpdateBuilder) {
+            com.javaorm.core.mutation.UpdateBuilder<?> ub = (com.javaorm.core.mutation.UpdateBuilder<?>) returned;
+            this.currentOperation = ub;
+            return new SqlExecution<>(this, ub, null);
+        }
+        if (returned instanceof SqlUpdateStream) {
+            SqlUpdateStream sus = (SqlUpdateStream) returned;
+            this.currentOperation = sus;
+            return new SqlExecution<>(this, sus, null);
+        }
+        if (returned instanceof com.javaorm.core.mutation.DeleteBuilder) {
+            com.javaorm.core.mutation.DeleteBuilder<?> db = (com.javaorm.core.mutation.DeleteBuilder<?>) returned;
+            this.currentOperation = db;
+            return new SqlExecution<>(this, db, null);
+        }
+        if (returned instanceof SqlDeleteStream) {
+            SqlDeleteStream sds = (SqlDeleteStream) returned;
+            this.currentOperation = sds;
+            return new SqlExecution<>(this, sds, null);
+        }
+        return toExecution();
+    }
+
     // ========== 6. 执行引擎方法（底层调度与生命周期管理） ==========
 
     public void logSql(SqlAndParams sqlAndParams, String prefix) {

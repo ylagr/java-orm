@@ -473,23 +473,24 @@ public class JavaOrm {
     }
 
     /**
-     * 声明式 SQL 执行环境统一入口（带返回值 lambda，直接 return 目标实体/DTO类对象 Class<T>）：
+     * 声明式 SQL 执行环境统一入口（带返回值 lambda，支持直接 return e.select(...) / WhereBuilder / 目标实体类 Class<T> 等）：
      * <pre>
      * List<Student> list = orm.sql(e -> {
      *     Student s = e.table(Student.class);
-     *     e.select(s.getStudentName(), s.getAge()).from(s);
-     *     return Student.class;
+     *     return e.select(s)
+     *             .where().and(s.getAge()).ge(22)
+     *             .orderBy(s.getId()).desc();
      * }).toList();
      * </pre>
      */
-    public <T> SqlExecution<T> sql(Function<SqlEnv, Class<T>> envFunction) {
+    public <T> SqlExecution<T> sql(Function<SqlEnv, ?> envFunction) {
         if (envFunction == null) {
             throw new IllegalArgumentException("SqlEnv function must not be null");
         }
         SqlEnv env = env();
         try {
-            Class<T> resultClass = envFunction.apply(env);
-            return env.toExecution(resultClass);
+            Object returned = envFunction.apply(env);
+            return env.toExecutionFromReturn(returned);
         } finally {
             com.javaorm.core.proxy.RecordingContext.clearRecording();
             com.javaorm.core.proxy.RecordingContext.clearAliases();
