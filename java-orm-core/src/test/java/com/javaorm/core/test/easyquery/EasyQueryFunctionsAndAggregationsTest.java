@@ -82,7 +82,7 @@ public class EasyQueryFunctionsAndAggregationsTest {
                         proxy.getId(),
                         nullOrDefault(proxy.getTitle(), "Default Title").as("safe_title")
                 ).from(Topic.class)
-                .where().and(proxy.getId()).eq("4")
+                .where().eq(proxy.getId(), "4")
                 .maps();
 
         assertEquals(1, nullList.size());
@@ -103,7 +103,7 @@ public class EasyQueryFunctionsAndAggregationsTest {
                         max(blog.getStar()).as("max_star")
                 ).from(Blog.class)
                 .groupBy(blog.getTopicId())
-                .having(w -> w.and(count()).ge(2))
+                .having(w -> w.ge(count(), 2))
                 .maps();
 
         assertEquals(1, stats.size());
@@ -145,15 +145,15 @@ public class EasyQueryFunctionsAndAggregationsTest {
                         topic.getTitle(),
                         col(blog.getTitle()).as("blog_title")
                 ).from(Topic.class)
-                .leftJoin(Blog.class, (w, t, b) -> w.and(b.getTopicId()).eq(t.getId()))
-                .where().and(topic.getId()).eq("1")
+                .leftJoin(Blog.class, (w, t, b) -> w.eq(b.getTopicId(), t.getId()))
+                .where().eq(topic.getId(), "1")
                 .maps();
 
         assertEquals(2, leftJoinList.size());
 
         // 2. EXISTS Subquery in WHERE
         SelectBuilder<Blog> existsSubQuery = orm.queryable(Blog.class)
-                .where(w -> w.and(blog.getTopicId()).eq(topic.getId()));
+                .where(w -> w.eq(blog.getTopicId(), topic.getId()));
 
         List<Topic> existsList = orm.queryable(Topic.class)
                 .where(w -> w.andExists(existsSubQuery))
@@ -165,7 +165,7 @@ public class EasyQueryFunctionsAndAggregationsTest {
                 .select(blog.getTopicId());
 
         List<Topic> inSubQueryList = orm.queryable(Topic.class)
-                .where(w -> w.and(topic.getId()).in(topicIdSubQuery))
+                .where(w -> w.in(topic.getId(), topicIdSubQuery))
                 .toList();
         assertEquals(2, inSubQueryList.size());
     }
@@ -181,7 +181,7 @@ public class EasyQueryFunctionsAndAggregationsTest {
                         topic.getStars(),
                         topic.getCreateTime()
                 ).from(Topic.class)
-                .where(w -> w.and(topic.getStars()).gt(15))
+                .where(w -> w.gt(topic.getStars(), 15))
                 .orderByAsc(topic.getStars())
                 .toList();
 
@@ -191,12 +191,12 @@ public class EasyQueryFunctionsAndAggregationsTest {
 
         // 2. CTE query
         Cte<Topic> highStarsCte = orm.queryable(Topic.class)
-                .where(w -> w.and(topic.getStars()).ge(30))
+                .where(w -> w.ge(topic.getStars(), 30))
                 .asCte("cte_high_stars");
 
         Topic highProxy = highStarsCte.proxy();
         List<Topic> fromCte = orm.select(highStarsCte)
-                .where(w -> w.and(highProxy.getStars()).le(35))
+                .where(w -> w.le(highProxy.getStars(), 35))
                 .toList();
 
         assertEquals(1, fromCte.size());

@@ -122,7 +122,7 @@ public class OracleAndWindowFunctionsTest {
                         ntile(2).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("nt"),
                         percentRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("pr"),
                         cumeDist().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("cd")
-                ).where(w -> w.and(s.getTeacherId()).eq(1L))
+                ).where(w -> w.eq(s.getTeacherId(), 1L))
                 .orderBy(s.getAge()).asc()
                 .orderBy(s.getId()).asc()
                 .maps();
@@ -177,7 +177,7 @@ public class OracleAndWindowFunctionsTest {
                         lead(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().orderBy(s.getId()).asc().as("next_age"),
                         lag(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().orderBy(s.getId()).asc().as("prev_age"),
                         firstValue(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().orderBy(s.getId()).asc().as("first_age")
-                ).where(w -> w.and(s.getTeacherId()).eq(1L))
+                ).where(w -> w.eq(s.getTeacherId(), 1L))
                 .orderBy(s.getAge()).asc()
                 .orderBy(s.getId()).asc()
                 .maps();
@@ -217,7 +217,7 @@ public class OracleAndWindowFunctionsTest {
                         sum(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().rowsUnboundedPreceding().as("running_sum"),
                         // 全表无 PARTITION 开窗统计
                         count().over().as("grand_count")
-                ).where(w -> w.and(s.getTeacherId()).eq(1L))
+                ).where(w -> w.eq(s.getTeacherId(), 1L))
                 .orderBy(s.getAge()).asc()
                 .orderBy(s.getId()).asc()
                 .maps();
@@ -271,7 +271,7 @@ public class OracleAndWindowFunctionsTest {
                         ifNull(s.getStudentName(), "NONAME").as("safe_name"),
                         concat(s.getStudentName(), raw("' ('"), s.getAge(), raw("')'")).as("display_info"),
                         now().as("cur_time")
-                ).where(w -> w.and(s.getId()).eq(page1.get(0).getId()))
+                ).where(w -> w.eq(s.getId(), page1.get(0).getId()))
                 .maps();
 
         assertEquals(1, funcList.size());
@@ -298,7 +298,7 @@ public class OracleAndWindowFunctionsTest {
                         denseRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("denseRankVal"),
                         ntile(2).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("ntileVal"),
                         sum(s.getAge()).over().partitionBy(s.getTeacherId()).as("sumAge")
-                ).where(w -> w.and(s.getTeacherId()).eq(1L))
+                ).where(w -> w.eq(s.getTeacherId(), 1L))
                 .orderBy(s.getId()).asc()
                 .list();
 

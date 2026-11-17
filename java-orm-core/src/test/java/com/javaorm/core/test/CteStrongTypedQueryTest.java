@@ -155,12 +155,12 @@ public class CteStrongTypedQueryTest {
 
         // 1. 定义 CTE
         Cte<Student> adultCte = orm.cte("adult_students",
-                orm.select(Student.class).where().and(s.getAge()).gt(20));
+                orm.select(Student.class).where().gt(s.getAge(), 20));
 
         // 2. 强类型查询 CTE
         Student cteProxy = adultCte.proxy();
         SelectBuilder<Student> mainQuery = orm.select(adultCte);
-        mainQuery.where().and(cteProxy.getAge()).lt(25);
+        mainQuery.where().lt(cteProxy.getAge(), 25);
 
         String sql = mainQuery.toSql();
         assertTrue("SQL should start with WITH \"adult_students\" AS",
@@ -185,7 +185,7 @@ public class CteStrongTypedQueryTest {
         Student s = orm.proxy(Student.class);
 
         Cte<Student> cte = orm.select(Student.class)
-                .where().and(s.getAge()).ge(22)
+                .where().ge(s.getAge(), 22)
                 .asCte("cte_ge22");
 
         List<Student> list = orm.select(cte).toList();
@@ -202,12 +202,12 @@ public class CteStrongTypedQueryTest {
 
         Cte<StudentDto> cte = orm.select(StudentDto.class, s.getId(), s.getStudentName(), s.getAge())
                 .from(Student.class)
-                .where(w -> w.and(s.getAge()).ge(20))
+                .where(w -> w.ge(s.getAge(), 20))
                 .asCte("dto_cte");
 
         StudentDto dtoProxy = cte.proxy();
         SelectBuilder<StudentDto> q = orm.select(cte);
-        q.where().and(dtoProxy.getAge()).lt(25);
+        q.where().lt(dtoProxy.getAge(), 25);
         List<StudentDto> result = q.toList();
 
         assertEquals(3, result.size()); // Alice(20), Bob(22), Charlie(22)
@@ -223,11 +223,11 @@ public class CteStrongTypedQueryTest {
         Student s = orm.proxy(Student.class);
 
         // cte1: age >= 20
-        Cte<Student> cte1 = orm.cte("c1", orm.select(Student.class).where().and(s.getAge()).ge(20));
+        Cte<Student> cte1 = orm.cte("c1", orm.select(Student.class).where().ge(s.getAge(), 20));
 
         // cte2: 基于 cte1 筛选 age <= 22
         Student s1 = cte1.proxy();
-        Cte<Student> cte2 = orm.cte("c2", orm.select(cte1).where().and(s1.getAge()).le(22));
+        Cte<Student> cte2 = orm.cte("c2", orm.select(cte1).where().le(s1.getAge(), 22));
 
         // 主查询查询 cte2
         SelectBuilder<Student> mainQuery = orm.select(cte2);
@@ -248,7 +248,7 @@ public class CteStrongTypedQueryTest {
     public void testCteJoinWithRegularTable() {
         Student s = orm.proxy(Student.class);
         Cte<Student> adultCte = orm.cte("adults",
-                orm.select(Student.class).where().and(s.getAge()).ge(22));
+                orm.select(Student.class).where().ge(s.getAge(), 22));
 
         // 主查询查 Teacher，LEFT JOIN adultCte
         SelectBuilder<Teacher> query = orm.select(Teacher.class)
@@ -271,7 +271,7 @@ public class CteStrongTypedQueryTest {
     public void testJoinBuilderFluentOn() {
         Student s = orm.proxy(Student.class);
         Cte<Student> adultCte = orm.cte("adults",
-                orm.select(Student.class).where().and(s.getAge()).ge(25));
+                orm.select(Student.class).where().ge(s.getAge(), 25));
 
         SelectBuilder<Teacher> query = orm.select(Teacher.class)
                 .innerJoin(adultCte).on((on, teacher, student) -> on.eq(student.getTeacherId(), teacher.getId()));
@@ -292,11 +292,11 @@ public class CteStrongTypedQueryTest {
     public void testWithStageQuery() {
         Student s = orm.proxy(Student.class);
         Cte<Student> cte = orm.cte("cte_students",
-                orm.select(Student.class).where().and(s.getAge()).gt(18));
+                orm.select(Student.class).where().gt(s.getAge(), 18));
 
         Student cteProxy = cte.proxy();
         SelectBuilder<Student> q = orm.with(cte).select(cte);
-        q.where().and(cteProxy.getAge()).eq(20);
+        q.where().eq(cteProxy.getAge(), 20);
         List<Student> list = q.toList();
 
         assertEquals(1, list.size());
@@ -314,7 +314,7 @@ public class CteStrongTypedQueryTest {
         Cte<Department> deptTreeCte = orm.cteRecursive("dept_tree", Department.class, self -> {
             // 锚点查询：根节点 parentId 为空
             SelectBuilder<Department> anchor = orm.select(Department.class);
-            anchor.where().and(d.getParentId()).isNull();
+            anchor.where().isNull(d.getParentId());
 
             // 递归迭代查询：当前部门的 parentId 等于上一级部门的 id
             SelectBuilder<Department> recursive = orm.select(Department.class)
@@ -353,7 +353,7 @@ public class CteStrongTypedQueryTest {
     public void testCteExplicitColumnNames() {
         Student s = orm.proxy(Student.class);
         Cte<Student> cte = orm.cte("custom_cols",
-                        orm.select(Student.class).where().and(s.getAge()).ge(20))
+                        orm.select(Student.class).where().ge(s.getAge(), 20))
                 .columns("c_id", "c_name", "c_age");
 
         SelectBuilder<Student> query = orm.select(cte);
@@ -369,7 +369,7 @@ public class CteStrongTypedQueryTest {
     public void testCteCount() {
         Student s = orm.proxy(Student.class);
         Cte<Student> adultCte = orm.cte("adults",
-                orm.select(Student.class).where().and(s.getAge()).ge(22));
+                orm.select(Student.class).where().ge(s.getAge(), 22));
 
         long count = orm.select(adultCte).count();
         // Bob(22), Charlie(22), David(25) = 3

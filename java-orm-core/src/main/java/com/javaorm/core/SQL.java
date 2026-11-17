@@ -33,11 +33,13 @@ public class SQL {
     }
 
     public static <T> ColumnExpression<T> col(String propertyOrColumn) {
-        List<PropertyPath> paths = RecordingContext.finishLast(1);
-        if (!paths.isEmpty()) {
-            return new ColumnExpression<>(paths.get(0));
+        if (propertyOrColumn == null) {
+            PropertyPath cur = RecordingContext.finishCurrent();
+            if (cur != null) {
+                return new ColumnExpression<>(cur);
+            }
+            return null;
         }
-        if (propertyOrColumn == null) return null;
         String str = propertyOrColumn.trim();
         String alias = null;
         String colPart = str;
@@ -78,9 +80,12 @@ public class SQL {
         if (prop instanceof String) {
             return col((String) prop);
         }
-        List<PropertyPath> paths = RecordingContext.finishLast(1);
-        if (!paths.isEmpty()) {
-            return new ColumnExpression<>(paths.get(0));
+        PropertyPath cur = RecordingContext.finishCurrent();
+        if (cur == null) {
+            cur = RecordingContext.poll();
+        }
+        if (cur != null) {
+            return new ColumnExpression<>(cur);
         }
         throw new IllegalStateException("No proxy column accessed before calling col(...)");
     }
@@ -1188,9 +1193,9 @@ public class SQL {
         if (obj instanceof String && "*".equals(((String) obj).trim())) {
             return new RawSqlExpression<T>("*");
         }
-        List<PropertyPath> paths = RecordingContext.finishLast(1);
-        if (!paths.isEmpty()) {
-            return new ColumnExpression<T>(paths.get(0));
+        PropertyPath cur = RecordingContext.finishCurrent();
+        if (cur != null) {
+            return new ColumnExpression<T>(cur);
         }
         if (obj != null) {
             return new RawSqlExpression<T>("?", obj);

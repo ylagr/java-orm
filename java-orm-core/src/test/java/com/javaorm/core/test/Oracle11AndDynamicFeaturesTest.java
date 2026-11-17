@@ -149,24 +149,24 @@ public class Oracle11AndDynamicFeaturesTest {
 
     @Test
     public void testDynamicStringWhereConditions() {
-        // 动态列名字符串: w.and("age").ge(24)
+        // 动态列名字符串: w.ge("age", 24)
         List<Student> list1 = orm.select(Student.class)
                 .where()
-                .and("age").ge(24)
+                .ge("age", 24)
                 .list();
         assertEquals(3, list1.size());
 
-        // 动态表别名.列名: w.and("t0.age").lt(24)
+        // 动态表别名.列名: w.lt("t0.age", 24)
         List<Student> list2 = orm.select(Student.class)
                 .where()
-                .and("t0.age").lt(24)
+                .lt("t0.age", 24)
                 .list();
         assertEquals(2, list2.size());
 
-        // 实体属性名自动转列名: w.and("studentName").eq("Alice")
+        // 实体属性名自动转列名: w.eq("studentName", "Alice")
         List<Student> list3 = orm.select(Student.class)
                 .where()
-                .and("studentName").eq("Alice")
+                .eq("studentName", "Alice")
                 .list();
         assertEquals(1, list3.size());
         assertEquals("Alice", list3.get(0).getStudentName());
@@ -174,8 +174,8 @@ public class Oracle11AndDynamicFeaturesTest {
         // 动态 or 条件与 between
         List<Student> list4 = orm.select(Student.class)
                 .where()
-                .and("age").between(20, 22)
-                .or("student_name").eq("Eve")
+                .between("age", 20, 22)
+                .or().eq("student_name", "Eve")
                 .list();
         assertEquals(3, list4.size());
 
@@ -193,7 +193,7 @@ public class Oracle11AndDynamicFeaturesTest {
         List<Map<String, Object>> maps = orm.select("id", "student_name as name", "age")
                 .from(Student.class)
                 .where()
-                .and("age").ge(24)
+                .ge("age", 24)
                 .orderBy("age").desc()
                 .listMaps();
         assertEquals(3, maps.size());
@@ -221,13 +221,13 @@ public class Oracle11AndDynamicFeaturesTest {
         int updated = orm.update(Student.class)
                 .set("age", 99)
                 .where()
-                .and("student_name").eq("Alice")
+                .eq("student_name", "Alice")
                 .execute();
         assertEquals(1, updated);
 
         Student alice = orm.select(Student.class)
                 .where()
-                .and("student_name").eq("Alice")
+                .eq("student_name", "Alice")
                 .single();
         assertNotNull(alice);
         assertEquals(99, alice.getAge().intValue());
@@ -236,12 +236,12 @@ public class Oracle11AndDynamicFeaturesTest {
         orm.update(Student.class)
                 .set("student_name", "BobUpdated")
                 .where()
-                .and("age").eq(22)
+                .eq("age", 22)
                 .execute();
 
         Student bob = orm.select(Student.class)
                 .where()
-                .and("age").eq(22)
+                .eq("age", 22)
                 .single();
         assertNotNull(bob);
         assertEquals("BobUpdated", bob.getStudentName());
@@ -249,13 +249,13 @@ public class Oracle11AndDynamicFeaturesTest {
         // delete 动态条件
         int deleted = orm.delete(Student.class)
                 .where()
-                .and("student_name").eq("Eve")
+                .eq("student_name", "Eve")
                 .execute();
         assertEquals(1, deleted);
 
         Student eve = orm.select(Student.class)
                 .where()
-                .and("student_name").eq("Eve")
+                .eq("student_name", "Eve")
                 .single();
         assertNull(eve);
     }
@@ -270,7 +270,7 @@ public class Oracle11AndDynamicFeaturesTest {
         assertEquals(sql1, q.toString());
 
         // WhereBuilder 阶段
-        WhereBuilder<Student> w = q.where().and("age").ge(20);
+        WhereBuilder<Student> w = q.where().ge("age", 20);
         String sql2 = w.toSql();
         SqlAndParams sp2 = w.toSqlAndParams();
         assertTrue(sql2.contains("WHERE"));
@@ -283,7 +283,7 @@ public class Oracle11AndDynamicFeaturesTest {
         String uSql1 = u.toSql();
         assertTrue(uSql1.startsWith("UPDATE \"t_student\" SET \"age\" = ?"));
         assertEquals(uSql1, u.toString());
-        WhereBuilder<Student> uWhere = u.where().and("id").eq(1);
+        WhereBuilder<Student> uWhere = u.where().eq("id", 1);
         String uSql2 = uWhere.toSql();
         assertTrue(uSql2.contains("WHERE"));
         assertEquals(uSql2, uWhere.toString());
@@ -294,7 +294,7 @@ public class Oracle11AndDynamicFeaturesTest {
         // 存在逻辑删除，因此渲染为 UPDATE is_deleted = 1
         assertTrue(dSql1.contains("UPDATE \"t_student\" SET \"is_deleted\" = ?"));
         assertEquals(dSql1, d.toString());
-        WhereBuilder<Student> dWhere = d.where().and("id").eq(1);
+        WhereBuilder<Student> dWhere = d.where().eq("id", 1);
         String dSql2 = dWhere.toSql();
         assertTrue(dSql2.contains("WHERE"));
         assertEquals(dSql2, dWhere.toString());
@@ -306,7 +306,7 @@ public class Oracle11AndDynamicFeaturesTest {
         String dtoSql1 = dtoQ.toSql();
         assertTrue(dtoSql1.contains("SELECT"));
         assertEquals(dtoSql1, dtoQ.toString());
-        WhereBuilder<Student> dtoWhere = dtoQ.where().and("age").ge(20);
+        WhereBuilder<Student> dtoWhere = dtoQ.where().ge("age", 20);
         String dtoSql2 = dtoWhere.toSql();
         assertTrue(dtoSql2.contains("WHERE"));
         assertEquals(dtoSql2, dtoWhere.toString());
@@ -318,7 +318,7 @@ public class Oracle11AndDynamicFeaturesTest {
         assertFalse(config.isPrintSql());
         SelectBuilder<Student> q1 = orm.select(Student.class).printSql(true);
         assertTrue(q1.getEffectiveConfig().isPrintSql());
-        List<Student> list1 = q1.where().and("age").gt(18).list();
+        List<Student> list1 = q1.where().gt("age", 18).list();
         assertEquals(5, list1.size());
 
         // 2. 链式指定 printSql(false)，强制不打印
@@ -335,14 +335,14 @@ public class Oracle11AndDynamicFeaturesTest {
         assertTrue(q4.getEffectiveConfig().isPrintSql());
 
         // 5. 在 WhereBuilder 上链式调用 printSql(false)
-        WhereBuilder<Student> w = orm.select(Student.class).where().and("age").gt(18).printSql(false);
+        WhereBuilder<Student> w = orm.select(Student.class).where().gt("age", 18).printSql(false);
         assertEquals(5, w.list().size());
 
         // 6. 在 UpdateBuilder 和 DeleteBuilder 上链式调用
-        int uCount = orm.update(Student.class).set("age", 25).where().and("id").eq(1).printSql(true).execute();
+        int uCount = orm.update(Student.class).set("age", 25).where().eq("id", 1).printSql(true).execute();
         assertEquals(1, uCount);
 
-        int dCount = orm.delete(Student.class).where().and("id").eq(9999).printSql(true).execute();
+        int dCount = orm.delete(Student.class).where().eq("id", 9999).printSql(true).execute();
         assertEquals(0, dCount);
     }
 
@@ -353,7 +353,7 @@ public class Oracle11AndDynamicFeaturesTest {
 
         // 1. 连续独立查询，每次的根表别名都必须从 t0 开始
         for (int i = 0; i < 5; i++) {
-            WhereBuilder<Student> q = orm.select(Student.class).where().and(s.getAge()).ge(18);
+            WhereBuilder<Student> q = orm.select(Student.class).where().ge(s.getAge(), 18);
             String sql = q.toSql();
             assertTrue("Query " + i + " should use t0 as root alias, but got: " + sql,
                     sql.contains("FROM \"t_student\" t0") || sql.contains("FROM (SELECT t0."));
@@ -365,14 +365,14 @@ public class Oracle11AndDynamicFeaturesTest {
         // 2. 带有 JOIN 的查询：内部表别名从 0 开始连续递增 (t0, t1)，下一次查询恢复从 t0 开始
         WhereBuilder<Student> joinQuery = orm.select(Student.class)
                 .where()
-                .and(s.getTeacher().getAge()).gt(30);
+                .gt(s.getTeacher().getAge(), 30);
         String joinSql = joinQuery.toSql();
         assertTrue(joinSql.contains("FROM \"t_student\" t0"));
         assertTrue(joinSql.contains("JOIN \"t_teacher\" t1"));
         joinQuery.list();
 
         // 之后的查询必须再次从 t0 开始
-        WhereBuilder<Student> afterJoin = orm.select(Student.class).where().and(s.getAge()).ge(20);
+        WhereBuilder<Student> afterJoin = orm.select(Student.class).where().ge(s.getAge(), 20);
         assertEquals("t0", afterJoin.getStatement().getRootTableAlias());
         assertTrue(afterJoin.toSql().contains("FROM \"t_student\" t0"));
 
@@ -383,7 +383,7 @@ public class Oracle11AndDynamicFeaturesTest {
                         orm.select(t.getId())
                                 .from(Teacher.class)
                                 .where()
-                                .and(t.getId()).eq(s.getTeacherId())
+                                .eq(t.getId(), s.getTeacherId())
                 );
         String subSql = subQuery.toSql();
         assertTrue(subSql.contains("FROM \"t_student\" t0"));
@@ -391,16 +391,16 @@ public class Oracle11AndDynamicFeaturesTest {
         assertTrue(subSql.contains("t1.\"id\" = t0.\"teacher_id\""));
 
         // 之后的查询必须再次从 t0 开始
-        WhereBuilder<Teacher> afterSub = orm.select(Teacher.class).where().and(t.getAge()).ge(30);
+        WhereBuilder<Teacher> afterSub = orm.select(Teacher.class).where().ge(t.getAge(), 30);
         assertEquals("t0", afterSub.getStatement().getRootTableAlias());
         assertTrue(afterSub.toSql().contains("FROM \"t_teacher\" t0"));
 
         // 4. Update 和 Delete 之后，新查询同样从 t0 开始
-        orm.update(Student.class).set(s.getAge(), 20).where().and(s.getId()).eq(1).execute();
+        orm.update(Student.class).set(s.getAge(), 20).where().eq(s.getId(), 1).execute();
         SelectBuilder<Student> afterUpdate = orm.select(Student.class);
         assertEquals("t0", afterUpdate.getStatement().getRootTableAlias());
 
-        orm.delete(Student.class).where().and(s.getId()).eq(99999).execute();
+        orm.delete(Student.class).where().eq(s.getId(), 99999).execute();
         SelectBuilder<Student> afterDelete = orm.select(Student.class);
         assertEquals("t0", afterDelete.getStatement().getRootTableAlias());
     }
@@ -417,24 +417,24 @@ public class Oracle11AndDynamicFeaturesTest {
         // 1.1 第一个查询 q1 开始写
         SelectBuilder<Student> q1 = orm.select(Student.class);
         WhereBuilder<Student> w1 = q1.where();
-        w1.and(s.getAge()).gt(18);
+        w1.gt(s.getAge(), 18);
 
         // 1.2 第二个查询 q2 在 q1 未完成时开始写
         SelectBuilder<Teacher> q2 = orm.select(Teacher.class);
         WhereBuilder<Teacher> w2 = q2.where();
-        w2.and(t.getAge()).gt(30);
+        w2.gt(t.getAge(), 30);
 
         // 1.3 交替继续写 q1: 增加 join 级联条件
-        w1.and(s.getTeacher().getTeacherName()).like("Prof%");
+        w1.like(s.getTeacher().getTeacherName(), "Prof%");
 
         // 1.4 交替继续写 q2: 增加主表条件
-        w2.and(t.getTitle()).eq("Dean");
+        w2.eq(t.getTitle(), "Dean");
 
         // 1.5 交替继续写 q1: 增加主表条件
-        w1.and(s.getStudentName()).eq("Alice");
+        w1.eq(s.getStudentName(), "Alice");
 
         // 1.6 交替继续写 q2: 增加另一个主表条件
-        w2.and(t.getTeacherName()).like("Bob%");
+        w2.like(t.getTeacherName(), "Bob%");
 
         String sql1 = q1.toSql();
         String sql2 = q2.toSql();
@@ -456,16 +456,16 @@ public class Oracle11AndDynamicFeaturesTest {
 
         // 场景 2: 相同实体的两个查询错位交替书写
         SelectBuilder<Student> qA = orm.select(Student.class);
-        WhereBuilder<Student> wA = qA.where().and(s.getAge()).gt(20);
+        WhereBuilder<Student> wA = qA.where().gt(s.getAge(), 20);
 
         SelectBuilder<Student> qB = orm.select(Student.class);
-        WhereBuilder<Student> wB = qB.where().and(s.getAge()).lt(25);
+        WhereBuilder<Student> wB = qB.where().lt(s.getAge(), 25);
 
-        wA.and(s.getTeacher().getTeacherName()).eq("TeacherA");
-        wB.and(s.getTeacher().getTeacherName()).eq("TeacherB");
+        wA.eq(s.getTeacher().getTeacherName(), "TeacherA");
+        wB.eq(s.getTeacher().getTeacherName(), "TeacherB");
 
-        wA.and(s.getStudentName()).eq("StudentA");
-        wB.and(s.getStudentName()).eq("StudentB");
+        wA.eq(s.getStudentName(), "StudentA");
+        wB.eq(s.getStudentName(), "StudentB");
 
         String sqlA = qA.toSql();
         String sqlB = qB.toSql();
@@ -479,16 +479,16 @@ public class Oracle11AndDynamicFeaturesTest {
 
         // 场景 3: 书写中间调用 toSql() 或执行查询，不破坏正在编写的其他查询状态
         SelectBuilder<Student> qX = orm.select(Student.class);
-        WhereBuilder<Student> wX = qX.where().and(s.getAge()).gt(18);
+        WhereBuilder<Student> wX = qX.where().gt(s.getAge(), 18);
         String sqlXPart = qX.toSql();
         assertTrue(sqlXPart.contains("FROM \"t_student\" t0"));
 
         // 中途开启并执行另一个完整查询
-        List<Teacher> teachers = orm.select(Teacher.class).where().and(t.getAge()).gt(30).list();
+        List<Teacher> teachers = orm.select(Teacher.class).where().gt(t.getAge(), 30).list();
         assertNotNull(teachers);
 
         // 继续完成 qX 的书写
-        wX.and(s.getTeacher().getTeacherName()).like("Prof%");
+        wX.like(s.getTeacher().getTeacherName(), "Prof%");
         String sqlXFull = qX.toSql();
         assertEquals("t0", qX.getStatement().getRootTableAlias());
         assertTrue(sqlXFull.contains("FROM \"t_student\" t0"));
@@ -496,18 +496,18 @@ public class Oracle11AndDynamicFeaturesTest {
 
         // 场景 4: 错位书写中包含关联子查询
         SelectBuilder<Student> qOuter = orm.select(Student.class);
-        WhereBuilder<Student> wOuter = qOuter.where().and(s.getAge()).gt(18);
+        WhereBuilder<Student> wOuter = qOuter.where().gt(s.getAge(), 18);
 
         // 中途插入独立查询
         SelectBuilder<Teacher> qUnrelated = orm.select(Teacher.class);
-        qUnrelated.where().and(t.getAge()).gt(40);
+        qUnrelated.where().gt(t.getAge(), 40);
 
         // 为 qOuter 增加关联子查询
         wOuter.andExists(
                 orm.select(t.getId())
                         .from(Teacher.class)
                         .where()
-                        .and(t.getId()).eq(s.getTeacherId())
+                        .eq(t.getId(), s.getTeacherId())
         );
 
         String sqlOuter = qOuter.toSql();

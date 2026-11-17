@@ -133,7 +133,7 @@ public class DynamicCteQueryTest {
 
         // 仅筛选人数等于 2 的年龄段 (age 20 -> 2人, age 22 -> 2人)
         List<Map<String, Object>> results = orm.select(ageSummary)
-                .where().and(ageSummary.col("cnt")).eq(2)
+                .where().eq(ageSummary.col("cnt"), 2)
                 .listMaps();
 
         assertEquals(2, results.size());
@@ -174,7 +174,7 @@ public class DynamicCteQueryTest {
         // 查询处于人数大于 1 的年龄段（age 20 和 22，共 4 位学生）
         List<Student> students = orm.select(Student.class)
                 .innerJoin(ageSummary, (on, student, sum) -> on.eq(ageSummary.col("age"), student.getAge()))
-                .where().and(ageSummary.col("cnt")).gt(1)
+                .where().gt(ageSummary.col("cnt"), 1)
                 .toList();
 
         assertEquals(4, students.size());
@@ -213,7 +213,7 @@ public class DynamicCteQueryTest {
 
         // 进一步在外层追加过滤
         List<Map<String, Object>> filtered = orm.select(rawCte)
-                .where().and(rawCte.col("student_name")).eq("David")
+                .where().eq(rawCte.col("student_name"), "David")
                 .listMaps();
 
         assertEquals(1, filtered.size());
@@ -257,7 +257,7 @@ public class DynamicCteQueryTest {
         assertEquals(3L, count);
 
         long filteredCount = orm.select(ageSummary)
-                .where().and(ageSummary.col("cnt")).gt(1)
+                .where().gt(ageSummary.col("cnt"), 1)
                 .count();
         assertEquals(2L, filteredCount);
     }

@@ -201,7 +201,7 @@ public class DeleteBuilder<T> {
         if (!condition) return this;
         ColumnMetadata idCol = metadata != null ? metadata.getIdColumn() : null;
         String idProp = idCol != null ? idCol.getPropertyName() : "id";
-        where().and(idProp).eq(id);
+        where().eq(idProp, id);
         return this;
     }
 
@@ -213,7 +213,7 @@ public class DeleteBuilder<T> {
         if (!condition) return this;
         ColumnMetadata idCol = metadata != null ? metadata.getIdColumn() : null;
         String idProp = idCol != null ? idCol.getPropertyName() : "id";
-        where().and(idProp).in((java.util.Collection) ids);
+        where().in(idProp, (java.util.Collection) ids);
         return this;
     }
 

@@ -131,7 +131,7 @@ public class AdvancedSqlFeaturesTest {
                 .from(Student.class)
                 .groupBy(s.getTeacherId())
                 .having()
-                .and(count(s.getId())).ge(2)
+                .ge(count(s.getId()), 2)
                 .orderBy(s.getTeacherId()).asc()
                 .listMaps();
 
@@ -156,7 +156,7 @@ public class AdvancedSqlFeaturesTest {
                 .select(count(s.getId()).as("total"), s.getTeacherId(), avg(s.getAge()).as("avgAge"))
                 .groupBy(s.getTeacherId())
                 .having()
-                .and(count(s.getId())).ge(2)
+                .ge(count(s.getId()), 2)
                 .list();
 
         assertEquals(1, dtoListA.size());
@@ -181,7 +181,7 @@ public class AdvancedSqlFeaturesTest {
 
     /**
      * 3. 测试 WHERE 中的函数断言
-     * w.and(min(s.getAge())).gt(18) 等
+     * w.gt(min(s.getAge()), 18) 等
      */
     @Test
     public void testSqlFunctionsInWhere() {
@@ -190,7 +190,7 @@ public class AdvancedSqlFeaturesTest {
         // 查询名字长度大于 2 的学生 (LENGTH(t0.student_name) > 2)
         List<Student> students = orm.select(Student.class)
                 .where()
-                .and(length(s.getStudentName())).gt(2)
+                .gt(length(s.getStudentName()), 2)
                 .list();
 
         assertEquals(4, students.size());
@@ -207,12 +207,10 @@ public class AdvancedSqlFeaturesTest {
         // 4.1 IN 子查询：查询指导教师年龄 > 40 的学生
         List<Student> studentsIn = orm.select(Student.class)
                 .where()
-                .and(s.getTeacherId()).in(
-                        orm.select(t.getId())
+                .in(s.getTeacherId(), orm.select(t.getId())
                                 .from(Teacher.class)
                                 .where()
-                                .and(t.getAge()).gt(40)
-                )
+                                .gt(t.getAge(), 40))
                 .list();
 
         assertEquals(3, studentsIn.size()); // 属于 t1 (张教授 45岁)
@@ -224,8 +222,8 @@ public class AdvancedSqlFeaturesTest {
                         orm.select(t.getId())
                                 .from(Teacher.class)
                                 .where()
-                                .and(t.getId()).eq(s.getTeacherId())
-                                .and(t.getTitle()).eq("讲师")
+                                .eq(t.getId(), s.getTeacherId())
+                                .eq(t.getTitle(), "讲师")
                 )
                 .list();
 
@@ -245,12 +243,12 @@ public class AdvancedSqlFeaturesTest {
         List<Map<String, Object>> unionResult = orm.select(s.getStudentName())
                 .from(Student.class)
                 .where()
-                .and(s.getAge()).le(20)
+                .le(s.getAge(), 20)
                 .union(
                         orm.select(s.getStudentName())
                                 .from(Student.class)
                                 .where()
-                                .and(s.getAge()).ge(22)
+                                .ge(s.getAge(), 22)
                 )
                 .listMaps();
 
@@ -303,11 +301,11 @@ public class AdvancedSqlFeaturesTest {
         int affected1 = orm.update(Student.class)
                 .set(s.getAge(), increment(2))
                 .where()
-                .and(s.getStudentName()).eq("学生A")
+                .eq(s.getStudentName(), "学生A")
                 .execute();
         assertEquals(1, affected1);
 
-        Student studentA = orm.select(Student.class).where().and(s.getStudentName()).eq("学生A").single();
+        Student studentA = orm.select(Student.class).where().eq(s.getStudentName(), "学生A").single();
         assertEquals(Integer.valueOf(22), studentA.getAge()); // 20 + 2 = 22
 
         // 7.2 自减计算 decrement(1) + andGroup((w, stu) -> ...) 无外部 proxy
@@ -315,29 +313,27 @@ public class AdvancedSqlFeaturesTest {
                 .set(s.getAge(), decrement(1))
                 .where()
                 .andGroup((w, stu) -> {
-                    w.and(stu.getStudentName()).eq("学生B");
-                    w.or(stu.getAge()).gt(100);
+                    w.eq(stu.getStudentName(), "学生B");
+                    w.or().gt(stu.getAge(), 100);
                 })
                 .execute();
         assertEquals(1, affected2);
 
-        Student studentB = orm.select(Student.class).where().and(s.getStudentName()).eq("学生B").single();
+        Student studentB = orm.select(Student.class).where().eq(s.getStudentName(), "学生B").single();
         assertEquals(Integer.valueOf(21), studentB.getAge()); // 22 - 1 = 21
 
         // 7.3 基于子查询条件的批量更新
         int affected3 = orm.update(Student.class)
                 .set(s.getAge(), 99)
                 .where()
-                .and(s.getTeacherId()).in(
-                        orm.select(t.getId())
+                .in(s.getTeacherId(), orm.select(t.getId())
                                 .from(Teacher.class)
                                 .where()
-                                .and(t.getTitle()).eq("讲师") // t2 (李讲师) 下的学生是 学生D
-                )
+                                .eq(t.getTitle(), "讲师")) // t2 (李讲师) 下的学生是 学生D
                 .execute();
         assertEquals(1, affected3);
 
-        Student studentD = orm.select(Student.class).where().and(s.getStudentName()).eq("学生D").single();
+        Student studentD = orm.select(Student.class).where().eq(s.getStudentName(), "学生D").single();
         assertEquals(Integer.valueOf(99), studentD.getAge());
     }
 
@@ -353,13 +349,13 @@ public class AdvancedSqlFeaturesTest {
         int affected1 = orm.delete(Student.class)
                 .where()
                 .andGroup((w, stu) -> {
-                    w.and(stu.getStudentName()).eq("学生A");
+                    w.eq(stu.getStudentName(), "学生A");
                 })
                 .execute();
         assertEquals(1, affected1);
 
         // 验证逻辑删除生效（is_deleted = 1），查不出来
-        Student deletedA = orm.select(Student.class).where().and(s.getStudentName()).eq("学生A").single();
+        Student deletedA = orm.select(Student.class).where().eq(s.getStudentName(), "学生A").single();
         assertNull(deletedA);
 
         // 8.2 基于 EXISTS 子查询删除
@@ -369,13 +365,13 @@ public class AdvancedSqlFeaturesTest {
                         orm.select(t.getId())
                                 .from(Teacher.class)
                                 .where()
-                                .and(t.getId()).eq(s.getTeacherId())
-                                .and(t.getTitle()).eq("讲师")
+                                .eq(t.getId(), s.getTeacherId())
+                                .eq(t.getTitle(), "讲师")
                 )
                 .execute();
         assertEquals(1, affected2);
 
-        Student deletedD = orm.select(Student.class).where().and(s.getStudentName()).eq("学生D").single();
+        Student deletedD = orm.select(Student.class).where().eq(s.getStudentName(), "学生D").single();
         assertNull(deletedD);
     }
 }

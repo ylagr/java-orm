@@ -90,8 +90,8 @@ public class ReviewIssuesRegressionTest {
         // 用户顶层使用 OR 条件：.and(age >= 18).or(studentName = 'DeletedTarget')
         WhereBuilder<Student> query = orm.select(Student.class)
                 .where()
-                .and(Student::getAge).ge(18)
-                .or(Student::getStudentName).eq("DeletedTarget");
+                .ge(Student::getAge, 18)
+                .or().eq(Student::getStudentName, "DeletedTarget");
 
         SqlAndParams sp = query.toSqlAndParams();
         String sql = sp.getSql();
@@ -116,24 +116,24 @@ public class ReviewIssuesRegressionTest {
     public void testDynamicColumnNameSqlInjectionBoundary() {
         // 1. 尝试注入非法字符的列名应被严格拒绝抛出异常
         try {
-            orm.select(Student.class).where().and("id` = 1 or `id").eq(2);
+            orm.select(Student.class).where().eq("id` = 1 or `id", 2);
             fail("Malicious identifier with backtick should be rejected");
         } catch (IllegalArgumentException e) {
             assertTrue(e.getMessage().contains("Invalid dynamic property or column name"));
         }
 
         try {
-            orm.select(Student.class).where().and("id = 1 or 1=1").eq(2);
+            orm.select(Student.class).where().eq("id = 1 or 1=1", 2);
             fail("Malicious identifier with spaces/operators should be rejected");
         } catch (IllegalArgumentException e) {
             assertTrue(e.getMessage().contains("Invalid dynamic property or column name"));
         }
 
         // 2. 合法字段名（驼峰或下划线或别名）正常支持
-        String sql1 = orm.select(Student.class).where().and("age").gt(18).toSql();
+        String sql1 = orm.select(Student.class).where().gt("age", 18).toSql();
         assertTrue(sql1.contains("\"age\" > ?"));
 
-        String sql2 = orm.select(Student.class).where().and("studentName").eq("Alice").toSql();
+        String sql2 = orm.select(Student.class).where().eq("studentName", "Alice").toSql();
         assertTrue(sql2.contains("\"student_name\" = ?"));
 
         // 3. 方言正确转义定界符
@@ -220,13 +220,13 @@ public class ReviewIssuesRegressionTest {
         // 4. 租户 100 更新：尝试更新 doc3 (属于租户200)，应当受阻影响 0 行
         int affected = orm.update(TenantDocument.class)
                 .set(TenantDocument::getTitle, "Hacked Title")
-                .where().and(TenantDocument::getId).eq(doc3.getId())
+                .where().eq(TenantDocument::getId, doc3.getId())
                 .execute();
         assertEquals("Cannot update other tenant data", 0, affected);
 
         // 5. 租户 100 删除：尝试删除 doc3，影响 0 行
         int deleted = orm.delete(TenantDocument.class)
-                .where().and(TenantDocument::getId).eq(doc3.getId())
+                .where().eq(TenantDocument::getId, doc3.getId())
                 .execute();
         assertEquals("Cannot delete other tenant data", 0, deleted);
 
@@ -243,28 +243,28 @@ public class ReviewIssuesRegressionTest {
     @Test
     public void testNullAndEmptyCollectionConditionHandling() {
         // 1. eq(null) 自动转为 IS NULL，无多余占位符
-        SqlAndParams sp1 = orm.select(Student.class).where().and(Student::getAge).eq(null).toSqlAndParams();
+        SqlAndParams sp1 = orm.select(Student.class).where().eq(Student::getAge, (Integer) null).toSqlAndParams();
         assertTrue("eq(null) must render IS NULL: " + sp1.getSql(), sp1.getSql().contains("\"age\" IS NULL"));
         assertEquals("Params must only contain is_deleted", 1, sp1.getParams().size());
 
         // 2. ne(null) 自动转为 IS NOT NULL
-        SqlAndParams sp2 = orm.select(Student.class).where().and(Student::getAge).ne(null).toSqlAndParams();
+        SqlAndParams sp2 = orm.select(Student.class).where().ne(Student::getAge, (Integer) null).toSqlAndParams();
         assertTrue("ne(null) must render IS NOT NULL: " + sp2.getSql(), sp2.getSql().contains("\"age\" IS NOT NULL"));
         assertEquals(1, sp2.getParams().size());
 
         // 3. 空集合 IN 渲染为 1 = 2 (或 1 = 0)
-        SqlAndParams sp3 = orm.select(Student.class).where().and(Student::getAge).in(Collections.emptyList()).toSqlAndParams();
+        SqlAndParams sp3 = orm.select(Student.class).where().in(Student::getAge, Collections.emptyList()).toSqlAndParams();
         assertTrue("Empty IN must render false (1 = 2 or 1 = 0): " + sp3.getSql(), sp3.getSql().contains("1 = 2") || sp3.getSql().contains("1 = 0"));
         assertEquals(1, sp3.getParams().size());
 
         // 4. 空集合 NOT IN 渲染为 1 = 1
-        SqlAndParams sp4 = orm.select(Student.class).where().and(Student::getAge).notIn(Collections.emptyList()).toSqlAndParams();
+        SqlAndParams sp4 = orm.select(Student.class).where().notIn(Student::getAge, Collections.emptyList()).toSqlAndParams();
         assertTrue("Empty NOT IN must render 1 = 1: " + sp4.getSql(), sp4.getSql().contains("1 = 1"));
         assertEquals(1, sp4.getParams().size());
 
         // 5. 不支持 null 的比较符抛出明确异常
         try {
-            orm.select(Student.class).where().and(Student::getAge).gt(null);
+            orm.select(Student.class).where().gt(Student::getAge, (Integer) null);
             fail("gt(null) should throw IllegalArgumentException");
         } catch (IllegalArgumentException e) {
             assertTrue(e.getMessage().contains("does not support null value"));
@@ -277,7 +277,7 @@ public class ReviewIssuesRegressionTest {
     @Test
     public void testCountSemanticsOnComplexQueries() {
         // 1. 普通简单查询
-        long simpleCount = orm.select(Student.class).where().and(Student::getAge).ge(20).count();
+        long simpleCount = orm.select(Student.class).where().ge(Student::getAge, 20).count();
         assertEquals(4, simpleCount);
 
         // 2. GROUP BY 查询：按 teacher_id 分组共有 2 个教师分组（teacher 1 和 teacher 2）
@@ -297,7 +297,7 @@ public class ReviewIssuesRegressionTest {
         // 4. 带 HAVING 分组
         long havingCount = orm.select(Student.class)
                 .groupBy(sp.getTeacherId())
-                .having(h -> h.and("COUNT(1)").gt(2)) // teacher 1 有 3 个学生 (Alice, Bob, Charlie)
+                .having(h -> h.gt("COUNT(1)", 2)) // teacher 1 有 3 个学生 (Alice, Bob, Charlie)
                 .count();
         assertEquals("Having count should be 1", 1, havingCount);
     }
@@ -356,7 +356,7 @@ public class ReviewIssuesRegressionTest {
             tx.insert(s);
         });
 
-        Student found = orm.select(Student.class).where().and(Student::getStudentName).eq("TxSuccessStudent").firstOrNull();
+        Student found = orm.select(Student.class).where().eq(Student::getStudentName, "TxSuccessStudent").firstOrNull();
         assertNotNull("Committed student must exist", found);
 
         // 2. 异常回滚事务
@@ -374,7 +374,7 @@ public class ReviewIssuesRegressionTest {
             assertTrue(expected.getMessage().contains("Simulated business error"));
         }
 
-        Student notFound = orm.select(Student.class).where().and(Student::getStudentName).eq("TxFailStudent").firstOrNull();
+        Student notFound = orm.select(Student.class).where().eq(Student::getStudentName, "TxFailStudent").firstOrNull();
         assertNull("Rolled back student must NOT exist in database", notFound);
     }
 }

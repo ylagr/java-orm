@@ -78,19 +78,19 @@ public class EasyQuerySyntaxParityTest {
 
         // 2. firstOrNull
         Topic first = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getId()).eq("1"))
+                .where(w -> w.eq(proxy.getId(), "1"))
                 .firstOrNull();
         assertNotNull(first);
         assertEquals("Java ORM Guide", first.getTitle());
 
         Topic notFound = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getId()).eq("non-existent"))
+                .where(w -> w.eq(proxy.getId(), "non-existent"))
                 .firstOrNull();
         assertNull(notFound);
 
         // 3. singleOrNull
         Topic single = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getId()).eq("2"))
+                .where(w -> w.eq(proxy.getId(), "2"))
                 .singleOrNull();
         assertNotNull(single);
         assertEquals(Integer.valueOf(20), single.getStars());
@@ -152,20 +152,20 @@ public class EasyQuerySyntaxParityTest {
 
         // eq, ne, gt, ge, lt, le
         List<Topic> geList = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getStars()).ge(30))
+                .where(w -> w.ge(proxy.getStars(), 30))
                 .toList();
         assertEquals(4, geList.size()); // 30, 40, 50, 60
 
         List<Topic> ltList = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getStars()).lt(30))
+                .where(w -> w.lt(proxy.getStars(), 30))
                 .toList();
         assertEquals(2, ltList.size()); // 10, 20
 
         // Conditional predicate false: should be omitted
         List<Topic> condList = orm.queryable(Topic.class)
                 .where(w -> {
-                    w.and(proxy.getStars()).ge(false, 100);
-                    w.and(proxy.getStars()).le(true, 30);
+                    w.ge(false, proxy.getStars(), 100);
+                    w.le(true, proxy.getStars(), 30);
                 })
                 .toList();
         assertEquals(3, condList.size()); // 10, 20, 30
@@ -177,29 +177,29 @@ public class EasyQuerySyntaxParityTest {
 
         // like
         List<Topic> likeList = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getTitle()).like("%ORM%"))
+                .where(w -> w.like(proxy.getTitle(), "%ORM%"))
                 .toList();
         assertEquals(1, likeList.size());
         assertEquals("Java ORM Guide", likeList.get(0).getTitle());
 
         // likeMatchLeft: 'Java%'
         List<Topic> matchLeftList = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getTitle()).likeMatchLeft("Java"))
+                .where(w -> w.likeMatchLeft(proxy.getTitle(), "Java"))
                 .toList();
         assertEquals(1, matchLeftList.size());
         assertEquals("Java ORM Guide", matchLeftList.get(0).getTitle());
 
         // likeMatchRight: '%Guide'
         List<Topic> matchRightList = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getTitle()).likeMatchRight("Guide"))
+                .where(w -> w.likeMatchRight(proxy.getTitle(), "Guide"))
                 .toList();
         assertEquals(1, matchRightList.size());
 
         // notLikeMatchLeft: NOT LIKE 'Java%'
         List<Topic> notMatchLeft = orm.queryable(Topic.class)
                 .where(w -> {
-                    w.and(proxy.getTitle()).isNotNull();
-                    w.and(proxy.getTitle()).notLikeMatchLeft("Java");
+                    w.isNotNull(proxy.getTitle());
+                    w.notLikeMatchLeft(proxy.getTitle(), "Java");
                 })
                 .toList();
         assertTrue(notMatchLeft.stream().noneMatch(t -> "Java ORM Guide".equals(t.getTitle())));
@@ -207,8 +207,8 @@ public class EasyQuerySyntaxParityTest {
         // notLikeMatchRight: NOT LIKE '%Guide'
         List<Topic> notMatchRight = orm.queryable(Topic.class)
                 .where(w -> {
-                    w.and(proxy.getTitle()).isNotNull();
-                    w.and(proxy.getTitle()).notLikeMatchRight("Guide");
+                    w.isNotNull(proxy.getTitle());
+                    w.notLikeMatchRight(proxy.getTitle(), "Guide");
                 })
                 .toList();
         assertTrue(notMatchRight.stream().noneMatch(t -> "Java ORM Guide".equals(t.getTitle())));
@@ -220,37 +220,37 @@ public class EasyQuerySyntaxParityTest {
 
         // 1. rangeClosed: [20, 40] -> stars >= 20 AND stars <= 40
         List<Topic> closed = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getStars()).rangeClosed(20, 40))
+                .where(w -> w.rangeClosed(proxy.getStars(), 20, 40))
                 .toList();
         assertEquals(3, closed.size()); // 20, 30, 40
 
         // 2. rangeOpen: (20, 40) -> stars > 20 AND stars < 40
         List<Topic> open = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getStars()).rangeOpen(20, 40))
+                .where(w -> w.rangeOpen(proxy.getStars(), 20, 40))
                 .toList();
         assertEquals(1, open.size()); // 30
 
         // 3. rangeClosedOpen: [20, 40) -> stars >= 20 AND stars < 40
         List<Topic> closedOpen = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getStars()).rangeClosedOpen(20, 40))
+                .where(w -> w.rangeClosedOpen(proxy.getStars(), 20, 40))
                 .toList();
         assertEquals(2, closedOpen.size()); // 20, 30
 
         // 4. rangeOpenClosed: (20, 40] -> stars > 20 AND stars <= 40
         List<Topic> openClosed = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getStars()).rangeOpenClosed(20, 40))
+                .where(w -> w.rangeOpenClosed(proxy.getStars(), 20, 40))
                 .toList();
         assertEquals(2, openClosed.size()); // 30, 40
 
         // 5. Partial range: left only (right is null)
         List<Topic> leftOnly = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getStars()).rangeClosed(50, null))
+                .where(w -> w.rangeClosed(proxy.getStars(), 50, null))
                 .toList();
         assertEquals(2, leftOnly.size()); // 50, 60
 
         // 6. Partial range: right only (left is null)
         List<Topic> rightOnly = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getStars()).rangeClosed(null, 20))
+                .where(w -> w.rangeClosed(proxy.getStars(), null, 20))
                 .toList();
         assertEquals(2, rightOnly.size()); // 10, 20
     }
@@ -261,7 +261,7 @@ public class EasyQuerySyntaxParityTest {
 
         // 1. isEmpty: (title IS NULL OR title = '')
         List<Topic> emptyList = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getTitle()).isEmpty())
+                .where(w -> w.isEmpty(proxy.getTitle()))
                 .toList();
         // ID 4 is empty string '', ID 6 is NULL
         assertEquals(2, emptyList.size());
@@ -270,13 +270,13 @@ public class EasyQuerySyntaxParityTest {
 
         // 2. isNotEmpty: (title IS NOT NULL AND title <> '')
         List<Topic> notEmptyList = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getTitle()).isNotEmpty())
+                .where(w -> w.isNotEmpty(proxy.getTitle()))
                 .toList();
         assertEquals(4, notEmptyList.size()); // ID 1, 2, 3, 5
 
         // 3. isBlank: (title IS NULL OR title = '' OR LTRIM(title) = '')
         List<Topic> blankList = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getTitle()).isBlank())
+                .where(w -> w.isBlank(proxy.getTitle()))
                 .toList();
         // ID 4 (''), ID 5 ('   '), ID 6 (NULL)
         assertEquals(3, blankList.size());
@@ -284,7 +284,7 @@ public class EasyQuerySyntaxParityTest {
 
         // 4. isNotBlank: (title IS NOT NULL AND title <> '' AND LTRIM(title) <> '')
         List<Topic> notBlankList = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getTitle()).isNotBlank())
+                .where(w -> w.isNotBlank(proxy.getTitle()))
                 .toList();
         // ID 1, 2, 3
         assertEquals(3, notBlankList.size());
@@ -296,13 +296,13 @@ public class EasyQuerySyntaxParityTest {
 
         // Empty collection in IN -> 1 = 2 (returns 0 rows)
         List<Topic> emptyIn = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getStars()).in(Collections.emptyList()))
+                .where(w -> w.in(proxy.getStars(), Collections.emptyList()))
                 .toList();
         assertEquals(0, emptyIn.size());
 
         // Empty collection in NOT IN -> 1 = 1 (returns all active rows)
         List<Topic> emptyNotIn = orm.queryable(Topic.class)
-                .where(w -> w.and(proxy.getStars()).notIn(Collections.emptyList()))
+                .where(w -> w.notIn(proxy.getStars(), Collections.emptyList()))
                 .toList();
         assertEquals(6, emptyNotIn.size());
     }

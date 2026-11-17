@@ -100,6 +100,11 @@ public class RecordingContext {
         }
     }
 
+    public static boolean isQueueEmpty() {
+        LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
+        return queue == null || queue.isEmpty();
+    }
+
     public static void recordRelation(String relationProperty) {
         PropertyPath path = CURRENT_PATH.get();
         if (path != null) {
@@ -227,32 +232,31 @@ public class RecordingContext {
         if (count <= 0) return list;
 
         PropertyPath cur = CURRENT_PATH.get();
-        if (cur == null || (entityClass != null && cur.getRootEntityClass() != entityClass)) {
-            // 没有当前属性调用，说明不是通过 proxy getter 调用的，绝不偷取外层的 RECORDED_QUEUE
-            return list;
+        if (cur != null && (entityClass == null || cur.getRootEntityClass() == entityClass)) {
+            CURRENT_PATH.remove();
+            list.add(cur);
+            count--;
         }
-
-        CURRENT_PATH.remove();
-        list.add(cur);
-        count--;
 
         if (count > 0) {
             LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
-            List<PropertyPath> fromQueue = new ArrayList<>();
-            for (int i = queue.size() - 1; i >= 0 && count > 0; i--) {
-                PropertyPath p = queue.get(i);
-                if (entityClass == null || p.getRootEntityClass() == entityClass) {
-                    fromQueue.add(p);
-                    queue.remove(i);
-                    count--;
+            if (queue != null && !queue.isEmpty()) {
+                List<PropertyPath> fromQueue = new ArrayList<>();
+                for (int i = queue.size() - 1; i >= 0 && count > 0; i--) {
+                    PropertyPath p = queue.get(i);
+                    if (entityClass == null || p.getRootEntityClass() == entityClass) {
+                        fromQueue.add(p);
+                        queue.remove(i);
+                        count--;
+                    }
                 }
+                if (queue.isEmpty() && CURRENT_PATH.get() == null) {
+                    RECORDED_QUEUE.remove();
+                }
+                Collections.reverse(fromQueue);
+                fromQueue.addAll(list);
+                return fromQueue;
             }
-            if (queue.isEmpty() && CURRENT_PATH.get() == null) {
-                RECORDED_QUEUE.remove();
-            }
-            Collections.reverse(fromQueue);
-            fromQueue.addAll(list);
-            return fromQueue;
         }
 
         return list;

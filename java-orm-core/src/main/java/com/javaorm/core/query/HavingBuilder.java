@@ -44,6 +44,57 @@ public class HavingBuilder<T> {
         return statement;
     }
 
+    private LogicalOperator currentLogOp = LogicalOperator.AND;
+
+    public HavingBuilder<T> and() {
+        this.currentLogOp = LogicalOperator.AND;
+        return this;
+    }
+
+    public HavingBuilder<T> or() {
+        this.currentLogOp = LogicalOperator.OR;
+        return this;
+    }
+
+    private HavingBuilder<T> executeHavingCondition(LogicalOperator logOp, Object propOrExpr, com.javaorm.core.operator.SqlOperator op, Object... vals) {
+        LogicalOperator effectiveOp = this.currentLogOp != null ? this.currentLogOp : logOp;
+        this.currentLogOp = LogicalOperator.AND;
+        SqlExpression<?> expr;
+        if (propOrExpr instanceof SqlExpression) {
+            expr = (SqlExpression<?>) propOrExpr;
+        } else if (propOrExpr instanceof String) {
+            PropertyPath path = RecordingContext.finish();
+            if (path != null) {
+                expr = query.pathToColumnExpression(path);
+            } else {
+                expr = new com.javaorm.core.ast.RawSqlExpression<>((String) propOrExpr);
+            }
+        } else {
+            PropertyPath path = RecordingContext.finish();
+            expr = query.pathToColumnExpression(path);
+        }
+        if (expr != null) {
+            query.resolveExpression(expr);
+        }
+        ExpressionCondition cond = new ExpressionCondition(expr, op, vals);
+        cond.setLogicalOperator(effectiveOp);
+        query.getStatement().addHavingCondition(cond);
+        return this;
+    }
+
+    public HavingBuilder<T> op(Object propOrExpr, com.javaorm.core.operator.SqlOperator op, Object... vals) {
+        return executeHavingCondition(LogicalOperator.AND, propOrExpr, op, vals);
+    }
+
+    public HavingBuilder<T> eq(Object propOrExpr, Object val) { return executeHavingCondition(LogicalOperator.AND, propOrExpr, com.javaorm.core.operator.SqlOperator.EQ, val); }
+    public HavingBuilder<T> ne(Object propOrExpr, Object val) { return executeHavingCondition(LogicalOperator.AND, propOrExpr, com.javaorm.core.operator.SqlOperator.NE, val); }
+    public HavingBuilder<T> gt(Object propOrExpr, Object val) { return executeHavingCondition(LogicalOperator.AND, propOrExpr, com.javaorm.core.operator.SqlOperator.GT, val); }
+    public HavingBuilder<T> ge(Object propOrExpr, Object val) { return executeHavingCondition(LogicalOperator.AND, propOrExpr, com.javaorm.core.operator.SqlOperator.GE, val); }
+    public HavingBuilder<T> lt(Object propOrExpr, Object val) { return executeHavingCondition(LogicalOperator.AND, propOrExpr, com.javaorm.core.operator.SqlOperator.LT, val); }
+    public HavingBuilder<T> le(Object propOrExpr, Object val) { return executeHavingCondition(LogicalOperator.AND, propOrExpr, com.javaorm.core.operator.SqlOperator.LE, val); }
+    public HavingBuilder<T> in(Object propOrExpr, Object... vals) { return executeHavingCondition(LogicalOperator.AND, propOrExpr, com.javaorm.core.operator.SqlOperator.IN, vals); }
+    public HavingBuilder<T> between(Object propOrExpr, Object min, Object max) { return executeHavingCondition(LogicalOperator.AND, propOrExpr, com.javaorm.core.operator.SqlOperator.BETWEEN, min, max); }
+
     public <R> PropertyOperator<HavingBuilder<T>, R> and(SqlExpression<R> expr) {
         query.resolveExpression(expr);
         return new PropertyOperator<>(this, (op, vals) -> {

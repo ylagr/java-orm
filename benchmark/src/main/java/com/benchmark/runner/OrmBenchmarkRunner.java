@@ -101,7 +101,7 @@ public class OrmBenchmarkRunner {
         long javaOrmTime = measure(() -> {
             Integer age = 0;
             for (int i = 0; i < iterations; i++) {
-                where.and(javaOrmProxy.getAge());
+                where.ge(javaOrmProxy.getAge(), 18);
             }
             consume(age);
         }, warmup, rounds);
@@ -128,8 +128,8 @@ public class OrmBenchmarkRunner {
             for (int i = 0; i < iterations; i++) {
                 javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                         .where((w, s) -> {
-                            w.and(s.getAge()).ge(18)
-                                    .and(s.getStudentName()).like("王%")
+                            w.ge(s.getAge(), 18)
+                                    .like(s.getStudentName(), "王%")
                                     .orderBy(s.getAge()).desc();
                         }).toSql();
 
@@ -162,7 +162,7 @@ public class OrmBenchmarkRunner {
                 long id = (i % 400) + 1;
                 com.benchmark.entity.javaorm.Student s = javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                         .where()
-                        .and(st -> st.getId()).eq(id)
+                        .eq(st -> st.getId(), id)
                         .single();
                 consume(s);
             }
@@ -191,7 +191,7 @@ public class OrmBenchmarkRunner {
             for (int i = 0; i < iterations; i++) {
                 List<com.benchmark.entity.javaorm.Student> list = javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                         .where()
-                        .and(s -> s.getAge()).ge(22)
+                        .ge(s -> s.getAge(), 22)
                         .list();
                 consume(list.size());
             }
@@ -219,7 +219,7 @@ public class OrmBenchmarkRunner {
             for (int i = 0; i < iterations; i++) {
                 List<com.benchmark.entity.javaorm.Student> list = javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                         .where()
-                        .and(s -> s.getTeacher().getAge()).gt(35)
+                        .gt(s -> s.getTeacher().getAge(), 35)
                         .list();
                 consume(list.size());
             }

@@ -344,7 +344,7 @@ public class ValueObjectTest {
             Company c = e.table(Company.class);
             e.select(c.getId(), c.getAddress())
                     .from(c)
-                    .where().and(c.getId()).eq(1L);
+                    .where().eq(c.getId(), 1L);
         }).listMaps();
 
         assertEquals(1, rows.size());
@@ -368,8 +368,8 @@ public class ValueObjectTest {
             e.select(c)
                     .from(c)
                     .where()
-                    .and(c.getAddress().getCity()).eq("Shenzhen")
-                    .and(c.getAddress().getArea().getCode()).eq("518000")
+                    .eq(c.getAddress().getCity(), "Shenzhen")
+                    .eq(c.getAddress().getArea().getCode(), "518000")
                     .orderBy(c.getAddress().getStreet()).asc();
         }).toList();
 
@@ -386,7 +386,7 @@ public class ValueObjectTest {
             Company c = e.table(Company.class);
             e.select(c.getId(), c.getAddress().getArea())
                     .from(c)
-                    .where().and(c.getId()).eq(2L);
+                    .where().eq(c.getId(), 2L);
         }).listMaps();
 
         assertEquals(1, rows.size());

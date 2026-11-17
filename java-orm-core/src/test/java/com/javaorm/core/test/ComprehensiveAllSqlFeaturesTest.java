@@ -102,9 +102,9 @@ public class ComprehensiveAllSqlFeaturesTest {
         // 筛选：Teacher 年龄 >= 35，School 城市为 '北京'
         List<Student> students = orm.select(Student.class)
                 .include(s.getTeacher(), (SelectBuilder<Teacher> tQuery, Teacher t) -> {
-                    tQuery.where().and(t.getAge()).ge(35);
+                    tQuery.where().ge(t.getAge(), 35);
                     tQuery.include(t.getSchool(), (SelectBuilder<School> schQuery, School sch) -> {
-                        schQuery.where().and(sch.getCity()).eq("北京");
+                        schQuery.where().eq(sch.getCity(), "北京");
                     });
                 })
                 .orderBy(s.getId()).asc()
@@ -139,14 +139,14 @@ public class ComprehensiveAllSqlFeaturesTest {
         // 筛选：Teacher 年龄 >= 30, Student 年龄 >= 20
         List<School> schools = orm.select(School.class)
                 .include(sch.getTeachers(), (SelectBuilder<Teacher> tQuery, Teacher t) -> {
-                    tQuery.where().and(t.getAge()).ge(30);
+                    tQuery.where().ge(t.getAge(), 30);
                     tQuery.orderBy(t.getAge()).desc();
                     tQuery.include(t.getStudents(), (SelectBuilder<Student> stQuery, Student st) -> {
-                        stQuery.where().and(st.getAge()).ge(20);
+                        stQuery.where().ge(st.getAge(), 20);
                         stQuery.orderBy(st.getAge()).asc();
                     });
                 })
-                .where().and(sch.getId()).eq(1L)
+                .where().eq(sch.getId(), 1L)
                 .list();
 
         assertNotNull(schools);
@@ -173,7 +173,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         // 直接链式写法：s.getTeacher().getSchool()
         List<Student> students = orm.select(Student.class)
                 .include(s.getTeacher().getSchool())
-                .where().and(s.getId()).eq(1L)
+                .where().eq(s.getId(), 1L)
                 .list();
 
         assertNotNull(students);
@@ -231,7 +231,7 @@ public class ComprehensiveAllSqlFeaturesTest {
                         nthValue(s.getAge(), 1).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("nv"),
                         sum(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("running_sum")
                 )
-                .where(w -> w.and(s.getTeacherId()).eq(1L));
+                .where(w -> w.eq(s.getTeacherId(), 1L));
 
         List<Map<String, Object>> winList = winQ.maps();
         assertNotNull(winList);
@@ -255,7 +255,7 @@ public class ComprehensiveAllSqlFeaturesTest {
                         right(s.getStudentName(), 1).as("str_rgt"),
                         instr(s.getStudentName(), "小").as("str_ins")
                 )
-                .where(w -> w.and(s.getId()).eq(1L));
+                .where(w -> w.eq(s.getId(), 1L));
         List<Map<String, Object>> strList = strQ.maps();
         assertNotNull(strList);
         assertEquals("大明", strList.get(0).get("str_rep"));
@@ -272,7 +272,7 @@ public class ComprehensiveAllSqlFeaturesTest {
                         power(s.getAge(), 2).as("m_pwr"),
                         sign(s.getAge()).as("m_sgn")
                 )
-                .where(w -> w.and(s.getId()).eq(1L));
+                .where(w -> w.eq(s.getId(), 1L));
         List<Map<String, Object>> mathList = mathQ.maps();
         assertNotNull(mathList);
         assertEquals(8, ((Number) mathList.get(0).get("m_mod")).intValue()); // 18 % 10 = 8
@@ -289,7 +289,7 @@ public class ComprehensiveAllSqlFeaturesTest {
                         now().as("d_now"),
                         curDate().as("d_cur")
                 )
-                .where(w -> w.and(s.getId()).eq(1L));
+                .where(w -> w.eq(s.getId(), 1L));
         List<Map<String, Object>> dateList = dateQ.maps();
         assertNotNull(dateList);
         assertEquals(2026, ((Number) dateList.get(0).get("d_yr")).intValue());
@@ -331,7 +331,7 @@ public class ComprehensiveAllSqlFeaturesTest {
 
         SelectBuilder<Student> selectSubQ = orm.select(Student.class)
                 .select(s.getId(), s.getStudentName(), subQuery(maxAgeSubQuery).as("max_teacher_age"))
-                .where(w -> w.and(s.getId()).eq(1L));
+                .where(w -> w.eq(s.getId(), 1L));
 
         List<Map<String, Object>> res1 = selectSubQ.maps();
         assertNotNull(res1);
@@ -340,23 +340,23 @@ public class ComprehensiveAllSqlFeaturesTest {
         // 2. WHERE IN 子查询
         SelectBuilder<Teacher> beijingTeacherQuery = orm.select(Teacher.class)
                 .select(t.getId())
-                .where(w -> w.and(t.getSchoolId()).eq(1L));
+                .where(w -> w.eq(t.getSchoolId(), 1L));
 
         List<Student> inList = orm.select(Student.class)
-                .where().and(s.getTeacherId()).in(beijingTeacherQuery)
+                .where().in(s.getTeacherId(), beijingTeacherQuery)
                 .list();
         assertEquals(4, inList.size()); // teacherId 1 and 2 belong to school 1
 
         // 3. WHERE NOT IN 子查询
         List<Student> notInList = orm.select(Student.class)
-                .where().and(s.getTeacherId()).notIn(subQuery(beijingTeacherQuery))
+                .where().notIn(s.getTeacherId(), subQuery(beijingTeacherQuery))
                 .list();
         assertEquals(1, notInList.size()); // student 5 has teacherId 3
 
         // 4. WHERE EXISTS / NOT EXISTS 子查询
         SelectBuilder<Teacher> existsSubQ = orm.select(Teacher.class)
-                .where(w -> w.and(t.getId()).eq(col("t0.teacher_id"))
-                        .and(t.getAge()).gt(40));
+                .where(w -> w.eq(t.getId(), col("t0.teacher_id"))
+                        .gt(t.getAge(), 40));
 
         List<Student> existsList = orm.select(Student.class)
                 .where().andExists(existsSubQ)
@@ -371,7 +371,7 @@ public class ComprehensiveAllSqlFeaturesTest {
         // 5. WHERE 比较运算符子查询 (例如 age > (SELECT AVG(age) FROM ...))
         SelectBuilder<Student> avgAgeSubQ = orm.select(Student.class).select(SQL.avg(s.getAge()));
         List<Student> gtAvgList = orm.select(Student.class)
-                .where(w -> w.and(s.getAge()).gt(avgAgeSubQ))
+                .where(w -> w.gt(s.getAge(), avgAgeSubQ))
                 .list();
         // avg = (18+22+16+25+20)/5 = 20.2. gt = 22, 25 (2 students)
         assertEquals(2, gtAvgList.size());
@@ -380,23 +380,23 @@ public class ComprehensiveAllSqlFeaturesTest {
         SelectBuilder<Teacher> minTeacherAgeQ = orm.select(Teacher.class).select(SQL.min(t.getAge()));
         int updated = orm.update(Student.class)
                 .set(s.getAge(), subQuery(minTeacherAgeQ))
-                .where(w -> w.and(s.getId()).eq(1L))
+                .where(w -> w.eq(s.getId(), 1L))
                 .execute();
         assertEquals(1, updated);
 
-        Student s1 = orm.select(Student.class).where().and(s.getId()).eq(1L).single();
+        Student s1 = orm.select(Student.class).where().eq(s.getId(), 1L).single();
         assertEquals(Integer.valueOf(28), s1.getAge()); // min teacher age is 28 (Zhao)
 
         // 7. 三层嵌套相关子查询 (3-Level Correlated SubQuery)
         // 查出所有拥有属于北京市学校的老师的学生
         School sch = orm.proxy(School.class);
         SelectBuilder<School> schoolSubQ = orm.select(School.class)
-                .where(w -> w.and(sch.getId()).eq(col("t1.school_id"))
-                        .and(sch.getCity()).eq("北京"));
+                .where(w -> w.eq(sch.getId(), col("t1.school_id"))
+                        .eq(sch.getCity(), "北京"));
 
         SelectBuilder<Teacher> teacherSubQ = orm.select(Teacher.class)
                 .as("t1")
-                .where(w -> w.and(col("t1.id")).eq(col("t0.teacher_id"))
+                .where(w -> w.eq(col("t1.id"), col("t0.teacher_id"))
                         .andExists(schoolSubQ));
 
         List<Student> correlated3Level = orm.select(Student.class)
@@ -440,7 +440,7 @@ public class ComprehensiveAllSqlFeaturesTest {
                                 .elseVal("MINOR")
                                 .as("status")
                 )
-                .where().and(s.getAge()).gt(15)
+                .where().gt(s.getAge(), 15)
                 .page(2, 10);
 
         // 1. 测试 SQLite 方言

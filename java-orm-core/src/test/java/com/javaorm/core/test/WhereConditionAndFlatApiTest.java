@@ -118,11 +118,11 @@ public class WhereConditionAndFlatApiTest {
         // 3.1 两阶段 API 在 eq(condition, ...) / gt(condition, ...) 上阻断
         SqlAndParams sp1 = orm.select(Student.class)
                 .where()
-                .and(s.getAge()).eq(false, 18)
-                .and("studentName").eq(false, "Jack")
-                .and(Student::getAge).gt(false, 20)
-                .and(min(s.getAge())).gt(false, 10)
-                .and(s.getAge()).eq(true, 30)
+                .eq(false, s.getAge(), 18)
+                .eq(false, "studentName", "Jack")
+                .gt(false, Student::getAge, 20)
+                .gt(false, min(s.getAge()), 10)
+                .eq(true, s.getAge(), 30)
                 .toSqlAndParams();
 
         String sql1 = sp1.getSql();
@@ -136,11 +136,11 @@ public class WhereConditionAndFlatApiTest {
         // 3.2 验证 condition 为 false 阻断，为 true 正常生效
         SqlAndParams sp2 = orm.select(Student.class)
                 .where()
-                .and(s.getAge()).eq(false, 18)
-                .and(s.getAge()).eq(false, 19)
-                .and(s.getAge()).gt(false, 20)
-                .and(s.getAge()).gt(false, 21)
-                .and(s.getAge()).eq(true, 35)
+                .eq(false, s.getAge(), 18)
+                .eq(false, s.getAge(), 19)
+                .gt(false, s.getAge(), 20)
+                .gt(false, s.getAge(), 21)
+                .eq(true, s.getAge(), 35)
                 .toSqlAndParams();
 
         String sql2 = sp2.getSql();
@@ -155,8 +155,8 @@ public class WhereConditionAndFlatApiTest {
         // 3.3 两阶段 API 字段与字段比较以及 condition 阻断
         SqlAndParams sp3 = orm.select(Student.class)
                 .where()
-                .and(s.getAge()).eq(false, s.getId())
-                .and(s.getAge()).eq(true, s.getTeacherId())
+                .eq(false, s.getAge(), s.getId())
+                .eq(true, s.getAge(), s.getTeacherId())
                 .toSqlAndParams();
 
         String sql3 = sp3.getSql();
@@ -166,21 +166,22 @@ public class WhereConditionAndFlatApiTest {
     }
 
     /**
-     * 4. 验证零堆分配（Zero Heap Allocation）：
-     * 检验 and(s.getAge()) 返回的是 WhereBuilder 内部单例缓存的 reusableOperator，无需每次 new
+     * 4. 验证零中间对象堆分配（Zero Intermediate Heap Allocation）：
+     * 检验 w.eq(s.getAge(), 18) 直接返回 WhereBuilder 本身，零中间 PropertyOperator 对象分配
      */
     @Test
-    public void testZeroHeapAllocationReusableOperator() {
+    public void testZeroHeapAllocationFlatFluentReturns() {
         Student s = orm.proxy(Student.class);
         WhereBuilder<Student> w = orm.select(Student.class).where();
 
-        PropertyOperator<WhereBuilder<Student>, Integer> op1 = w.and(s.getAge());
-        PropertyOperator<WhereBuilder<Student>, String> op2 = w.and(s.getStudentName());
-        PropertyOperator<WhereBuilder<Student>, Long> op3 = w.or(s.getTeacherId());
+        WhereBuilder<Student> w1 = w.eq(s.getAge(), 18);
+        WhereBuilder<Student> w2 = w.eq(s.getStudentName(), "Tom");
+        WhereBuilder<Student> w3 = w.or().eq(s.getTeacherId(), 1L);
 
-        // 验证全部引用同一个 operator 单例实例，零对象分配
-        assertSame("op1 and op2 must be the exact same instance", op1, op2);
-        assertSame("op2 and op3 must be the exact same instance", op2, op3);
+        // 验证全部直接返回 WhereBuilder 实例自身，零中间对象分配
+        assertSame("w1 and w must be the exact same instance", w, w1);
+        assertSame("w2 and w must be the exact same instance", w, w2);
+        assertSame("w3 and w must be the exact same instance", w, w3);
     }
 
     /**

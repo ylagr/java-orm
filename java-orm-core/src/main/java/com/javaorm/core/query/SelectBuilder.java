@@ -324,7 +324,7 @@ public class SelectBuilder<T> implements Query<T> {
     public SelectBuilder<T> select(Object... expressions) {
         statement.getProjectExpressions().clear();
         if (expressions != null && expressions.length > 0) {
-            List<PropertyPath> paths = RecordingContext.finishAll(rootEntityClass);
+            List<PropertyPath> paths = RecordingContext.finishLast(rootEntityClass, expressions.length);
             int pathIdx = 0;
             for (Object item : expressions) {
                 SqlExpression expr;
@@ -490,7 +490,7 @@ public class SelectBuilder<T> implements Query<T> {
      * 直接单条件快速断言：orm.select(Student.class).where(s.getId(), SqlOperator.EQ, 1L)
      */
     public SelectBuilder<T> where(SqlExpression expr, SqlOperator op, Object... values) {
-        where().and(expr).op(op, values);
+        where().op(expr, op, values);
         return this;
     }
 
@@ -498,7 +498,7 @@ public class SelectBuilder<T> implements Query<T> {
         if (prop instanceof SqlExpression) {
             return where((SqlExpression) prop, op, values);
         }
-        where().and(prop).op(op, values);
+        where().op(prop, op, values);
         return this;
     }
 
@@ -507,7 +507,7 @@ public class SelectBuilder<T> implements Query<T> {
      */
     public SelectBuilder<T> groupBy(Object... expressions) {
         if (expressions != null && expressions.length > 0) {
-            List<PropertyPath> paths = RecordingContext.finishAll(rootEntityClass);
+            List<PropertyPath> paths = RecordingContext.finishLast(rootEntityClass, expressions.length);
             int pathIdx = 0;
             for (Object item : expressions) {
                 SqlExpression expr;

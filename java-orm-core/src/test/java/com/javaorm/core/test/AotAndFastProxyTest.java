@@ -87,7 +87,7 @@ public class AotAndFastProxyTest {
 
         // 5. 验证从磁盘加载的 AOT 代理类依然具备完备的查询能力
         String sql = orm.select(Student.class)
-                .where().and(s -> s.getAge()).gt(18)
+                .where().gt(s -> s.getAge(), 18)
                 .toSql();
         assertTrue(sql.contains("\"age\" > ?"));
     }

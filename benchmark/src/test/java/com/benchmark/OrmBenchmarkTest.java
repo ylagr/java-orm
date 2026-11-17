@@ -43,7 +43,7 @@ public class OrmBenchmarkTest {
     public void testVerifyQueryEquivalence() {
         // 1. Point query
         com.benchmark.entity.javaorm.Student s1 = javaOrm.select(com.benchmark.entity.javaorm.Student.class)
-                .where().and(s -> s.getId()).eq(1L)
+                .where().eq(s -> s.getId(), 1L)
                 .single();
         com.benchmark.entity.easyquery.Student s2 = easyQuery.queryable(com.benchmark.entity.easyquery.Student.class)
                 .where(s -> s.id().eq(1L))
@@ -58,8 +58,8 @@ public class OrmBenchmarkTest {
         // 2. Condition list query
         List<com.benchmark.entity.javaorm.Student> joList = javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                 .where()
-                .and(s -> s.getAge()).ge(22)
-                .and(s -> s.getStudentName()).like("王%")
+                .ge(s -> s.getAge(), 22)
+                .like(s -> s.getStudentName(), "王%")
                 .list();
 
         List<com.benchmark.entity.easyquery.Student> eqList = easyQuery.queryable(com.benchmark.entity.easyquery.Student.class)
@@ -75,7 +75,7 @@ public class OrmBenchmarkTest {
         // 3. Join navigation query
         List<com.benchmark.entity.javaorm.Student> joJoin = javaOrm.select(com.benchmark.entity.javaorm.Student.class)
                 .where()
-                .and(s -> s.getTeacher().getAge()).gt(35)
+                .gt(s -> s.getTeacher().getAge(), 35)
                 .list();
 
         List<com.benchmark.entity.easyquery.Student> eqJoin = easyQuery.queryable(com.benchmark.entity.easyquery.Student.class)

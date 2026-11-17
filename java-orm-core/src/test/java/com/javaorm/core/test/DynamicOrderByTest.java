@@ -189,7 +189,7 @@ public class DynamicOrderByTest {
         // WhereBuilder 链式动态排序
         String wSql = orm.select(Student.class)
                 .where()
-                .and(s.getAge()).gt(10)
+                .gt(s.getAge(), 10)
                 .orderBy(s.getAge(), false)
                 .toSql();
         assertTrue(wSql.contains("WHERE t0.\"is_deleted\" = ? AND (t0.\"age\" > ?) ORDER BY t0.\"age\" DESC"));
@@ -198,7 +198,7 @@ public class DynamicOrderByTest {
         String hSql = orm.select(Student.class)
                 .groupBy(s.getTeacherId())
                 .having()
-                .and(count(s.getId())).gt(0L)
+                .gt(count(s.getId()), 0L)
                 .orderBy(s.getTeacherId(), false)
                 .toSql();
         assertTrue(hSql.contains("HAVING COUNT(t0.\"id\") > ? ORDER BY t0.\"teacher_id\" DESC"));

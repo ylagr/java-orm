@@ -279,7 +279,7 @@ public class ConverterAndEnumAndEncryptionTest {
         assertNotNull(acc.getId());
 
         // 使用底层 Maps 直接查看 DB 物理存储形态
-        Map<String, Object> map = orm.select(Account.class).where().and("id").eq(acc.getId()).maps().get(0);
+        Map<String, Object> map = orm.select(Account.class).where().eq("id", acc.getId()).maps().get(0);
 
         // a. @JoConverter: Boolean -> Integer (1)
         assertEquals(1, ((Number) map.get("enabled")).intValue());
@@ -323,7 +323,7 @@ public class ConverterAndEnumAndEncryptionTest {
         orm.insert(acc);
 
         // 实体查询
-        Account selected = orm.select(Account.class).where().and("id").eq(acc.getId()).single();
+        Account selected = orm.select(Account.class).where().eq("id", acc.getId()).single();
         assertNotNull(selected);
         assertEquals("bob", selected.getUsername());
         assertEquals(Boolean.FALSE, selected.getEnabled());
@@ -358,34 +358,34 @@ public class ConverterAndEnumAndEncryptionTest {
 
         // a. 针对 @JoEnumValue 字段查询：直接传枚举对象，条件自动转为 status = 1001
         Account res1 = orm.select(Account.class)
-                .where().and($.getStatus()).eq(UserStatus.ACTIVE)
+                .where().eq($.getStatus(), UserStatus.ACTIVE)
                 .single();
         assertNotNull(res1);
         assertEquals("charlie", res1.getUsername());
 
         // b. 针对 @JoEncrypt 字段查询：直接传明文手机号，条件自动加密后与 DB 密文精准等值匹配
         Account res2 = orm.select(Account.class)
-                .where().and($.getPhone()).eq("13700001111")
+                .where().eq($.getPhone(), "13700001111")
                 .single();
         assertNotNull(res2);
         assertEquals("charlie", res2.getUsername());
 
         // c. 不匹配的手机号查不出数据
         Account res3 = orm.select(Account.class)
-                .where().and($.getPhone()).eq("13700002222")
+                .where().eq($.getPhone(), "13700002222")
                 .single();
         assertNull(res3);
 
         // d. 针对 @JoConverter 字段查询：直接传 Boolean，自动转为 1 查出
         Account res4 = orm.select(Account.class)
-                .where().and($.getEnabled()).eq(true)
+                .where().eq($.getEnabled(), true)
                 .single();
         assertNotNull(res4);
         assertEquals("charlie", res4.getUsername());
 
         // e. IN 集合查询自动批量序列化
         List<Account> res5 = orm.select(Account.class)
-                .where().and($.getStatus()).in(Arrays.asList(UserStatus.ACTIVE, UserStatus.DISABLED))
+                .where().in($.getStatus(), Arrays.asList(UserStatus.ACTIVE, UserStatus.DISABLED))
                 .list();
         assertFalse(res5.isEmpty());
     }
@@ -408,17 +408,17 @@ public class ConverterAndEnumAndEncryptionTest {
         int updated = orm.env().createUpdate(Account.class)
                 .set($.getStatus(), UserStatus.ACTIVE)
                 .set($.getPhone(), "13699999999")
-                .where().and($.getId()).eq(acc.getId())
+                .where().eq($.getId(), acc.getId())
                 .execute();
         assertEquals(1, updated);
 
         // 查询验证
-        Account found = orm.select(Account.class).where().and($.getId()).eq(acc.getId()).single();
+        Account found = orm.select(Account.class).where().eq($.getId(), acc.getId()).single();
         assertEquals(UserStatus.ACTIVE, found.getStatus());
         assertEquals("13699999999", found.getPhone());
 
         // 查看底层物理存储确认已加密且 code 为 1001
-        Map<String, Object> map = orm.select(Account.class).where().and($.getId()).eq(acc.getId()).maps().get(0);
+        Map<String, Object> map = orm.select(Account.class).where().eq($.getId(), acc.getId()).maps().get(0);
         assertEquals(1001, ((Number) map.get("status")).intValue());
         assertNotEquals("13699999999", map.get("phone"));
     }
@@ -434,7 +434,7 @@ public class ConverterAndEnumAndEncryptionTest {
         }
 
         // 实体查询：因为设置了 @JoEnum(fallback = "UNKNOWN")，必须安全兜底为 UNKNOWN，不抛异常也不为 null
-        Account eve = orm.select(Account.class).where().and("username").eq("eve").single();
+        Account eve = orm.select(Account.class).where().eq("username", "eve").single();
         assertNotNull(eve);
         assertEquals(ThirdPartyRole.UNKNOWN, eve.getRole());
     }

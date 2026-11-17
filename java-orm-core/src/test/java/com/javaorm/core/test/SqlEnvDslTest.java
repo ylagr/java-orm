@@ -147,7 +147,7 @@ public class SqlEnvDslTest {
             Student s = e.table(Student.class);
             e.select(s)
                     .where()
-                    .and(s.getAge()).ge(22)
+                    .ge(s.getAge(), 22)
                     .orderBy(s.getId()).desc();
         }).toList();
 
@@ -168,7 +168,7 @@ public class SqlEnvDslTest {
             e.select(s.getStudentName(), t.getTeacherName())
                     .from(s)
                     .leftJoin(t).on(s.getTeacherId(), t.getId())
-                    .where().and(s.getAge()).eq(25);
+                    .where().eq(s.getAge(), 25);
         }).listMaps();
 
         assertEquals(1, rows.size());
@@ -196,7 +196,7 @@ public class SqlEnvDslTest {
             e.select(parent.getName(), child.getName())
                     .from(parent)
                     .leftJoin(child).on(child.getParentId(), parent.getId())
-                    .where().and(parent.getName()).eq("研发部")
+                    .where().eq(parent.getName(), "研发部")
                     .orderBy(child.getId()).asc();
         }).listMaps();
 
@@ -215,7 +215,7 @@ public class SqlEnvDslTest {
             Student s = e.table(Student.class);
             e.select(StudentDto.class, s.getId(), s.getStudentName(), s.getAge())
                     .from(s)
-                    .where().and(s.getAge()).ge(22)
+                    .where().ge(s.getAge(), 22)
                     .orderBy(s.getAge()).asc();
         }).toList();
 
@@ -235,7 +235,7 @@ public class SqlEnvDslTest {
             Cte<?> temp = e.table(rawCte, "sn");
             e.select(temp.col("name"))
                     .from(temp)
-                    .where().and(temp.col("name")).eq("David");
+                    .where().eq(temp.col("name"), "David");
         }).listMaps();
 
         assertEquals(1, rows.size());
@@ -253,13 +253,13 @@ public class SqlEnvDslTest {
             e.update(s)
                     .set(s.getAge(), 35)
                     .set(s.getStudentName(), "Alice_Updated")
-                    .where().and(s.getId()).eq(1L);
+                    .where().eq(s.getId(), 1L);
         }).exec();
 
         assertEquals(1, updated);
 
         // 验证已更新
-        Student alice = orm.select(Student.class).where().and(SQL.$(Student.class).getId()).eq(1L).firstOrNull();
+        Student alice = orm.select(Student.class).where().eq(SQL.$(Student.class).getId(), 1L).firstOrNull();
         assertNotNull(alice);
         assertEquals(Integer.valueOf(35), alice.getAge());
         assertEquals("Alice_Updated", alice.getStudentName());
@@ -278,12 +278,12 @@ public class SqlEnvDslTest {
             e.update(s)
                     .set(newAge != null, s.getAge(), newAge)
                     .set(newName != null, s.getStudentName(), newName)
-                    .where().and(s.getId()).eq(3L);
+                    .where().eq(s.getId(), 3L);
         }).exec();
 
         assertEquals(1, updated);
 
-        Student charlie = orm.select(Student.class).where().and(SQL.$(Student.class).getId()).eq(3L).firstOrNull();
+        Student charlie = orm.select(Student.class).where().eq(SQL.$(Student.class).getId(), 3L).firstOrNull();
         assertNotNull(charlie);
         assertEquals(Integer.valueOf(20), charlie.getAge()); // 原来的年龄未被改变
         assertEquals("Charlie_Renamed", charlie.getStudentName());
@@ -297,12 +297,12 @@ public class SqlEnvDslTest {
         int deleted = orm.sql(e -> {
             Student s = e.table(Student.class);
             e.delete(s)
-                    .where().and(s.getId()).eq(4L);
+                    .where().eq(s.getId(), 4L);
         }).exec();
 
         assertEquals(1, deleted);
 
-        long count = orm.select(Student.class).where().and(SQL.$(Student.class).getId()).eq(4L).count();
+        long count = orm.select(Student.class).where().eq(SQL.$(Student.class).getId(), 4L).count();
         assertEquals(0L, count);
     }
 
@@ -314,7 +314,7 @@ public class SqlEnvDslTest {
         // toSql 验证
         String selectSql = orm.sql(e -> {
             Student s = e.table(Student.class);
-            e.select(s).where().and(s.getAge()).gt(18);
+            e.select(s).where().gt(s.getAge(), 18);
         }).toSql();
         assertNotNull(selectSql);
         assertTrue(selectSql.toUpperCase().contains("SELECT"));
@@ -323,14 +323,14 @@ public class SqlEnvDslTest {
         // count 验证
         long count = orm.sql(e -> {
             Student s = e.table(Student.class);
-            e.select(s).where().and(s.getAge()).ge(20);
+            e.select(s).where().ge(s.getAge(), 20);
         }).count();
         assertEquals(4L, count);
 
         // firstOrNull 验证
         Student first = orm.sql(e -> {
             Student s = e.table(Student.class);
-            e.select(s).where().and(s.getId()).eq(2L);
+            e.select(s).where().eq(s.getId(), 2L);
         }).firstOrNull();
         assertNotNull(first);
         assertEquals("Bob", first.getStudentName());
@@ -356,7 +356,7 @@ public class SqlEnvDslTest {
         try {
             orm.sql(e -> {
                 Student s = e.table(Student.class);
-                e.update(s).set(s.getAge(), 20).where().and(s.getId()).eq(1L);
+                e.update(s).set(s.getAge(), 20).where().eq(s.getId(), 1L);
             }).toList();
             fail("Should fail when calling toList() on UPDATE");
         } catch (IllegalStateException e) {
@@ -374,7 +374,7 @@ public class SqlEnvDslTest {
             Student s = e.table(Student.class);
             e.select(s.getId(), s.getStudentName(), s.getAge())
                     .from(s)
-                    .where().and(s.getAge()).ge(22)
+                    .where().ge(s.getAge(), 22)
                     .orderBy(s.getAge()).asc();
         }).toList();
         assertEquals(2, dtoList.size());
@@ -386,7 +386,7 @@ public class SqlEnvDslTest {
             Student s = e.table(Student.class);
             e.select(s.getId(), s.getStudentName(), s.getAge())
                     .from(s)
-                    .where().and(s.getAge()).ge(22)
+                    .where().ge(s.getAge(), 22)
                     .orderBy(s.getAge()).asc();
         }).toList(StudentDto.class);
         assertEquals(2, explicitDtoList.size());
@@ -397,7 +397,7 @@ public class SqlEnvDslTest {
             Student s = e.table(Student.class);
             e.select(s.getId(), s.getStudentName(), s.getAge())
                     .from(s)
-                    .where().and(s.getAge()).ge(22)
+                    .where().ge(s.getAge(), 22)
                     .orderBy(s.getAge()).asc();
         }).toList(Student.class);
         assertEquals(2, studentList.size());
@@ -408,7 +408,7 @@ public class SqlEnvDslTest {
             Student s = e.table(Student.class);
             e.select(s.getStudentName())
                     .from(s)
-                    .where().and(s.getAge()).ge(22)
+                    .where().ge(s.getAge(), 22)
                     .orderBy(s.getAge()).asc();
         }).toList(String.class);
         assertEquals(2, names.size());
@@ -420,7 +420,7 @@ public class SqlEnvDslTest {
             Student s = e.table(Student.class);
             e.select(s.getStudentName())
                     .from(s)
-                    .where().and(s.getId()).eq(2L);
+                    .where().eq(s.getId(), 2L);
         }).firstOrNull(String.class);
         assertEquals("Bob", firstName);
 
@@ -428,7 +428,7 @@ public class SqlEnvDslTest {
             Student s = e.table(Student.class);
             e.select(s.getId(), s.getStudentName(), s.getAge())
                     .from(s)
-                    .where().and(s.getId()).eq(2L);
+                    .where().eq(s.getId(), 2L);
         }).firstOrNull();
         assertNotNull(firstDto);
         assertEquals("Bob", firstDto.getStudentName());
@@ -446,7 +446,7 @@ public class SqlEnvDslTest {
             Student s = e.table(Student.class);
             e.select(s.getStudentName(), s.getAge())
                     .from(s)
-                    .where().and(s.getId()).eq(1L);
+                    .where().eq(s.getId(), 1L);
         }).toList();
         assertEquals(1, autoInferred.size());
         assertEquals("Alice", autoInferred.get(0).getStudentName());
@@ -472,11 +472,11 @@ public class SqlEnvDslTest {
      */
     @Test
     public void testReturnQueryPipelineDirectly() {
-        // 1. 用户要求语法：return e.select(s).where().and(s.getAge()).ge(22).orderBy(s.getId()).desc();
+        // 1. 用户要求语法：return e.select(s).where().ge(s.getAge(), 22).orderBy(s.getId()).desc();
         List<Student> list = orm.sql(e -> {
             Student s = e.table(Student.class);
             return e.select(s)
-                    .where().and(s.getAge()).ge(22)
+                    .where().ge(s.getAge(), 22)
                     .orderBy(s.getId()).desc();
         }).toList();
 
@@ -488,7 +488,7 @@ public class SqlEnvDslTest {
         Student first = orm.sql(e -> {
             Student s = e.table(Student.class);
             return e.select(s)
-                    .where().and(s.getId()).eq(2L);
+                    .where().eq(s.getId(), 2L);
         }).firstOrNull();
 
         assertNotNull(first);
@@ -499,7 +499,7 @@ public class SqlEnvDslTest {
             Student s = e.table(Student.class);
             return e.select(StudentDto.class, s.getId(), s.getStudentName(), s.getAge())
                     .from(s)
-                    .where().and(s.getAge()).ge(22)
+                    .where().ge(s.getAge(), 22)
                     .orderBy(s.getAge()).asc();
         }).toList();
 
@@ -512,7 +512,7 @@ public class SqlEnvDslTest {
             Student s = e.table(Student.class);
             return e.update(s)
                     .set(s.getAge(), 26)
-                    .where().and(s.getId()).eq(4L); // David
+                    .where().eq(s.getId(), 4L); // David
         }).exec();
 
         assertEquals(1, updated);
@@ -522,7 +522,7 @@ public class SqlEnvDslTest {
             Student s = e.table(Student.class);
             return e.update(s)
                     .set(s.getAge(), 25)
-                    .where().and(s.getId()).eq(4L);
+                    .where().eq(s.getId(), 4L);
         }).exec();
     }
 
@@ -535,7 +535,7 @@ public class SqlEnvDslTest {
         Query<Student> query = orm.sql(e -> {
             Student s = e.table(Student.class);
             return e.select(s)
-                    .where().and(s.getAge()).ge(22)
+                    .where().ge(s.getAge(), 22)
                     .orderBy(s.getId()).desc();
         });
 
@@ -553,7 +553,7 @@ public class SqlEnvDslTest {
         List<Student> directStudents = orm.sql(e -> {
             Student s = e.table(Student.class);
             return e.select(s)
-                    .where().and(s.getAge()).ge(22)
+                    .where().ge(s.getAge(), 22)
                     .orderBy(s.getId()).desc();
         }).toList();
         assertEquals(2, directStudents.size());
@@ -570,7 +570,7 @@ public class SqlEnvDslTest {
             return e.select(StudentDto.class, s.getId(), s.getStudentName(), s.getAge())
                     .from(s)
                     .leftJoin(t).on(s.getTeacherId(), t.getId())
-                    .where().and(s.getAge()).ge(22)
+                    .where().ge(s.getAge(), 22)
                     .orderBy(s.getAge()).asc();
         });
 
@@ -588,7 +588,7 @@ public class SqlEnvDslTest {
             return e.select(StudentDto.class, s.getId(), s.getStudentName(), s.getAge())
                     .from(s)
                     .leftJoin(t).on(s.getTeacherId(), t.getId())
-                    .where().and(s.getAge()).ge(22)
+                    .where().ge(s.getAge(), 22)
                     .orderBy(s.getAge()).asc();
         }).toList();
         assertEquals(2, directDtos.size());
@@ -597,7 +597,7 @@ public class SqlEnvDslTest {
         Query<Student> sqlQuery = orm.sql(e -> {
             Student s = e.table(Student.class);
             return e.select(s)
-                    .where().and(s.getId()).eq(2L);
+                    .where().eq(s.getId(), 2L);
         });
 
         assertNotNull(sqlQuery);
@@ -661,7 +661,7 @@ public class SqlEnvDslTest {
             Query<Student> queryWithTypedChain = e.select(s)
                     .from(Student.class)
                     .leftJoin(Teacher.class).on(s.getTeacherId(), t.getId())
-                    .where().and(s.getAge()).ge(20);
+                    .where().ge(s.getAge(), 20);
 
             assertNotNull(queryWithTypedChain);
             assertTrue(queryWithTypedChain.toList().size() > 0);
