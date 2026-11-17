@@ -25,6 +25,8 @@ public class ColumnMetadata {
     private com.javaorm.core.fastbean.FastPropertySetter fastSetter;
     private com.javaorm.core.fastbean.FastPropertyGetter fastGetter;
     private java.util.List<ValueObjectStep> valueObjectSteps;
+    private java.lang.reflect.Type genericType;
+    private com.javaorm.core.converter.ValueConverter<?, ?> converter;
 
     public java.util.List<ValueObjectStep> getValueObjectSteps() {
         return valueObjectSteps;
@@ -38,10 +40,12 @@ public class ColumnMetadata {
         return valueObjectSteps != null && !valueObjectSteps.isEmpty();
     }
 
+    @SuppressWarnings("unchecked")
     public Object getValue(Object entity) {
         if (entity == null) {
             return null;
         }
+        Object rawVal;
         if (valueObjectSteps != null && !valueObjectSteps.isEmpty()) {
             Object current = entity;
             for (ValueObjectStep step : valueObjectSteps) {
@@ -50,9 +54,14 @@ public class ColumnMetadata {
                     return null;
                 }
             }
-            return getLeafValue(current);
+            rawVal = getLeafValue(current);
+        } else {
+            rawVal = getLeafValue(entity);
         }
-        return getLeafValue(entity);
+        if (converter != null) {
+            return ((com.javaorm.core.converter.ValueConverter<Object, Object>) converter).serialize(rawVal, this);
+        }
+        return rawVal;
     }
 
     private Object getLeafValue(Object target) {
@@ -111,9 +120,14 @@ public class ColumnMetadata {
         setLeafValue(entity, value);
     }
 
+    @SuppressWarnings("unchecked")
     private void setLeafValue(Object target, Object value) {
         if (target == null) return;
-        Object converted = convertValue(value, propertyType);
+        Object valToSet = value;
+        if (converter != null) {
+            valToSet = ((com.javaorm.core.converter.ValueConverter<Object, Object>) converter).deserialize(valToSet, this);
+        }
+        Object converted = convertValue(valToSet, propertyType);
         if (fastSetter != null) {
             try {
                 fastSetter.set(target, converted);
@@ -133,6 +147,15 @@ public class ColumnMetadata {
         } catch (Exception e) {
             throw new RuntimeException("Failed to set value for property " + propertyName + " with value " + value, e);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    public Object serializeParam(Object param) {
+        if (param == null) return null;
+        if (converter != null) {
+            return ((com.javaorm.core.converter.ValueConverter<Object, Object>) converter).serialize(param, this);
+        }
+        return param;
     }
 
     public com.javaorm.core.fastbean.FastPropertySetter getFastSetter() {
@@ -251,6 +274,9 @@ public class ColumnMetadata {
                 return value;
             }
             return new java.math.BigDecimal(value.toString());
+        }
+        if (targetType.isEnum()) {
+            return com.javaorm.core.converter.EnumMetadataManager.getMetadata(targetType, null).toEnum(value);
         }
         return value;
     }
@@ -396,5 +422,21 @@ public class ColumnMetadata {
 
     public void setSetter(Method setter) {
         this.setter = setter;
+    }
+
+    public java.lang.reflect.Type getGenericType() {
+        return genericType;
+    }
+
+    public void setGenericType(java.lang.reflect.Type genericType) {
+        this.genericType = genericType;
+    }
+
+    public com.javaorm.core.converter.ValueConverter<?, ?> getConverter() {
+        return converter;
+    }
+
+    public void setConverter(com.javaorm.core.converter.ValueConverter<?, ?> converter) {
+        this.converter = converter;
     }
 }

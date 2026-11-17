@@ -103,4 +103,17 @@ public class OrmConfig {
         if (entityClass == null) return null;
         return metadataCache.computeIfAbsent(entityClass, c -> com.javaorm.core.metadata.EntityMetadataManager.get(c, this));
     }
+
+    private final java.util.List<com.javaorm.core.converter.AutoValueConverter<?, ?>> autoConverters = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public java.util.List<com.javaorm.core.converter.AutoValueConverter<?, ?>> getAutoConverters() {
+        return autoConverters;
+    }
+
+    public OrmConfig addAutoConverter(com.javaorm.core.converter.AutoValueConverter<?, ?> converter) {
+        if (converter != null) {
+            this.autoConverters.add(converter);
+        }
+        return this;
+    }
 }

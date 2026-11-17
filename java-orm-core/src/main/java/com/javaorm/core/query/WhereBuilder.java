@@ -2482,9 +2482,54 @@ public class WhereBuilder<T> implements Query<T> {
             colName = rootQuery != null ? rootQuery.resolveColumnName(path) : path.getTerminalProperty();
         }
 
-        BinaryCondition cond = new BinaryCondition(alias, colName, op, vals);
+        com.javaorm.core.metadata.ColumnMetadata targetCol = resolveColumnMetadata(path);
+        Object[] serializedVals = serializeConditionValues(targetCol, vals);
+        BinaryCondition cond = new BinaryCondition(alias, colName, op, serializedVals);
         cond.setLogicalOperator(logOp);
         conditionReceiver.accept(cond);
+    }
+
+    private com.javaorm.core.metadata.ColumnMetadata resolveColumnMetadata(PropertyPath path) {
+        if (rootQuery != null) {
+            return rootQuery.resolveColumnMetadata(path);
+        }
+        Class<?> targetClass = (path.getRootEntityClass() != null) ? path.getRootEntityClass() : entityClass;
+        if (targetClass == null) return null;
+        com.javaorm.core.metadata.EntityMetadata meta = env != null ? (env.getConfig() != null ? env.getConfig().getMetadata(targetClass) : com.javaorm.core.metadata.EntityMetadataManager.get(targetClass, env.getConfig())) : com.javaorm.core.metadata.EntityMetadataManager.get(targetClass);
+        if (meta == null) return null;
+        com.javaorm.core.metadata.ColumnMetadata col = meta.getColumnByProperty(path.getFullPath());
+        if (col == null) {
+            col = meta.getColumnByProperty(path.getTerminalProperty());
+        }
+        return col;
+    }
+
+    private Object[] serializeConditionValues(com.javaorm.core.metadata.ColumnMetadata col, Object[] vals) {
+        if (col == null || vals == null || vals.length == 0 || col.getConverter() == null) {
+            return vals;
+        }
+        Object[] res = new Object[vals.length];
+        for (int i = 0; i < vals.length; i++) {
+            Object v = vals[i];
+            if (v instanceof java.util.Collection) {
+                java.util.Collection<?> coll = (java.util.Collection<?>) v;
+                java.util.List<Object> list = new java.util.ArrayList<>(coll.size());
+                for (Object item : coll) {
+                    list.add(col.serializeParam(item));
+                }
+                res[i] = list;
+            } else if (v instanceof Object[]) {
+                Object[] arr = (Object[]) v;
+                Object[] converted = new Object[arr.length];
+                for (int j = 0; j < arr.length; j++) {
+                    converted[j] = col.serializeParam(arr[j]);
+                }
+                res[i] = converted;
+            } else {
+                res[i] = col.serializeParam(v);
+            }
+        }
+        return res;
     }
 
     private static final java.util.regex.Pattern SAFE_IDENTIFIER =
@@ -2537,6 +2582,7 @@ public class WhereBuilder<T> implements Query<T> {
         }
 
         boolean matchedInMetadata = false;
+        com.javaorm.core.metadata.ColumnMetadata matchedCol = null;
         if (entityClass != null && rootQuery != null) {
             com.javaorm.core.metadata.EntityMetadata meta = (entityClass == rootQuery.getRootEntityClass() && rootQuery.getRootMetadata() != null)
                     ? rootQuery.getRootMetadata()
@@ -2545,17 +2591,20 @@ public class WhereBuilder<T> implements Query<T> {
             if (cm != null) {
                 colName = cm.getColumnName();
                 matchedInMetadata = true;
+                matchedCol = cm;
             } else {
                 com.javaorm.core.metadata.ColumnMetadata dbCol = meta.getColumnByDbName(colName);
                 if (dbCol != null) {
                     colName = dbCol.getColumnName();
                     matchedInMetadata = true;
+                    matchedCol = dbCol;
                 } else if (rootQuery.getConfig() != null && rootQuery.getConfig().getNameConversion() != null) {
                     String converted = rootQuery.getConfig().getNameConversion().convert(colName);
                     com.javaorm.core.metadata.ColumnMetadata convCol = meta.getColumnByDbName(converted);
                     if (convCol != null) {
                         colName = convCol.getColumnName();
                         matchedInMetadata = true;
+                        matchedCol = convCol;
                     }
                 }
             }
@@ -2569,7 +2618,8 @@ public class WhereBuilder<T> implements Query<T> {
             throw new IllegalArgumentException("Invalid table alias '" + alias + "'. Must be a valid SQL identifier.");
         }
 
-        BinaryCondition cond = new BinaryCondition(alias, colName, op, vals);
+        Object[] serializedVals = serializeConditionValues(matchedCol, vals);
+        BinaryCondition cond = new BinaryCondition(alias, colName, op, serializedVals);
         cond.setLogicalOperator(logOp);
         conditionReceiver.accept(cond);
     }

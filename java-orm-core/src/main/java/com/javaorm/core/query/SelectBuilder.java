@@ -1436,6 +1436,28 @@ public class SelectBuilder<T> implements Query<T> {
         }
     }
 
+    public ColumnMetadata resolveColumnMetadata(PropertyPath path) {
+        if (path == null) return null;
+        Class<?> targetClass;
+        if (!path.hasRelations()) {
+            targetClass = (path.getRootEntityClass() != null && path.getRootEntityClass() != rootEntityClass)
+                    ? path.getRootEntityClass() : rootEntityClass;
+        } else {
+            targetClass = resolveTargetClass(path);
+            if (path.getRootEntityClass() != null && path.getRootEntityClass() != rootEntityClass && !path.hasRelations()) {
+                targetClass = path.getRootEntityClass();
+            }
+        }
+        EntityMetadata targetMeta = (targetClass == rootEntityClass && rootMetadata != null)
+                ? rootMetadata : (getConfig() != null ? getConfig().getMetadata(targetClass) : EntityMetadataManager.get(targetClass, getConfig()));
+        if (targetMeta == null) return null;
+        ColumnMetadata col = targetMeta.getColumnByProperty(path.getFullPath());
+        if (col == null) {
+            col = targetMeta.getColumnByProperty(path.getTerminalProperty());
+        }
+        return col;
+    }
+
     public String resolveColumnName(PropertyPath path) {
         if (!path.hasRelations()) {
             Class<?> targetClass = (path.getRootEntityClass() != null && path.getRootEntityClass() != rootEntityClass)

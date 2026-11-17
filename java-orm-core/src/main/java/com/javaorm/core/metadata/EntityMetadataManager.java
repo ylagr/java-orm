@@ -365,6 +365,7 @@ public class EntityMetadataManager {
         col.setPropertyName(field.getName());
         col.setPropertyType(field.getType());
         col.setField(field);
+        col.setGenericType(field.getGenericType());
         col.setGetter(getter);
         col.setSetter(setter);
         col.setFastSetter(LambdaFactory.createSetter(clazz, setter, field));
@@ -409,6 +410,48 @@ public class EntityMetadataManager {
                 col.setAutoFill(true);
                 AutoFillType fillType = af.fillType() != AutoFillType.INSERT ? af.fillType() : af.value();
                 col.setAutoFillType(fillType);
+            } else if (ann instanceof com.javaorm.core.annotation.JoConverter) {
+                Class<? extends com.javaorm.core.converter.ValueConverter<?, ?>> convCls = ((com.javaorm.core.annotation.JoConverter) ann).value();
+                try {
+                    col.setConverter(convCls.getDeclaredConstructor().newInstance());
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to instantiate ValueConverter: " + convCls.getName(), e);
+                }
+            } else if (ann instanceof com.javaorm.core.annotation.JoEncrypt) {
+                Class<? extends com.javaorm.core.converter.EncryptionStrategy> stratCls = ((com.javaorm.core.annotation.JoEncrypt) ann).value();
+                try {
+                    com.javaorm.core.converter.EncryptionStrategy strat = stratCls.getDeclaredConstructor().newInstance();
+                    col.setConverter(new com.javaorm.core.converter.EncryptionValueConverter(strat));
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to instantiate EncryptionStrategy: " + stratCls.getName(), e);
+                }
+            } else if (ann instanceof com.javaorm.core.annotation.JoJson) {
+                com.javaorm.core.annotation.JoJson jj = (com.javaorm.core.annotation.JoJson) ann;
+                col.setConverter(new com.javaorm.core.converter.JsonValueConverter(jj.provider()));
+            } else if (ann instanceof com.javaorm.core.annotation.JoEnum) {
+                com.javaorm.core.annotation.JoEnum je = (com.javaorm.core.annotation.JoEnum) ann;
+                if (field.getType().isEnum()) {
+                    com.javaorm.core.converter.EnumMetadata em = com.javaorm.core.converter.EnumMetadataManager.getMetadata(field.getType(), je);
+                    col.setConverter(new com.javaorm.core.converter.EnumConverter(em));
+                }
+            }
+        }
+
+        // 默认枚举自动匹配
+        if (col.getConverter() == null && field.getType().isEnum()) {
+            com.javaorm.core.converter.EnumMetadata em = com.javaorm.core.converter.EnumMetadataManager.getMetadata(field.getType(), null);
+            if (em != null) {
+                col.setConverter(new com.javaorm.core.converter.EnumConverter(em));
+            }
+        }
+
+        // 全局 AutoValueConverter 自动匹配
+        if (col.getConverter() == null && config != null && config.getAutoConverters() != null) {
+            for (com.javaorm.core.converter.AutoValueConverter<?, ?> ac : config.getAutoConverters()) {
+                if (ac.matches(clazz, field.getName(), col)) {
+                    col.setConverter(ac);
+                    break;
+                }
             }
         }
 

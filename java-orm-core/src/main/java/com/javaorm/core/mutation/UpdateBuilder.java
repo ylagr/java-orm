@@ -145,7 +145,8 @@ public class UpdateBuilder<T> {
             if (value instanceof SqlExpression) {
                 queryHelper.resolveExpression((SqlExpression) value);
             }
-            statement.addSet(colName, value);
+            Object finalVal = (col != null && !(value instanceof SqlExpression)) ? col.serializeParam(value) : value;
+            statement.addSet(colName, finalVal);
             return this;
         }
         if (propertyOrColumn == null) {
@@ -159,14 +160,17 @@ public class UpdateBuilder<T> {
             ColumnMetadata dbCol = metadata.getColumnByDbName(propertyOrColumn);
             if (dbCol != null) {
                 colName = dbCol.getColumnName();
+                col = dbCol;
             } else if (getConfig() != null && getConfig().getNameConversion() != null) {
                 colName = getConfig().getNameConversion().convert(propertyOrColumn);
+                col = metadata.getColumnByDbName(colName);
             }
         }
         if (value instanceof SqlExpression) {
             queryHelper.resolveExpression((SqlExpression) value);
         }
-        statement.addSet(colName, value);
+        Object finalVal = (col != null && !(value instanceof SqlExpression)) ? col.serializeParam(value) : value;
+        statement.addSet(colName, finalVal);
         return this;
     }
 
@@ -193,7 +197,8 @@ public class UpdateBuilder<T> {
         if (value instanceof SqlExpression) {
             queryHelper.resolveExpression((SqlExpression) value);
         }
-        statement.addSet(colName, value);
+        Object finalVal = (col != null && !(value instanceof SqlExpression)) ? col.serializeParam(value) : value;
+        statement.addSet(colName, finalVal);
         return this;
     }
 
@@ -204,7 +209,8 @@ public class UpdateBuilder<T> {
         if (value instanceof SqlExpression) {
             queryHelper.resolveExpression((SqlExpression) value);
         }
-        statement.addSet(colName, value);
+        Object finalVal = (col != null && !(value instanceof SqlExpression)) ? col.serializeParam(value) : value;
+        statement.addSet(colName, finalVal);
         return this;
     }
 
