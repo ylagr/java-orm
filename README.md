@@ -11,41 +11,6 @@
 
 ---
 
-## 📢 重要更新与 API 变动说明（Breaking Changes）
-
-### 移除特性：废弃旧版二阶段 `.and(column).op(val)` 模式
-
-在早期版本中，条件构建采用两阶段调用（先 `.and(column)` 再 `.eq(val)`）。为了提供更紧凑流畅的开发体验，并原生支持动态条件判断，框架已**彻底移除**二阶段模式，全面统一为**扁平三参数/双参数条件 API**：
-
-#### 迁移对照示例：
-
-```java
-// ❌ 旧版模式（已彻底移除，编译不通过）：
-orm.select(Student.class)
-    .where()
-    .and(s -> s.getAge()).ge(18)
-    .and(s -> s.getStudentName()).like("张%")
-    .toList();
-
-// ✅ 新版扁平模式（标准写法）：
-orm.select(Student.class)
-    .where()
-    .ge(Student::getAge, 18)
-    .like(Student::getStudentName, "张%")
-    .toList();
-
-// ✅ 新版三参数条件模式（自带布尔条件判断，告别繁琐的 if 嵌套）：
-String nameKeyword = ...;
-Integer minAge = ...;
-orm.select(Student.class)
-    .where()
-    .like(nameKeyword != null && !nameKeyword.isEmpty(), Student::getStudentName, nameKeyword + "%")
-    .ge(minAge != null, Student::getAge, minAge)
-    .toList();
-```
-
----
-
 ## 核心特性一览
 
 - ⚡ **高性能批量操作引擎（Batch Engine）**：参考 EasyQuery，原生支持 `insertBatch`、`updateBatch`、`deleteBatch`、`deleteByIds`，支持 `batchSize(n)` 批量分块切分，支持多值 VALUES 批量构造与 JDBC `addBatch()` 双模式，自动识别并分发到对应物理分库分表节点，支持主键安全回填与批量乐观锁。
