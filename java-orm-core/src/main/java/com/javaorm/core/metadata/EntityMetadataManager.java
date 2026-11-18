@@ -139,15 +139,7 @@ public class EntityMetadataManager {
 
     private static boolean hasValueObjectAnnotation(Field field, Class<?> clazz, String propName) {
         Method getter = findGetter(clazz, propName, field.getType());
-        Annotation[] annotations = collectAnnotations(field, getter);
-        for (Annotation ann : annotations) {
-            if (ann instanceof JoValueObject) return true;
-            String name = ann.annotationType().getName();
-            if (name.endsWith(".JoValueObject") || name.endsWith(".ValueObject") || name.endsWith(".Embedded")) {
-                return true;
-            }
-        }
-        return false;
+        return com.javaorm.core.bridge.MetadataBridgeRegistry.resolveValueObject(clazz, field, getter);
     }
 
     public static void clearCache() {
@@ -165,24 +157,10 @@ public class EntityMetadataManager {
         metadata.setBeanCreator(LambdaFactory.createConstructor(clazz));
         NameConversion nameConversion = config.getNameConversion();
 
-        // 1. 解析表名（优先 @JoTable，亦兼容 JPA 的 @Table）
-        String tableName = null;
-        String schema = null;
-        for (Annotation ann : clazz.getAnnotations()) {
-            String annName = ann.annotationType().getName();
-            if (ann instanceof JoTable) {
-                JoTable t = (JoTable) ann;
-                if (!t.value().isEmpty()) tableName = t.value();
-                else if (!t.name().isEmpty()) tableName = t.name();
-                if (!t.schema().isEmpty()) schema = t.schema();
-            } else if (annName.endsWith(".JoTable") || annName.endsWith(".Table")) {
-                tableName = getAnnotationString(ann, "value");
-                if (tableName == null || tableName.isEmpty()) {
-                    tableName = getAnnotationString(ann, "name");
-                }
-                schema = getAnnotationString(ann, "schema");
-            }
-        }
+        // 1. 从支持列表中解析表名与 Schema（优先 @JoTable，亦兼容第三方桥接与 JPA）
+        com.javaorm.core.bridge.TableInfo tableInfo = com.javaorm.core.bridge.MetadataBridgeRegistry.resolveTable(clazz);
+        String tableName = tableInfo != null ? tableInfo.getTableName() : null;
+        String schema = tableInfo != null ? tableInfo.getSchema() : null;
         if (tableName == null || tableName.isEmpty()) {
             tableName = nameConversion.convertTableName(clazz.getSimpleName());
         }
@@ -405,68 +383,48 @@ public class EntityMetadataManager {
         String colName = null;
         boolean isPk = "id".equalsIgnoreCase(field.getName());
 
-        for (Annotation ann : annotations) {
-            String name = ann.annotationType().getName();
-            if (ann instanceof JoColumn) {
-                JoColumn c = (JoColumn) ann;
-                if (!c.value().isEmpty()) colName = c.value();
-                else if (!c.name().isEmpty()) colName = c.name();
-                if (c.primaryKey()) isPk = true;
-                if (c.ignore()) col.setIgnored(true);
-            } else if (name.endsWith(".JoColumn") || name.endsWith(".Column")) {
-                String n = getAnnotationString(ann, "value");
-                if (n == null || n.isEmpty()) {
-                    n = getAnnotationString(ann, "name");
-                }
-                if (n != null && !n.isEmpty()) colName = n;
-            } else if (ann instanceof JoId || name.endsWith(".JoId") || name.endsWith(".Id")) {
+        // 从支持列表中按优先级提取列信息并去重合并
+        com.javaorm.core.bridge.ColumnInfo colInfo = com.javaorm.core.bridge.MetadataBridgeRegistry.resolveColumn(clazz, field, getter);
+        if (colInfo != null) {
+            if (colInfo.getColumnName() != null && !colInfo.getColumnName().isEmpty()) {
+                colName = colInfo.getColumnName();
+            }
+            if (Boolean.TRUE.equals(colInfo.getPrimaryKey())) {
                 isPk = true;
-            } else if (ann instanceof JoGeneratedValue) {
-                JoGeneratedValue gv = (JoGeneratedValue) ann;
+            }
+            if (Boolean.TRUE.equals(colInfo.getIgnored())) {
+                col.setIgnored(true);
+            }
+            if (Boolean.TRUE.equals(colInfo.getGenerated())) {
                 col.setGenerated(true);
-                col.setGenerationType(gv.strategy());
-            } else if (name.endsWith(".JoGeneratedValue") || name.endsWith(".GeneratedValue")) {
-                col.setGenerated(true);
-            } else if (ann instanceof JoLogicDelete) {
-                JoLogicDelete ld = (JoLogicDelete) ann;
+                if (colInfo.getGenerationType() != null) {
+                    col.setGenerationType(colInfo.getGenerationType());
+                }
+            }
+            if (Boolean.TRUE.equals(colInfo.getVersion())) {
+                col.setVersion(true);
+            }
+            if (Boolean.TRUE.equals(colInfo.getLogicDelete())) {
                 col.setLogicDelete(true);
-                String norm = !ld.value().isEmpty() ? ld.value() : ld.normalValue();
-                String del = !ld.delval().isEmpty() ? ld.delval() : ld.deletedValue();
+                Object norm = colInfo.getLogicDeleteNormalValue() != null ? colInfo.getLogicDeleteNormalValue() : (config != null ? config.getDefaultLogicDeleteNormalValue() : 0);
+                Object del = colInfo.getLogicDeleteDeletedValue() != null ? colInfo.getLogicDeleteDeletedValue() : (config != null ? config.getDefaultLogicDeleteDeletedValue() : 1);
                 col.setLogicDeleteNormalValue(norm);
                 col.setLogicDeleteDeletedValue(del);
-            } else if (ann instanceof JoTenantId) {
+            }
+            if (Boolean.TRUE.equals(colInfo.getTenant())) {
                 col.setTenant(true);
-            } else if (ann instanceof JoAutoFill) {
-                JoAutoFill af = (JoAutoFill) ann;
-                col.setAutoFill(true);
-                AutoFillType fillType = af.fillType() != AutoFillType.INSERT ? af.fillType() : af.value();
-                col.setAutoFillType(fillType);
-            } else if (ann instanceof com.javaorm.core.annotation.JoConverter) {
-                Class<? extends com.javaorm.core.converter.ValueConverter<?, ?>> convCls = ((com.javaorm.core.annotation.JoConverter) ann).value();
-                try {
-                    col.setConverter(convCls.getDeclaredConstructor().newInstance());
-                } catch (Exception e) {
-                    throw new RuntimeException("Failed to instantiate ValueConverter: " + convCls.getName(), e);
-                }
-            } else if (ann instanceof com.javaorm.core.annotation.JoEncrypt) {
-                Class<? extends com.javaorm.core.converter.EncryptionStrategy> stratCls = ((com.javaorm.core.annotation.JoEncrypt) ann).value();
-                try {
-                    com.javaorm.core.converter.EncryptionStrategy strat = stratCls.getDeclaredConstructor().newInstance();
-                    col.setConverter(new com.javaorm.core.converter.EncryptionValueConverter(strat));
-                } catch (Exception e) {
-                    throw new RuntimeException("Failed to instantiate EncryptionStrategy: " + stratCls.getName(), e);
-                }
-            } else if (ann instanceof com.javaorm.core.annotation.JoJson) {
-                com.javaorm.core.annotation.JoJson jj = (com.javaorm.core.annotation.JoJson) ann;
-                col.setConverter(new com.javaorm.core.converter.JsonValueConverter(jj.provider()));
-            } else if (ann instanceof com.javaorm.core.annotation.JoEnum) {
-                com.javaorm.core.annotation.JoEnum je = (com.javaorm.core.annotation.JoEnum) ann;
-                if (field.getType().isEnum()) {
-                    com.javaorm.core.converter.EnumMetadata em = com.javaorm.core.converter.EnumMetadataManager.getMetadata(field.getType(), je);
-                    col.setConverter(new com.javaorm.core.converter.EnumConverter(em));
-                }
-            } else if (ann instanceof com.javaorm.core.sharding.JoShardingKey || name.endsWith(".JoShardingKey") || name.endsWith(".ShardingKey") || name.endsWith(".ShardingProperty")) {
+            }
+            if (Boolean.TRUE.equals(colInfo.getShardingKey())) {
                 col.setShardingKey(true);
+            }
+            if (Boolean.TRUE.equals(colInfo.getAutoFill())) {
+                col.setAutoFill(true);
+                if (colInfo.getAutoFillType() != null) {
+                    col.setAutoFillType(colInfo.getAutoFillType());
+                }
+            }
+            if (colInfo.getConverter() != null) {
+                col.setConverter(colInfo.getConverter());
             }
         }
 
@@ -515,6 +473,10 @@ public class EntityMetadataManager {
 
     public static boolean hasEntityAnnotation(Class<?> clazz) {
         if (clazz == null || clazz.isPrimitive() || clazz.getName().startsWith("java.")) return false;
+        com.javaorm.core.bridge.TableInfo tableInfo = com.javaorm.core.bridge.MetadataBridgeRegistry.resolveTable(clazz);
+        if (tableInfo != null && tableInfo.getTableName() != null && !tableInfo.getTableName().isEmpty()) {
+            return true;
+        }
         for (Annotation ann : clazz.getAnnotations()) {
             String name = ann.annotationType().getName();
             if (name.endsWith(".Entity") || name.endsWith(".Table") || name.endsWith(".JoTable") || ann instanceof JoTable) {

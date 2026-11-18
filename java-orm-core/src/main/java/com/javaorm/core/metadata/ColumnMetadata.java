@@ -15,6 +15,7 @@ public class ColumnMetadata {
     private boolean logicDelete;
     private Object logicDeleteNormalValue;
     private Object logicDeleteDeletedValue;
+    private boolean version;
     private boolean tenant;
     private boolean shardingKey;
     private boolean autoFill;
@@ -367,6 +368,14 @@ public class ColumnMetadata {
 
     public void setLogicDeleteDeletedValue(Object logicDeleteDeletedValue) {
         this.logicDeleteDeletedValue = logicDeleteDeletedValue;
+    }
+
+    public boolean isVersion() {
+        return version;
+    }
+
+    public void setVersion(boolean version) {
+        this.version = version;
     }
 
     public boolean isTenant() {

@@ -14,6 +14,7 @@ public class EntityMetadata {
     private final Map<String, RelationMetadata> relations = new LinkedHashMap<>();
     private ColumnMetadata logicDeleteColumn;
     private ColumnMetadata tenantColumn;
+    private ColumnMetadata versionColumn;
 
     public EntityMetadata(Class<?> entityClass) {
         this.entityClass = entityClass;
@@ -36,6 +37,17 @@ public class EntityMetadata {
         if (column.isShardingKey()) {
             this.shardingColumn = column;
         }
+        if (column.isVersion()) {
+            this.versionColumn = column;
+        }
+    }
+
+    public ColumnMetadata getVersionColumn() {
+        return versionColumn;
+    }
+
+    public boolean hasVersion() {
+        return versionColumn != null;
     }
 
     public void addRelation(RelationMetadata relation) {

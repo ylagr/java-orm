@@ -7,19 +7,73 @@
 
 > **Java-ORM** 是一个面向 Java 8+ 的轻量级现代关系型数据库 ORM 框架。
 > 它借鉴了 **Easy-Query** 的设计哲学，但**彻底摒弃了编译期 APT（代码生成器）技术**。
-> 通过基于 **ByteBuddy 的运行时代理调用录制（Invocation Recording）**，实现了类似 `s.getTeacher().getAge()` 的多级级联字段感知、编译期类型安全与纯粹的 SQL 链式流，实体保持纯净 POJO（`@Column` 完全可选）。
+> 通过基于 **ByteBuddy 的运行时代理调用录制（Invocation Recording）**，实现了类似 `s.getTeacher().getAge()` 的多级级联字段感知、编译期类型安全与纯粹的 SQL 链式流，实体保持纯净 POJO。
 
 ---
 
-## 核心特性
+## 📢 重要更新与 API 变动说明（Breaking Changes）
 
+### 移除特性：废弃旧版二阶段 `.and(column).op(val)` 模式
+
+在早期版本中，条件构建采用两阶段调用（先 `.and(column)` 再 `.eq(val)`）。为了提供更紧凑流畅的开发体验，并原生支持动态条件判断，框架已**彻底移除**二阶段模式，全面统一为**扁平三参数/双参数条件 API**：
+
+#### 迁移对照示例：
+
+```java
+// ❌ 旧版模式（已彻底移除，编译不通过）：
+orm.select(Student.class)
+    .where()
+    .and(s -> s.getAge()).ge(18)
+    .and(s -> s.getStudentName()).like("张%")
+    .toList();
+
+// ✅ 新版扁平模式（标准写法）：
+orm.select(Student.class)
+    .where()
+    .ge(Student::getAge, 18)
+    .like(Student::getStudentName, "张%")
+    .toList();
+
+// ✅ 新版三参数条件模式（自带布尔条件判断，告别繁琐的 if 嵌套）：
+String nameKeyword = ...;
+Integer minAge = ...;
+orm.select(Student.class)
+    .where()
+    .like(nameKeyword != null && !nameKeyword.isEmpty(), Student::getStudentName, nameKeyword + "%")
+    .ge(minAge != null, Student::getAge, minAge)
+    .toList();
+```
+
+---
+
+## 核心特性一览
+
+- ⚡ **高性能批量操作引擎（Batch Engine）**：参考 EasyQuery，原生支持 `insertBatch`、`updateBatch`、`deleteBatch`、`deleteByIds`，支持 `batchSize(n)` 批量分块切分，支持多值 VALUES 批量构造与 JDBC `addBatch()` 双模式，自动识别并分发到对应物理分库分表节点，支持主键安全回填与批量乐观锁。
+- 🛡️ **多级乐观锁机制（Optimistic Locking）**：内置 `@JoVersion`，更新自动带上 `WHERE version = ?` 并递增 `version + 1`，并发冲突自动抛出强类型 `OptimisticLockException`。
+- 🌉 **多框架无缝桥接模块（java-orm-bridge）**：
+  - **注解支持列表动态获取与去重合并**：基于 SPI 动态加载外部元数据，核心模块零硬编码。引入桥接包后，同时支持 **MyBatis-Plus**（`@TableName`, `@TableId`, `@TableField`, `@Version`, `@TableLogic`）、**EasyQuery**（`@Table`, `@Column`, `@Version`, `@LogicDelete` 等）、**JPA**（`@Table`, `@Id`, `@Column`, `@Version`）等注解，多注解并存时按优先级智能去重合并为一个属性。
+  - **MyBatis 深度执行器集成**：提供 `MyBatisSqlExecutor` 与 `JavaOrmMyBatisSupport`，Java-ORM 的流式 DSL 直接运行在 MyBatis 的 `SqlSession` / Spring 事务管理上下文中！
 - 🚀 **零 APT 编译依赖**：无需在 `pom.xml` 中配置任何 annotation processor，无须生成 `QUser` 或 `UserProxy` 冗余代码，代码随写随测，实体即改即用。
-- 🔍 **多级字段感知与 IDE 原生重构**：直接写 `s -> s.getTeacher().getAge()`，IDE 自动补全字段，字段重命名时全局安全重构。
-- 🌊 **纯粹贴近 SQL 的链式流**：抛弃繁琐难看的 `$(...)` 包裹语法，操作符直接跟在字段后面：`.where().and(s -> s.getAge()).ge(18).and(s -> s.getTeacher().getAge()).gt(30)`。
-- 🔗 **智能导航与多表自动 JOIN**：在条件或排序列中点号调用外键关联实体属性，框架自动基于 JPA / 外键约定生成对应表的 `LEFT JOIN`。
+- 🔍 **多级字段感知与 IDE 原生重构**：直接写 `s -> s.getTeacher().getAge()` 或 `Student::getAge`，IDE 原生自动补全字段，重命名时全局安全重构。
+- 🌊 **扁平流畅的 SQL 条件流**：支持 `where().eq([condition, ]column, value)`，自带布尔判断参数，无需繁复的 `if` 拼接。
+- 🔗 **智能导航与多表自动 JOIN**：在条件或排序列中点号调用外键关联实体属性，框架自动基于外键关系生成对应的 `LEFT JOIN`。
 - 📦 **高性能 Split/Batch IN 装配（Include）**：一对一/多对一/一对多关系通过 `.include()` 显式批量加载（IN 查询），从根源杜绝 SQL 笛卡尔积膨胀与分页失效问题。
-- 🏷️ **极低侵入性（@Column 完全可选）**：预设全局 `NameConversion` 策略（默认驼峰转下划线），标准 POJO 无需任何额外标记即可映射数据表。
-- 🛡️ **无感逻辑删除与多租户隔离**：标记 `@LogicDelete` 或 `@TenantId`，系统过滤与用户过滤分开建 AST，所有查询、JOIN、Include 及更新/删除操作自动受逻辑删除与租户隔离保护，即使顶层使用 `OR` 条件也无法绕过系统边界。
+- 🔄 **值转换器体系（ValueConverter）**：统一单层转换架构，支持属性级 `@JoColumn(converter = ...)` 以及全局自动匹配 `AutoValueConverter`。
+- 🎯 **高性能枚举支持（@JoEnumValue & JoEnum）**：
+  - 实体/枚举属性标注 `@JoEnumValue` 即可自动完成 Code/Name 双向映射。
+  - 支持实现 `JoEnum` 接口。
+  - 内置零反射快速查找缓存，O(1) 时间复杂度完成装配。
+- 🔒 **字段级敏感数据加密（@JoEncrypt）**：内置标准 AES-CBC/Base64 加密策略基类，落库自动加密，入库/查询反序列化自动解密。
+- 📄 **开箱即用 JSON 字段（@JoJson）**：
+  - 零配置自动通过 SPI 探测 classpath 上的 JSON 库（Jackson、Fastjson2、Gson）。
+  - 保留并解析 `java.lang.reflect.Type` 完整泛型，彻底解决 `List<MyVo>` 反序列化泛型擦除难题。
+- 🧩 **DDD 扁平值对象（ValueObject）**：实体中通过 `@JoEmbedded` 嵌入值对象，数据库单表平铺展开存储，支持多层嵌套 VO 与 DDD 优雅 null 回填策略。
+- 🌐 **分库分表与多数据源（Unified Sharding）**：
+  - 单一类注解 `@JoSharding` 统辖分库与分表（支持静态从库、动态分库、动态分表、全表扫描防护 `allowFullScan`）。
+  - 单一字段注解 `@JoShardingKey` 驱动库表路由；未标注时**自动回退 `@JoId`** 缺省作为分片键。
+  - 多数据源管理器 `DataSourceManager` 与线程级切库上下文 `DataSourceContext`。
+  - 笛卡尔积执行引擎：支持单库单表直接下推与多库多表广播/内存归并聚合。
+- 🔌 **底层执行器解耦（SqlExecutor SPI）**：分片在 `SqlExecutor` 之前执行，底层无缝解耦并可插拔替换为原生 JDBC、MyBatis、Spring 等执行引擎。
 - ☕ **向下兼容 Java 8**：基线面向 Java 8，无缝向上兼容运行于 Java 11 / 17 / 21 / 25。
 
 ---
@@ -36,16 +90,17 @@
 </dependency>
 ```
 
-### 2. 实体定义（无需生成任何代理代码）
+### 2. 实体定义
 
 ```java
 import com.javaorm.core.annotation.*;
+import com.javaorm.core.sharding.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Table(name = "t_teacher")
+@JoTable(name = "t_teacher")
 public class Teacher {
-    @Id
+    @JoId
     private Long id;
     
     private String teacherName; // 自动映射为 teacher_name
@@ -57,9 +112,9 @@ public class Teacher {
     // Getter / Setter ...
 }
 
-@Table(name = "t_student")
+@JoTable(name = "t_student")
 public class Student {
-    @Id
+    @JoId
     private Long id;
 
     private String studentName; // 自动映射为 student_name
@@ -68,7 +123,7 @@ public class Student {
 
     private Teacher teacher; // 多对一关联（默认匹配 teacherId -> Teacher.id）
 
-    @LogicDelete(normalValue = "0", deletedValue = "1")
+    @JoLogicDelete(normalValue = "0", deletedValue = "1")
     private Integer isDeleted;
 
     private LocalDateTime createTime;
@@ -93,33 +148,35 @@ JavaOrm orm = JavaOrm.create(dataSource);
 ```java
 List<Student> list = orm.select(Student.class)
     .where()
-        .and(s -> s.getAge()).ge(18)
-        .and(s -> s.getStudentName()).like("张%")
-    .orderBy(s -> s.getAge()).desc()
+        .ge(Student::getAge, 18)
+        .like(Student::getStudentName, "张%")
+    .orderBy(Student::getAge).desc()
     .page(1, 10)
-    .list();
+    .toList();
 ```
 
-### 2. 级联导航字段过滤（自动隐式 LEFT JOIN）
+### 2. 动态条件过滤（三参数布尔开关）
+
+```java
+String searchName = "张";
+Integer minAge = 20;
+
+List<Student> list = orm.select(Student.class)
+    .where()
+        .like(searchName != null, Student::getStudentName, searchName + "%")
+        .ge(minAge != null, Student::getAge, minAge)
+    .toList();
+```
+
+### 3. 级联导航字段过滤（自动隐式 LEFT JOIN）
 
 直接点出两层实体关系，框架自动根据外键生成 `LEFT JOIN t_teacher t1 ON t0.teacher_id = t1.id`：
 
 ```java
 List<Student> students = orm.select(Student.class)
     .where()
-        .and(s -> s.getTeacher().getAge()).gt(35)
-    .list();
-```
-
-### 3. 关联作用域子块（whereRelation）
-
-```java
-List<Student> students = orm.select(Student.class)
-    .whereRelation(s -> s.getTeacher(), t -> t
-        .where()
-            .and(Teacher::getTitle).eq("教授")
-    )
-    .list();
+        .gt(s -> s.getTeacher().getAge(), 35)
+    .toList();
 ```
 
 ### 4. 关联数据装配（Include 模式，避免笛卡尔积）
@@ -127,15 +184,15 @@ List<Student> students = orm.select(Student.class)
 ```java
 // 多对一：查出学生，并装配每个学生的指导老师对象
 List<Student> students = orm.select(Student.class)
-    .include(s -> s.getTeacher())
+    .include(Student::getTeacher)
     .where()
-        .and(s -> s.getAge()).ge(18)
-    .list();
+        .ge(Student::getAge, 18)
+    .toList();
 
-// 一对多：查出老师，并装配名下的所有学生集合 List<Student>
+// 一对多：查出老师，并批量装配名下的学生集合 List<Student>
 List<Teacher> teachers = orm.select(Teacher.class)
-    .include(t -> t.getStudents())
-    .list();
+    .include(Teacher::getStudents)
+    .toList();
 ```
 
 ### 5. 增删改（CUD 操作）
@@ -151,352 +208,196 @@ orm.insert(s);
 s.setAge(21);
 orm.update(s);
 
-// 实体级删除（标有 @LogicDelete 则自动执行 UPDATE is_deleted = 1）
+// 实体级删除（标有 @JoLogicDelete 则自动执行 UPDATE is_deleted = 1）
 orm.delete(s);
 
 // 纯 SQL 批量流式条件更新（支持直接代理属性、自增/自减计算与表达式）
-Student s = orm.proxy(Student.class);
 orm.update(Student.class)
-    .set(s.getAge(), increment(1))   // 原地自增 age = age + 1
-    .set(s.getStudentName(), "新名字")
+    .set(Student::getAge, increment(1))   // 原地自增 age = age + 1
+    .set(Student::getStudentName, "新名字")
     .where()
-        .and(s.getStudentName()).eq("王大锤")
-        .andGroup((w, stu) -> {     // 无需外部 proxy，直接注入 (w, stu)
-            w.and(stu.getAge()).ge(18);
-            w.or(stu.getAge()).isNull();
-        })
+        .eq(Student::getStudentName, "王大锤")
     .execute();
 
-// 纯 SQL 批量流式条件删除（有 @LogicDelete 自动转逻辑删除）
+// 纯 SQL 条件删除（有 @JoLogicDelete 自动转逻辑删除）
 orm.delete(Student.class)
     .where()
-        .and(s.getAge()).lt(10)
+        .lt(Student::getAge, 10)
     .execute();
 ```
 
 ---
 
-## 高级 SQL 特性支持
+## 高级特性
 
-### 1. SQL 函数与 Group By / Having
-
-支持 `count`、`sum`、`avg`、`min`、`max`、`length` 等标准 SQL 函数，并可直接在投影、`where`、`having` 中使用：
+### 1. 枚举与转换器（@JoEnumValue / ValueConverter）
 
 ```java
-import static com.javaorm.core.SQL.*;
+public enum Gender implements JoEnum<Integer> {
+    MALE(1, "男"),
+    FEMALE(2, "女");
 
-Student s = orm.proxy(Student.class);
+    @JoEnumValue // 标明数据库存储该字段的值
+    private final int code;
+    private final String desc;
 
-// 自定义投影 + GROUP BY + HAVING
-List<Map<String, Object>> list = orm.select(count(s.getId()).as("total"), s.getTeacherId())
-    .from(Student.class)
-    .groupBy(s.getTeacherId())
-    .having()
-        .and(count(s.getId())).ge(2)
-    .orderBy(s.getTeacherId()).asc()
-    .listMaps();
+    @Override
+    public Integer getValue() { return code; }
+    // ...
+}
+
+@JoTable(name = "t_user")
+public class User {
+    @JoId private Long id;
+    private Gender gender; // 零配置，自动以 code(1/2) 存入数据库，查询自动反序列化为枚举
+}
 ```
 
-### 2. DTO 投影模式
-
-支持直接映射到业务 DTO（自动驼峰/下划线字段映射与类型转换）：
+### 2. JSON 字段自动映射（@JoJson）
 
 ```java
-// 方式 A：orm.select(DTO.class).from(Entity.class).select(...)
-List<StatDto> dtoListA = orm.select(StatDto.class)
-    .from(Student.class)
-    .select(count(s.getId()).as("total"), s.getTeacherId(), avg(s.getAge()).as("avgAge"))
-    .groupBy(s.getTeacherId())
-    .having()
-        .and(count(s.getId())).ge(2)
-    .list();
+@JoTable(name = "t_user")
+public class User {
+    @JoId private Long id;
 
-// 方式 B：orm.select(DTO.class, expr1, expr2...).from(Entity.class)
-List<StatDto> dtoListB = orm.select(StatDto.class, count(s.getId()).as("total"), s.getTeacherId())
-    .from(Student.class)
-    .groupBy(s.getTeacherId())
-    .list();
+    @JoJson // 自动使用 classpath 上的 Jackson/Fastjson2/Gson 进行序列化与反序列化
+    private List<AddressVo> addressList; // 完美保留泛型，绝不沦为 List<Map>
+}
 ```
 
-### 3. 子查询与 EXISTS
-
-支持类型安全的 IN 子查询与相关联 EXISTS 语法：
+### 3. 字段敏感加密（@JoEncrypt）
 
 ```java
-Student s = orm.proxy(Student.class);
-Teacher t = orm.proxy(Teacher.class);
+@JoTable(name = "t_user")
+public class User {
+    @JoId private Long id;
 
-// 3.1 IN 子查询
-List<Student> students = orm.select(Student.class)
-    .where()
-        .and(s.getTeacherId()).in(
-            orm.select(t.getId())
-               .from(Teacher.class)
-               .where()
-                   .and(t.getAge()).gt(40)
-        )
-    .list();
-
-// 3.2 EXISTS 关联子查询
-List<Student> existsStudents = orm.select(Student.class)
-    .where()
-        .andExists(
-            orm.select(t.getId())
-               .from(Teacher.class)
-               .where()
-                   .and(t.getId()).eq(s.getTeacherId())
-                   .and(t.getTitle()).eq("讲师")
-        )
-    .list();
+    @JoEncrypt(MyAesStrategy.class) // 落库自动 AES-CBC 加密，出库自动解密
+    private String idCard;
+}
 ```
 
-### 4. UNION / UNION ALL
+### 4. DDD 扁平值对象（ValueObject）
 
 ```java
-List<Map<String, Object>> unionResult = orm.select(s.getStudentName())
-    .from(Student.class)
-    .where()
-        .and(s.getAge()).le(20)
-    .union(
-        orm.select(s.getStudentName())
-           .from(Student.class)
-           .where()
-               .and(s.getAge()).ge(22)
-    )
-    .listMaps();
+@JoEmbeddable
+public class Address {
+    private String province;
+    private String city;
+    // ...
+}
+
+@JoTable(name = "t_user")
+public class User {
+    @JoId private Long id;
+
+    @JoEmbedded // 字段自动平铺映射至 t_user 表的 province, city 列
+    private Address address;
+}
 ```
 
-### 5. 开窗函数 (Window Functions)
-
-支持 SQL 标准及 Oracle 全量开窗函数，通过链式 `.over().partitionBy(...).orderBy(...).rowsBetween(...)` 构建：
+### 5. 分库分表与多数据源（Unified Sharding）
 
 ```java
-Student s = orm.proxy(Student.class);
+// 既分库又分表：按 tradeId % 2 路由数据源(ds_0/ds_1)，按 tradeId % 4 路由物理表(t_trade_0..3)
+// 若省略 @JoShardingKey，默认使用 @JoId 主键字段作为分片键
+@JoSharding(
+    dataSourceRouter = ModDataSourceRouter.class,
+    tableRouter = ModTableRouter.class,
+    allowFullScan = false // 安全开关：禁止无分片键的全库全表扫描
+)
+@JoTable(name = "t_trade")
+public class Trade {
+    @JoId private Long id;
+    @JoShardingKey private Long tradeId;
+    private Double amount;
+}
 
-// 1. 排名开窗函数：ROW_NUMBER, RANK, DENSE_RANK, NTILE, PERCENT_RANK, CUME_DIST
-List<Map<String, Object>> rankList = orm.select(Student.class).select(
-    s.getId(),
-    s.getStudentName(),
-    s.getAge(),
-    rowNumber().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rn"),
-    rank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rk"),
-    denseRank().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("drk"),
-    ntile(3).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("nt")
-).maps();
+// 统一 Fluent 查询：根据 tradeId 自动定位物理库和物理表
+Trade trade = orm.select(Trade.class)
+    .where().eq(Trade::getTradeId, 200L)
+    .firstOrNull();
 
-// 2. 取值/位移开窗函数：LEAD, LAG, FIRST_VALUE, LAST_VALUE, NTH_VALUE
-List<Map<String, Object>> navList = orm.select(Student.class).select(
-    s.getId(),
-    s.getAge(),
-    lead(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("next_age"),
-    lag(s.getAge(), 1, 0).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("prev_age"),
-    firstValue(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("first_age")
-).maps();
-
-// 3. 聚合开窗与滑动窗口 (ROWS BETWEEN)
-List<Map<String, Object>> aggList = orm.select(Student.class).select(
-    s.getId(),
-    s.getAge(),
-    sum(s.getAge()).over().partitionBy(s.getTeacherId()).as("dept_sum"),
-    // 累计求和: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-    sum(s.getAge()).over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().rowsUnboundedPreceding().as("running_sum"),
-    // 全表开窗统计
-    count().over().as("grand_count")
-).maps();
-
-// 4. 自动装配到 DTO
-List<StudentWindowDto> dtoList = orm.select(StudentWindowDto.class).from(Student.class).select(
-    s.getId(),
-    s.getStudentName(),
-    rowNumber().over().partitionBy(s.getTeacherId()).orderBy(s.getAge()).asc().as("rowNum"),
-    sum(s.getAge()).over().partitionBy(s.getTeacherId()).as("sumAge")
-).list();
-```
-
-### 6. 多数据库方言支持与 Oracle 11g / 12c+
-
-支持主流数据库方言切换：`MySQLDialect`, `PostgreSQLDialect`, `OracleDialect`, `Oracle11Dialect`, `SQLiteDialect`, `H2Dialect`。
-
-针对 Oracle 提供两套专属方言支持：
-- **Oracle 12c+ (`OracleDialect`)**：严格遵循 Oracle 双引号标识符转义，原生 ANSI 分页（`OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`）。
-- **Oracle 11g (`Oracle11Dialect`)**：自动适配经典 ROWNUM 三层/两层嵌套分页算法，完美兼容老旧 Oracle 11g 数据库环境：
-  - 单 limit / offset=0 时：两层嵌套 `SELECT * FROM ( ... ) WHERE ROWNUM <= ?`
-  - 带有 offset + limit 时：三层嵌套 `SELECT * FROM (SELECT tt.*, ROWNUM AS "row_num" FROM ( ... ) tt WHERE ROWNUM <= ?) WHERE "row_num" > ?`
-- 无表虚拟查询自动注入 `FROM DUAL`。
-- 函数智能映射：`NOW()` -> `SYSDATE`，`IFNULL()` -> `NVL()`，`CONCAT()` -> `||`，`SUBSTRING()` -> `SUBSTR()`。
-
-```java
-// 初始化 Oracle 11g 方言 ORM 客户端（亦可通过 JDBC 元数据自动侦测识别）
-JavaOrm orm = JavaOrm.create(dataSource, new Oracle11Dialect());
-
-// 原生支持 Oracle 11g ROWNUM 嵌套链式分页
-List<Student> pageStudents = orm.select(Student.class)
-    .orderBy(s.getId()).asc()
-    .page(1, 10)
-    .list();
-```
-
-### 7. 原地更新与自增算术表达式 (UPDATE / DELETE)
-
-```java
-// 7.1 原地自增/自减更新: age = age + 1, age = age - 5, age = age * 2
-orm.update(Student.class)
-    .set(s.getAge(), increment(1))
-    .where()
-        .and(s.getId()).eq(1L)
-    .execute();
-
-// 7.2 双参数作用域条件更新与删除: (w, s)
-orm.update(Student.class)
-    .set(s.getAge(), 20)
-    .where((w, s) -> w.and(s.getAge()).lt(18))
-    .execute();
-
-orm.delete(Student.class)
-    .where((w, s) -> w.and(s.getAge()).ge(60))
-    .execute();
-```
-
-### 8. 动态列名与安全边界 (Dynamic Syntax & Security Boundary)
-
-除了强类型代理方式外，框架支持纯字符串传参（动态列名、表别名），适用于动态报表与前端条件映射：
-
-- **白名单与标识符安全校验**：动态列名通过实体元数据白名单与 SQL 标识符格式校验（`[a-zA-Z_][a-zA-Z0-9_]*`），严密阻断 SQL 注入；方言层对标识符内的引号定界符进行严格转义（如 MySQL 双写反引号、ANSI 双写双引号）。
-- **信任边界分明**：动态字段 API 与 Raw SQL API 严格区分。对于任意复杂 SQL 片段或自定义表达式，使用 `andRaw(...)` / `orRaw(...)`。
-
-```java
-// 1. 动态安全列名与原生 Raw SQL
-orm.select(Student.class)
-    .where()
-        .and("age").ge(18)
-        .and("student_name").like("张%")
-        .andRaw("status IN (?, ?)", 1, 2)
-    .list();
-
-// 2. 动态投影选择 (支持别名映射)
-List<Map<String, Object>> dynamicCols = orm.select(Student.class)
-    .select("id", "student_name as name", "age")
-    .where()
-        .and("age").gt(20)
-    .groupBy("age")
-    .orderBy("age").desc()
-    .maps();
-
-// 3. 动态更新与删除
-orm.update(Student.class)
-    .set("student_name", "动态李四")
-    .set("age", 22)
-    .where()
-        .and("id").eq(1L)
-    .execute();
-
-orm.delete(Student.class)
-    .where()
-        .and("age").le(10)
-    .execute();
-```
-
-### 9. 随时获取当前 SQL 与链式 SQL 打印 (toSql & printSql)
-
-#### 随时获取当前 SQL (`toSql()`, `toSqlAndParams()`)
-在流式链调用的任何阶段（`SelectBuilder`, `WhereBuilder`, `UpdateBuilder`, `DeleteBuilder`, `DtoQuery` 等），均可无损输出当前装配的 SQL 和参数，亦可直接调用 `toString()` 查看：
-
-```java
-// 任意链式阶段直接获取当前 SQL 和参数
-String sql = orm.select(Student.class).where().and(s.getAge()).ge(18).toSql();
-SqlAndParams sp = orm.select(Student.class).where().and(s.getAge()).ge(18).toSqlAndParams();
-System.out.println("SQL: " + sp.getSql());
-System.out.println("Params: " + sp.getParams());
-
-// toString() 亦等价于 toSql()
-System.out.println(orm.select(Student.class).where().and(s.getAge()).ge(18));
-```
-
-#### 链式 SQL 打印控制 (`printSql()`)
-- `.printSql(true)`：**无视全局配置**，本次执行强制打印当前 SQL 及其参数绑定。
-- `.printSql(false)`：本次执行强制不打印。
-- `.printSql()`：遵循当前全局配置（`config.isPrintSql()`）决定是否打印。
-
-```java
-// 链式调用控制是否打印
-List<Student> students = orm.select(Student.class)
-    .printSql(true) // 强制打印本次执行的 SQL
-    .where()
-        .and(s.getAge()).ge(18)
-    .list();
-```
-
-### 10. 事务管理与多租户隔离 (Transactions & Multi-Tenancy)
-
-#### 编程式事务
-支持 `orm.transaction(...)` 闭包，自动管理物理连接复用与 commit/rollback，异常时自动回滚：
-
-```java
-orm.transaction(tx -> {
-    Student s = new Student();
-    s.setStudentName("新学生");
-    tx.insert(s);
-
-    tx.update(Teacher.class)
-      .set(Teacher::getTitle, "资深教授")
-      .where().and(Teacher::getId).eq(1L)
-      .execute();
+// 线程级动态切库
+orm.useDataSource("ds_slave", () -> {
+    return orm.select(Report.class).toList();
 });
 ```
 
-#### Spring 事务集成
-配置 `OrmConfig.setConnectionProvider(...)` 可无缝接入 Spring `@Transactional` 或外部连接池：
+### 6. 批量操作引擎与乐观锁（参考 EasyQuery）
 
 ```java
-OrmConfig config = new OrmConfig();
-config.setConnectionProvider(ds -> org.springframework.jdbc.datasource.DataSourceUtils.getConnection(ds));
-JavaOrm orm = JavaOrm.create(dataSource, dialect, config);
+@JoTable(name = "t_product")
+public class Product {
+    @JoId private Long id;
+    private String name;
+    private Double price;
+
+    @JoVersion // 乐观锁版本号
+    private Integer version;
+}
+
+// 1. 批量插入（支持自动按 batchSize 分批分块，支持多库多分表自动分组分发）
+List<Product> products = ...;
+orm.insertBatch(products)
+    .batchSize(500)
+    .execute();
+
+// 2. 批量更新（自动递增版本号，并发冲突校验）
+for (Product p : products) {
+    p.setPrice(p.getPrice() * 1.1);
+}
+orm.updateBatch(products)
+    .batchSize(200)
+    .execute(); // 若版本号不匹配，自动抛出 OptimisticLockException
+
+// 3. 批量删除与根据 ID 列表批量删除
+orm.deleteBatch(products).execute();
+orm.deleteByIds(Product.class, Arrays.asList(1L, 2L, 3L)).batchSize(100).execute();
 ```
 
-#### 完整多租户隔离 (`@TenantId`)
-在实体字段上标注 `@TenantId`，并在请求入口设置 `TenantContext.setTenantId(...)`：
-- **SELECT / JOIN / Include**：自动在根表和关联子表注入系统级 `tenant_id = ?` 过滤。
-- **UPDATE / DELETE**：自动注入系统级租户隔离，无法跨租户更新或删除。
-- **INSERT**：未设置租户属性时自动填充当前租户 ID。
+### 7. 多框架注解桥接与 MyBatis 深度集成（java-orm-bridge）
+
+引入 `java-orm-bridge` 模块后，实体类可直接使用现有框架的注解，Java-ORM 通过 SPI 自动探测、动态提取并智能去重合并：
 
 ```java
-TenantContext.setTenantId(1001L);
-try {
-    List<Student> list = orm.select(Student.class).where().and(s -> s.getAge()).gt(18).list();
-} finally {
-    TenantContext.clear();
+// 实体完全复用 MyBatis-Plus / EasyQuery 注解，无需改造为 @Jo 注解！
+@TableName("t_mp_user")
+public class User {
+    @TableId(value = "user_id", type = IdType.AUTO)
+    private Long id;
+
+    @TableField("user_name")
+    private String name;
+
+    @com.baomidou.mybatisplus.annotation.Version // 支持 MyBatis-Plus / EasyQuery 乐观锁
+    private Integer version;
+
+    @TableLogic(value = "0", delval = "1") // 支持逻辑删除
+    private Integer deleted;
+}
+
+// 统一复用 MyBatis 的事务与连接池：
+try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
+    JavaOrm mybatisOrm = JavaOrmMyBatisSupport.from(sqlSession);
+
+    // 完全在 MyBatis 事务环境下执行流式 Java-ORM DSL！
+    mybatisOrm.insert(user);
+    List<User> list = mybatisOrm.select(User.class)
+        .where()
+        .gt(User::getAge, 18)
+        .list();
 }
 ```
 
 ---
 
-## 运行录制原理解析
-
-```
-业务代码                                  ByteBuddy 拦截器                     ThreadLocal 录制栈
-   |                                              |                                   |
-   |-- and(s -> s.getTeacher().getAge()) -------->|                                   |
-   |                                              |-- 拦截 getTeacher() ------------->| 记录: "teacher"
-   |                                              |-- 返回 Teacher 代理 ------------->|
-   |                                              |-- 拦截 teacher.getAge() --------->| 记录: "age"
-   |                                              |-- 返回默认值 (0) -----------------|
-   |<-- 返回 PropertyOperator(teacher.age) -------|                                   |
-   |                                                                                  |
-   |-- .gt(30) ----------------------------------> 构建 SQL: t1.age > 30               |
-```
-
-1. **单例代理池**：每个实体的代理子类仅在首次使用时生成一次，且实例在内存中单例复用，录制属性与全局配置彻底解耦。
-2. **纳秒级开销**：录制调用仅执行空方法拦截与 ThreadLocal 字符串记录，每次条件构建仅需数十纳秒，性能无限逼近手写 SQL。
-
----
-
 ## 开源协议与版权声明
 
-本项目基于 [Apache License 2.0](LICENSE) 协议开源，完全支持个人及企业闭源商业使用、自由分发与二次修改。
+本项目基于 [Apache License 2.0](LICENSE) 协议开源，完全支持个人及企业商业使用、自由分发与二次修改。
 
 依据 Apache 2.0 规范，商业二次分发或引用时请保留原作者的版权声明及 [NOTICE](NOTICE) 文件。
 
 - **作者 (Author)**: ssuiwp / ylagr
 - **Gitee**: [https://gitee.com/ssuiwp](https://gitee.com/ssuiwp)
 - **GitHub**: [https://github.com/ylagr](https://github.com/ylagr)
-

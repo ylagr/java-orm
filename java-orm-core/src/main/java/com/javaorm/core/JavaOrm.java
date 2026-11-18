@@ -81,6 +81,10 @@ public class JavaOrm {
         return new JavaOrm(dataSource, dialect, new OrmConfig());
     }
 
+    public static JavaOrm create(DataSource dataSource, OrmConfig config) {
+        return new JavaOrm(dataSource, null, config);
+    }
+
     public static JavaOrm create(DataSource dataSource, Dialect dialect, OrmConfig config) {
         return new JavaOrm(dataSource, dialect, config);
     }
@@ -168,6 +172,25 @@ public class JavaOrm {
      */
     public <T> SelectBuilder<T> queryable(Class<T> entityClass) {
         return select(entityClass);
+    }
+
+    /**
+     * 开启流式查询别名（等价于 select(entityClass)）
+     */
+    public <T> SelectBuilder<T> query(Class<T> entityClass) {
+        return select(entityClass);
+    }
+
+    /**
+     * 根据主键查询单条实体
+     */
+    public <T> T findById(Class<T> entityClass, Object id) {
+        if (id == null) return null;
+        com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(entityClass, config);
+        if (meta.getIdColumn() == null) {
+            throw new IllegalArgumentException("Entity " + entityClass.getName() + " does not have an ID column");
+        }
+        return select(entityClass).whereById(id).first();
     }
 
     /**
@@ -300,15 +323,18 @@ public class JavaOrm {
     }
 
     /**
-     * 批量实体插入
+     * 批量实体插入（默认分批执行，每批 500 条）
      */
     public <T> int insert(java.util.Collection<T> entities) {
         if (entities == null || entities.isEmpty()) return 0;
-        int sum = 0;
-        for (T entity : entities) {
-            sum += insert(entity);
-        }
-        return sum;
+        return insertBatch(entities).execute();
+    }
+
+    /**
+     * 开启批处理插入构建器（参考 EasyQuery，支持自定义 batchSize、多值/JDBC Batch 模式）
+     */
+    public <T> com.javaorm.core.batch.BatchInsertBuilder<T> insertBatch(java.util.Collection<T> entities) {
+        return new com.javaorm.core.batch.BatchInsertBuilder<>(env(), entities);
     }
 
     /**
@@ -330,15 +356,18 @@ public class JavaOrm {
     }
 
     /**
-     * 批量实体更新
+     * 批量实体更新（默认分批执行，支持乐观锁与分库分表）
      */
     public <T> int update(java.util.Collection<T> entities) {
         if (entities == null || entities.isEmpty()) return 0;
-        int sum = 0;
-        for (T entity : entities) {
-            sum += update(entity);
-        }
-        return sum;
+        return updateBatch(entities).execute();
+    }
+
+    /**
+     * 开启批处理更新构建器（支持自定义 batchSize、selective 配置）
+     */
+    public <T> com.javaorm.core.batch.BatchUpdateBuilder<T> updateBatch(java.util.Collection<T> entities) {
+        return new com.javaorm.core.batch.BatchUpdateBuilder<>(env(), entities);
     }
 
     /**
@@ -387,12 +416,30 @@ public class JavaOrm {
     /**
      * 实体级删除（按实体主键删除，支持逻辑删除自动重写）
      */
+    /**
+     * 实体级删除（按实体主键删除，支持逻辑删除自动重写）
+     */
     public <T> int delete(T entity) {
         try {
             return DeleteBuilder.deleteEntity(entity, env());
         } finally {
             SelectBuilder.resetAliasSeq();
         }
+    }
+
+    /**
+     * 批量实体删除
+     */
+    public <T> int delete(java.util.Collection<T> entities) {
+        if (entities == null || entities.isEmpty()) return 0;
+        return deleteBatch(entities).execute();
+    }
+
+    /**
+     * 开启批处理实体删除构建器
+     */
+    public <T> com.javaorm.core.batch.BatchDeleteBuilder<T> deleteBatch(java.util.Collection<T> entities) {
+        return new com.javaorm.core.batch.BatchDeleteBuilder<>(env(), entities);
     }
 
     /**
@@ -404,6 +451,21 @@ public class JavaOrm {
         } finally {
             SelectBuilder.resetAliasSeq();
         }
+    }
+
+    /**
+     * 批量根据主键 ID 删除
+     */
+    public <T> int deleteByIds(Class<T> entityClass, java.util.Collection<?> ids) {
+        if (ids == null || ids.isEmpty()) return 0;
+        return deleteByIdsBuilder(entityClass, ids).execute();
+    }
+
+    /**
+     * 开启批处理 ID 删除构建器
+     */
+    public <T> com.javaorm.core.batch.BatchDeleteBuilder<T> deleteByIdsBuilder(Class<T> entityClass, java.util.Collection<?> ids) {
+        return new com.javaorm.core.batch.BatchDeleteBuilder<>(env(), entityClass, ids);
     }
 
     /**
@@ -457,10 +519,6 @@ public class JavaOrm {
         return builder;
     }
 
-    public <T> int delete(java.util.Collection<T> entities) {
-        if (entities == null || entities.isEmpty()) return 0;
-        return deletable(entities).execute();
-    }
 
     public DataSource getDataSource() {
         return dataSource;

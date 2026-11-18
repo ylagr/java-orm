@@ -176,6 +176,34 @@ public class InsertBuilder<T> {
                 }
             }
 
+            // 处理乐观锁版本号初始值
+            if (col.isVersion()) {
+                Object val = col.getValue(entity);
+                if (val == null) {
+                    Class<?> propType = col.getPropertyType();
+                    if (propType == Integer.class || propType == int.class) {
+                        val = 1;
+                    } else if (propType == Long.class || propType == long.class) {
+                        val = 1L;
+                    } else if (propType == Short.class || propType == short.class) {
+                        val = (short) 1;
+                    } else if (propType == java.time.LocalDateTime.class) {
+                        val = java.time.LocalDateTime.now();
+                    } else if (propType == java.util.Date.class) {
+                        val = new java.util.Date();
+                    }
+                    col.setValue(entity, val);
+                }
+            }
+
+            // 处理逻辑删除初始值
+            if (col.isLogicDelete()) {
+                Object ldVal = col.getValue(entity);
+                if (ldVal == null && col.getLogicDeleteNormalValue() != null) {
+                    col.setValue(entity, col.getLogicDeleteNormalValue());
+                }
+            }
+
             // 自动填充日期/时间
             Object val = col.getValue(entity);
             if (val == null) {

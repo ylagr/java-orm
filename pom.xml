@@ -33,6 +33,7 @@
 
     <modules>
         <module>java-orm-core</module>
+        <module>java-orm-bridge</module>
         <module>benchmark</module>
     </modules>
 

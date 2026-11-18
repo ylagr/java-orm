@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.javaorm</groupId>
+        <artifactId>java-orm</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>java-orm-bridge</artifactId>
+    <name>java-orm-bridge</name>
+    <description>Bridge adapter for third-party ORMs (MyBatis, MyBatis-Plus, EasyQuery, JPA) annotations and execution</description>
+
+    <properties>
+        <mybatis.version>3.5.15</mybatis.version>
+        <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <easy-query.version>2.2.0</easy-query.version>
+        <jpa.version>2.2</jpa.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.javaorm</groupId>
+            <artifactId>java-orm-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- MyBatis 核心 (provided/optional) -->
+        <dependency>
+            <groupId>org.mybatis</groupId>
+            <artifactId>mybatis</artifactId>
+            <version>${mybatis.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- MyBatis-Plus 注解 (provided/optional) -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-annotation</artifactId>
+            <version>${mybatis-plus.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- EasyQuery 核心 (provided/optional) -->
+        <dependency>
+            <groupId>com.easy-query</groupId>
+            <artifactId>sql-core</artifactId>
+            <version>${easy-query.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- JPA 注解 (provided/optional) -->
+        <dependency>
+            <groupId>javax.persistence</groupId>
+            <artifactId>javax.persistence-api</artifactId>
+            <version>${jpa.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 测试依赖 -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>${h2.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

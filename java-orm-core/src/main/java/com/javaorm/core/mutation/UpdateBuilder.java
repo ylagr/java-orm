@@ -416,9 +416,16 @@ public class UpdateBuilder<T> {
         }
 
         UpdateBuilder<E> builder = new UpdateBuilder<>(env, clazz);
+        ColumnMetadata versionCol = meta.getVersionColumn();
+        Object currentVersion = null;
+        Object nextVersion = null;
+
         for (ColumnMetadata col : meta.getColumns()) {
             if (col.isPrimaryKey() || col.isIgnored()) {
                 continue;
+            }
+            if (col.isVersion()) {
+                continue; // 版本号由专门的乐观锁逻辑处理
             }
             Object val = col.getValue(entity);
             if (selective && val == null) {
@@ -427,8 +434,45 @@ public class UpdateBuilder<T> {
             builder.statement.addSet(col.getColumnName(), val);
         }
 
+        if (versionCol != null) {
+            currentVersion = versionCol.getValue(entity);
+            if (currentVersion == null) {
+                currentVersion = 1;
+            }
+            if (currentVersion instanceof Number) {
+                long cv = ((Number) currentVersion).longValue();
+                long nv = cv + 1;
+                Class<?> propType = versionCol.getPropertyType();
+                if (propType == Integer.class || propType == int.class) {
+                    nextVersion = (int) nv;
+                } else if (propType == Long.class || propType == long.class) {
+                    nextVersion = nv;
+                } else if (propType == Short.class || propType == short.class) {
+                    nextVersion = (short) nv;
+                } else {
+                    nextVersion = nv;
+                }
+            } else if (currentVersion instanceof java.time.LocalDateTime) {
+                nextVersion = java.time.LocalDateTime.now();
+            } else if (currentVersion instanceof java.util.Date) {
+                nextVersion = new java.util.Date();
+            } else {
+                nextVersion = 1;
+            }
+
+            builder.statement.addSet(versionCol.getColumnName(), nextVersion);
+            builder.statement.addWhereCondition(new BinaryCondition(null, versionCol.getColumnName(), SqlOperator.EQ, currentVersion));
+        }
+
         builder.statement.addWhereCondition(new BinaryCondition(null, meta.getIdColumn().getColumnName(), SqlOperator.EQ, idVal));
-        return builder.execute();
+        int affected = builder.execute();
+        if (versionCol != null) {
+            if (affected == 0) {
+                throw new com.javaorm.core.exception.OptimisticLockException(clazz, idVal, currentVersion);
+            }
+            versionCol.setValue(entity, nextVersion);
+        }
+        return affected;
     }
 
     private <R> PropertyPath recordPath(Function<T, R> getter) {
