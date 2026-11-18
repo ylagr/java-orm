@@ -20,6 +20,8 @@ public class SelectStatement implements Statement {
     private Integer limit;
     private Integer offset;
     private boolean distinct;
+    private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
+    private Boolean allowFullShardingScan;
 
     public SelectStatement(Class<?> rootEntityClass, String rootTableName, String rootTableAlias) {
         this.rootEntityClass = rootEntityClass;
@@ -170,5 +172,41 @@ public class SelectStatement implements Statement {
 
     public void setDistinct(boolean distinct) {
         this.distinct = distinct;
+    }
+
+    public com.javaorm.core.sharding.TableRouter<?> getShardingRouter() {
+        return shardingRouter;
+    }
+
+    public void setShardingRouter(com.javaorm.core.sharding.TableRouter<?> shardingRouter) {
+        this.shardingRouter = shardingRouter;
+    }
+
+    public Boolean getAllowFullShardingScan() {
+        return allowFullShardingScan;
+    }
+
+    public void setAllowFullShardingScan(Boolean allowFullShardingScan) {
+        this.allowFullShardingScan = allowFullShardingScan;
+    }
+
+    public SelectStatement copyWithTableName(String newTableName) {
+        SelectStatement copy = new SelectStatement(this.rootEntityClass, newTableName, this.rootTableAlias);
+        copy.selectColumns.addAll(this.selectColumns);
+        copy.projectExpressions.addAll(this.projectExpressions);
+        copy.joins.addAll(this.joins);
+        copy.systemConditions.addAll(this.systemConditions);
+        copy.whereConditions.addAll(this.whereConditions);
+        copy.groupByExpressions.addAll(this.groupByExpressions);
+        copy.havingConditions.addAll(this.havingConditions);
+        copy.orderBys.addAll(this.orderBys);
+        copy.unions.addAll(this.unions);
+        copy.ctes.addAll(this.ctes);
+        copy.limit = this.limit;
+        copy.offset = this.offset;
+        copy.distinct = this.distinct;
+        copy.shardingRouter = this.shardingRouter;
+        copy.allowFullShardingScan = this.allowFullShardingScan;
+        return copy;
     }
 }

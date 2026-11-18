@@ -37,4 +37,36 @@ public class DeleteStatement implements Statement {
     public List<Condition> getWhereConditions() {
         return whereConditions;
     }
+
+    private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
+    private Boolean allowFullShardingScan;
+
+    public void setTableName(String tableName) {
+        this.tableName = tableName;
+    }
+
+    public com.javaorm.core.sharding.TableRouter<?> getShardingRouter() {
+        return shardingRouter;
+    }
+
+    public void setShardingRouter(com.javaorm.core.sharding.TableRouter<?> shardingRouter) {
+        this.shardingRouter = shardingRouter;
+    }
+
+    public Boolean getAllowFullShardingScan() {
+        return allowFullShardingScan;
+    }
+
+    public void setAllowFullShardingScan(Boolean allowFullShardingScan) {
+        this.allowFullShardingScan = allowFullShardingScan;
+    }
+
+    public DeleteStatement copyWithTableName(String newTableName) {
+        DeleteStatement copy = new DeleteStatement(this.entityClass, newTableName);
+        copy.systemConditions.addAll(this.systemConditions);
+        copy.whereConditions.addAll(this.whereConditions);
+        copy.shardingRouter = this.shardingRouter;
+        copy.allowFullShardingScan = this.allowFullShardingScan;
+        return copy;
+    }
 }

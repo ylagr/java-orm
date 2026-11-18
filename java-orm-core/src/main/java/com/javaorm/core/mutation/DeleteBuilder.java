@@ -51,6 +51,31 @@ public class DeleteBuilder<T> {
         this(new SqlEnv(dataSource, dialect, config), entityClass);
     }
 
+    public DeleteBuilder<T> sharding(com.javaorm.core.sharding.TableRouter<?> router) {
+        if (statement != null) {
+            statement.setShardingRouter(router);
+        }
+        return this;
+    }
+
+    public DeleteBuilder<T> sharding(Class<? extends com.javaorm.core.sharding.TableRouter<?>> routerClass) {
+        if (routerClass != null) {
+            try {
+                sharding(routerClass.getDeclaredConstructor().newInstance());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate router " + routerClass.getName(), e);
+            }
+        }
+        return this;
+    }
+
+    public DeleteBuilder<T> allowFullShardingScan(boolean allow) {
+        if (statement != null) {
+            statement.setAllowFullShardingScan(allow);
+        }
+        return this;
+    }
+
     public SqlEnv getEnv() {
         return env;
     }
@@ -244,7 +269,7 @@ public class DeleteBuilder<T> {
             }
             // 如果存在逻辑删除，自动重写为 UPDATE t SET is_deleted = 1 WHERE ...
             if (metadata != null && metadata.hasLogicDelete() && !logicDeleteDisabled) {
-                return env.executeLogicDelete(metadata, entityClass, statement.getWhereConditions());
+                return env.executeLogicDelete(metadata, entityClass, statement.getWhereConditions(), statement.getShardingRouter(), statement.getAllowFullShardingScan());
             }
 
             // 物理删除

@@ -67,6 +67,31 @@ public class UpdateBuilder<T> {
         this(new SqlEnv(dataSource, dialect, config), entityClass);
     }
 
+    public UpdateBuilder<T> sharding(com.javaorm.core.sharding.TableRouter<?> router) {
+        if (statement != null) {
+            statement.setShardingRouter(router);
+        }
+        return this;
+    }
+
+    public UpdateBuilder<T> sharding(Class<? extends com.javaorm.core.sharding.TableRouter<?>> routerClass) {
+        if (routerClass != null) {
+            try {
+                sharding(routerClass.getDeclaredConstructor().newInstance());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate router " + routerClass.getName(), e);
+            }
+        }
+        return this;
+    }
+
+    public UpdateBuilder<T> allowFullShardingScan(boolean allow) {
+        if (statement != null) {
+            statement.setAllowFullShardingScan(allow);
+        }
+        return this;
+    }
+
     public SqlEnv getEnv() {
         return env;
     }

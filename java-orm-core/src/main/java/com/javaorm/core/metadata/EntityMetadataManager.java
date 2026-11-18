@@ -189,6 +189,16 @@ public class EntityMetadataManager {
         metadata.setTableName(tableName);
         metadata.setSchema(schema);
 
+        com.javaorm.core.sharding.JoSharding shardingAnn = clazz.getAnnotation(com.javaorm.core.sharding.JoSharding.class);
+        if (shardingAnn != null) {
+            metadata.setShardingAnnotation(shardingAnn);
+            metadata.setAllowFullShardingScan(shardingAnn.allowFullScan());
+            try {
+                metadata.setShardingRouter(shardingAnn.router().getDeclaredConstructor().newInstance());
+            } catch (Exception ignored) {
+            }
+        }
+
         // 2. 填充关联关系（独立静态解析）
         Map<String, RelationMetadata> classRelations = parseClassRelations(clazz);
         for (RelationMetadata rel : classRelations.values()) {
@@ -434,6 +444,8 @@ public class EntityMetadataManager {
                     com.javaorm.core.converter.EnumMetadata em = com.javaorm.core.converter.EnumMetadataManager.getMetadata(field.getType(), je);
                     col.setConverter(new com.javaorm.core.converter.EnumConverter(em));
                 }
+            } else if (ann instanceof com.javaorm.core.sharding.JoShardingKey || name.endsWith(".JoShardingKey") || name.endsWith(".ShardingKey") || name.endsWith(".ShardingProperty")) {
+                col.setShardingKey(true);
             }
         }
 

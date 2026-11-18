@@ -73,6 +73,15 @@ public class SqlEnv {
         return this;
     }
 
+    private final com.javaorm.core.executor.SqlExecutor defaultSqlExecutor = new com.javaorm.core.executor.DefaultJdbcExecutor();
+
+    public com.javaorm.core.executor.SqlExecutor getSqlExecutor() {
+        if (config != null && config.getSqlExecutor() != null) {
+            return config.getSqlExecutor();
+        }
+        return defaultSqlExecutor;
+    }
+
     public Boolean getPrintSqlOverride() {
         return printSqlOverride;
     }
@@ -517,45 +526,58 @@ public class SqlEnv {
 
     public int executeSqlAndParams(SqlAndParams sqlAndParams, String prefix) {
         logSql(sqlAndParams, prefix);
-        Connection conn = null;
-        boolean isTx = false;
-        try {
-            conn = ConnectionUtils.getConnection(dataSource, config);
-            isTx = ConnectionUtils.isTransactionConnection(conn);
-            try (PreparedStatement ps = conn.prepareStatement(sqlAndParams.getSql())) {
-                List<Object> params = sqlAndParams.getParams();
-                if (params != null) {
-                    for (int i = 0; i < params.size(); i++) {
-                        ps.setObject(i + 1, params.get(i));
-                    }
-                }
-                return ps.executeUpdate();
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute " + (prefix != null ? prefix : "SQL") + " statement", e);
-        } finally {
-            if (!isTx && conn != null) {
-                ConnectionUtils.closeConnection(conn);
-            }
-            RecordingContext.clearRecording();
-            SelectBuilder.resetAliasSeq();
-        }
+        return getSqlExecutor().executeUpdate(null, sqlAndParams, prefix, dialect, getEffectiveConfig(), dataSource);
+    }
+
+    public int[] executeBatchUpdate(String sql, List<List<Object>> batchParams) {
+        return getSqlExecutor().executeBatchUpdate(null, sql, batchParams, dialect, getEffectiveConfig(), dataSource);
     }
 
     public int executeUpdate(UpdateStatement statement) {
+        return executeUpdate(statement, null, null);
+    }
+
+    public int executeUpdate(UpdateStatement statement, com.javaorm.core.sharding.TableRouter<?> routerOverride, Boolean allowFullScanOverride) {
         if (statement.getSetValues().isEmpty()) {
             return 0;
         }
+        Class<?> entityClass = statement.getEntityClass();
+        EntityMetadata metadata = entityClass != null ? (config != null ? config.getMetadata(entityClass) : EntityMetadataManager.get(entityClass, config)) : null;
+        com.javaorm.core.sharding.TableRouter<?> effRouter = routerOverride != null ? routerOverride : statement.getShardingRouter();
+        Boolean effAllowFullScan = allowFullScanOverride != null ? allowFullScanOverride : statement.getAllowFullShardingScan();
+
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeUpdate(null, statement, metadata, effRouter, effAllowFullScan, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
+        }
         SqlAndParams sqlAndParams = dialect.buildUpdate(statement);
-        return executeSqlAndParams(sqlAndParams, "UPDATE");
+        logSql(sqlAndParams, "UPDATE");
+        return getSqlExecutor().executeUpdate(null, sqlAndParams, "UPDATE", dialect, getEffectiveConfig(), dataSource);
     }
 
     public int executeDelete(DeleteStatement statement) {
+        return executeDelete(statement, null, null);
+    }
+
+    public int executeDelete(DeleteStatement statement, com.javaorm.core.sharding.TableRouter<?> routerOverride, Boolean allowFullScanOverride) {
+        Class<?> entityClass = statement.getEntityClass();
+        EntityMetadata metadata = entityClass != null ? (config != null ? config.getMetadata(entityClass) : EntityMetadataManager.get(entityClass, config)) : null;
+        com.javaorm.core.sharding.TableRouter<?> effRouter = routerOverride != null ? routerOverride : statement.getShardingRouter();
+        Boolean effAllowFullScan = allowFullScanOverride != null ? allowFullScanOverride : statement.getAllowFullShardingScan();
+
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeDelete(null, statement, metadata, effRouter, effAllowFullScan, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
+        }
         SqlAndParams sqlAndParams = dialect.buildDelete(statement);
-        return executeSqlAndParams(sqlAndParams, "DELETE");
+        logSql(sqlAndParams, "DELETE");
+        return getSqlExecutor().executeUpdate(null, sqlAndParams, "DELETE", dialect, getEffectiveConfig(), dataSource);
     }
 
     public int executeLogicDelete(EntityMetadata metadata, Class<?> entityClass, List<Condition> whereConditions) {
+        return executeLogicDelete(metadata, entityClass, whereConditions, null, null);
+    }
+
+    public int executeLogicDelete(EntityMetadata metadata, Class<?> entityClass, List<Condition> whereConditions,
+                                  com.javaorm.core.sharding.TableRouter<?> routerOverride, Boolean allowFullScanOverride) {
         ColumnMetadata ld = metadata.getLogicDeleteColumn();
         UpdateStatement updateStmt = new UpdateStatement(entityClass, metadata.getTableName());
         updateStmt.addSet(ld.getColumnName(), ld.getLogicDeleteDeletedValue());
@@ -574,194 +596,67 @@ public class SqlEnv {
             }
         }
 
-        SqlAndParams sqlAndParams = dialect.buildUpdate(updateStmt);
-        return executeSqlAndParams(sqlAndParams, "LogicDelete");
+        return executeUpdate(updateStmt, routerOverride, allowFullScanOverride);
+    }
+
+    public int executeInsert(Connection conn, com.javaorm.core.ast.InsertStatement statement, EntityMetadata metadata,
+                             boolean returnKeys, Object entity, com.javaorm.core.sharding.TableRouter<?> routerOverride) {
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, routerOverride)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeInsert(conn, statement, metadata, returnKeys, entity, routerOverride, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
+        }
+        return getSqlExecutor().executeInsert(conn, statement, metadata, returnKeys, entity, dialect, getEffectiveConfig(), dataSource);
     }
 
     public <R> List<R> executeSelectList(Connection conn, SelectStatement statement, EntityMetadata metadata, List<IncludeSpec> includes) {
-        boolean closeConn = false;
-        Connection effectiveConn = conn;
-        try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            List<R> result = EntityHydrator.queryList(effectiveConn, statement, metadata, dialect, getEffectiveConfig());
-            if (includes != null && !includes.isEmpty() && result != null && !result.isEmpty()) {
-                IncludeProcessor.processIncludes(effectiveConn, result, metadata, includes, dialect, getEffectiveConfig(), dataSource);
-            }
-            return result;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute query list", e);
-        } finally {
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(statement, metadata)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeSelectList(conn, statement, metadata, includes, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
         }
+        return getSqlExecutor().executeQuery(conn, statement, metadata, includes, dialect, getEffectiveConfig(), dataSource);
     }
 
     public <DTO> List<DTO> executeSelectDtoList(Connection conn, SelectStatement statement, Class<DTO> dtoClass) {
-        boolean closeConn = false;
-        Connection effectiveConn = conn;
-        try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            return EntityHydrator.queryDtoList(effectiveConn, statement, dtoClass, dialect, getEffectiveConfig());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to query list for " + (dtoClass != null ? dtoClass.getName() : "DTO"), e);
-        } finally {
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
+        Class<?> rootClass = statement.getRootEntityClass();
+        EntityMetadata metadata = rootClass != null ? (config != null ? config.getMetadata(rootClass) : EntityMetadataManager.get(rootClass, config)) : null;
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(statement, metadata)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeSelectDtoList(conn, statement, dtoClass, metadata, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
         }
+        return getSqlExecutor().executeDtoQuery(conn, statement, dtoClass, dialect, getEffectiveConfig(), dataSource);
     }
 
     public List<Map<String, Object>> executeSelectMaps(Connection conn, SelectStatement statement) {
-        boolean closeConn = false;
-        Connection effectiveConn = conn;
-        try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            return EntityHydrator.queryMaps(effectiveConn, statement, dialect, getEffectiveConfig());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute listMaps query", e);
-        } finally {
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
+        Class<?> rootClass = statement.getRootEntityClass();
+        EntityMetadata metadata = rootClass != null ? (config != null ? config.getMetadata(rootClass) : EntityMetadataManager.get(rootClass, config)) : null;
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(statement, metadata)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeSelectMaps(conn, statement, metadata, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
         }
+        return getSqlExecutor().executeMaps(conn, statement, dialect, getEffectiveConfig(), dataSource);
     }
 
     public <V> V executeSelectScalar(Connection conn, SelectStatement statement, Class<V> targetType) {
-        boolean closeConn = false;
-        Connection effectiveConn = conn;
-        try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            return EntityHydrator.queryScalar(effectiveConn, statement, targetType, dialect, getEffectiveConfig());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch one scalar", e);
-        } finally {
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
+        Class<?> rootClass = statement.getRootEntityClass();
+        EntityMetadata metadata = rootClass != null ? (config != null ? config.getMetadata(rootClass) : EntityMetadataManager.get(rootClass, config)) : null;
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(statement, metadata)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeSelectScalar(conn, statement, targetType, metadata, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
         }
+        return getSqlExecutor().executeScalar(conn, statement, targetType, dialect, getEffectiveConfig(), dataSource);
     }
 
     public <V> List<V> executeSelectScalarList(Connection conn, SelectStatement statement, Class<V> targetType) {
-        boolean closeConn = false;
-        Connection effectiveConn = conn;
-        try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            return EntityHydrator.queryScalarList(effectiveConn, statement, targetType, dialect, getEffectiveConfig());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch scalar list", e);
-        } finally {
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
+        Class<?> rootClass = statement.getRootEntityClass();
+        EntityMetadata metadata = rootClass != null ? (config != null ? config.getMetadata(rootClass) : EntityMetadataManager.get(rootClass, config)) : null;
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(statement, metadata)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeSelectScalarList(conn, statement, targetType, metadata, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
         }
+        return getSqlExecutor().executeScalarList(conn, statement, targetType, dialect, getEffectiveConfig(), dataSource);
     }
 
     public long executeSelectCount(Connection conn, SelectStatement statement, Dialect targetDialect, Class<?> rootEntityClass) {
         Dialect effDialect = targetDialect != null ? targetDialect : dialect;
-        boolean isComplex = statement.isDistinct()
-                || !statement.getGroupByExpressions().isEmpty()
-                || !statement.getHavingConditions().isEmpty()
-                || !statement.getUnions().isEmpty();
-
-        boolean closeConn = false;
-        Connection effectiveConn = conn;
-        try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-
-            if (!isComplex) {
-                SelectStatement countStmt = new SelectStatement(rootEntityClass, statement.getRootTableName(), statement.getRootTableAlias());
-                for (CteClause cte : statement.getCtes()) {
-                    countStmt.addCte(cte);
-                }
-                countStmt.addSelectColumn("COUNT(1)");
-                for (TableJoin join : statement.getJoins()) {
-                    countStmt.addJoin(join);
-                }
-                for (Condition cond : statement.getSystemConditions()) {
-                    countStmt.addSystemCondition(cond);
-                }
-                for (Condition cond : statement.getWhereConditions()) {
-                    countStmt.addWhereCondition(cond);
-                }
-                return EntityHydrator.queryCount(effectiveConn, countStmt, effDialect, getEffectiveConfig());
-            } else {
-                SelectStatement innerStmt = new SelectStatement(rootEntityClass, statement.getRootTableName(), statement.getRootTableAlias());
-                for (CteClause cte : statement.getCtes()) {
-                    innerStmt.addCte(cte);
-                }
-                innerStmt.setDistinct(statement.isDistinct());
-                for (SqlExpression expr : statement.getProjectExpressions()) {
-                    innerStmt.addProjectExpression(expr);
-                }
-                for (String col : statement.getSelectColumns()) {
-                    innerStmt.addSelectColumn(col);
-                }
-                if (!statement.getGroupByExpressions().isEmpty() && innerStmt.getProjectExpressions().isEmpty() && innerStmt.getSelectColumns().isEmpty()) {
-                    for (SqlExpression expr : statement.getGroupByExpressions()) {
-                        innerStmt.addProjectExpression(expr);
-                    }
-                }
-                for (TableJoin join : statement.getJoins()) {
-                    innerStmt.addJoin(join);
-                }
-                for (Condition cond : statement.getSystemConditions()) {
-                    innerStmt.addSystemCondition(cond);
-                }
-                for (Condition cond : statement.getWhereConditions()) {
-                    innerStmt.addWhereCondition(cond);
-                }
-                for (SqlExpression expr : statement.getGroupByExpressions()) {
-                    innerStmt.addGroupByExpression(expr);
-                }
-                for (Condition cond : statement.getHavingConditions()) {
-                    innerStmt.addHavingCondition(cond);
-                }
-                for (UnionClause u : statement.getUnions()) {
-                    innerStmt.addUnion(u);
-                }
-
-                SqlAndParams countSqlAndParams;
-                if (!innerStmt.getCtes().isEmpty()) {
-                    SqlAndParams withSql = effDialect.buildSelect(innerStmt, true);
-                    SqlAndParams innerWithoutCte = effDialect.buildSelect(innerStmt, false);
-                    String sqlStr = withSql.getSql();
-                    int selectIdx = sqlStr.indexOf("SELECT ");
-                    String withPrefix = selectIdx > 0 ? sqlStr.substring(0, selectIdx) : "";
-                    String countSql = withPrefix + "SELECT COUNT(1) FROM (" + innerWithoutCte.getSql() + ") count_sub";
-                    countSqlAndParams = new SqlAndParams(countSql, withSql.getParams());
-                } else {
-                    SqlAndParams innerSql = effDialect.buildSelect(innerStmt);
-                    String countSql = "SELECT COUNT(1) FROM (" + innerSql.getSql() + ") count_sub";
-                    countSqlAndParams = new SqlAndParams(countSql, innerSql.getParams());
-                }
-                return EntityHydrator.queryCount(effectiveConn, countSqlAndParams, getEffectiveConfig(), !innerStmt.getCtes().isEmpty(), effDialect);
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute count query", e);
-        } finally {
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
+        EntityMetadata metadata = rootEntityClass != null ? (config != null ? config.getMetadata(rootEntityClass) : EntityMetadataManager.get(rootEntityClass, config)) : null;
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(statement, metadata)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeSelectCount(conn, statement, metadata, effDialect, getEffectiveConfig(), dataSource, getSqlExecutor());
         }
+        return getSqlExecutor().executeCount(conn, statement, effDialect, getEffectiveConfig(), dataSource);
     }
 
     public void resolveExpression(SqlExpression<?> expr, SelectStatement statement) {

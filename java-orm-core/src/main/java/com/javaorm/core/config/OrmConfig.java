@@ -116,4 +116,15 @@ public class OrmConfig {
         }
         return this;
     }
+
+    private com.javaorm.core.executor.SqlExecutor sqlExecutor = null;
+
+    public com.javaorm.core.executor.SqlExecutor getSqlExecutor() {
+        return sqlExecutor;
+    }
+
+    public OrmConfig setSqlExecutor(com.javaorm.core.executor.SqlExecutor sqlExecutor) {
+        this.sqlExecutor = sqlExecutor;
+        return this;
+    }
 }

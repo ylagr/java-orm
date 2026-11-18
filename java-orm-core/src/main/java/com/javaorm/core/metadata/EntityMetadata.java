@@ -33,6 +33,9 @@ public class EntityMetadata {
         if (column.isTenant()) {
             this.tenantColumn = column;
         }
+        if (column.isShardingKey()) {
+            this.shardingColumn = column;
+        }
     }
 
     public void addRelation(RelationMetadata relation) {
@@ -149,5 +152,46 @@ public class EntityMetadata {
         } catch (Exception e) {
             throw new RuntimeException("Failed to instantiate entity " + entityClass.getName(), e);
         }
+    }
+
+    private ColumnMetadata shardingColumn;
+    private com.javaorm.core.sharding.JoSharding shardingAnnotation;
+    private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
+    private boolean allowFullShardingScan;
+
+    public boolean isSharding() {
+        return shardingRouter != null || shardingAnnotation != null;
+    }
+
+    public ColumnMetadata getShardingColumn() {
+        return shardingColumn;
+    }
+
+    public void setShardingColumn(ColumnMetadata shardingColumn) {
+        this.shardingColumn = shardingColumn;
+    }
+
+    public com.javaorm.core.sharding.JoSharding getShardingAnnotation() {
+        return shardingAnnotation;
+    }
+
+    public void setShardingAnnotation(com.javaorm.core.sharding.JoSharding shardingAnnotation) {
+        this.shardingAnnotation = shardingAnnotation;
+    }
+
+    public com.javaorm.core.sharding.TableRouter<?> getShardingRouter() {
+        return shardingRouter;
+    }
+
+    public void setShardingRouter(com.javaorm.core.sharding.TableRouter<?> shardingRouter) {
+        this.shardingRouter = shardingRouter;
+    }
+
+    public boolean isAllowFullShardingScan() {
+        return allowFullShardingScan;
+    }
+
+    public void setAllowFullShardingScan(boolean allowFullShardingScan) {
+        this.allowFullShardingScan = allowFullShardingScan;
     }
 }

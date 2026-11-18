@@ -154,6 +154,31 @@ public class SelectBuilder<T> implements Query<T> {
         this(new SqlEnv(dataSource, dialect, config), rootEntityClass, rootAlias);
     }
 
+    public SelectBuilder<T> sharding(com.javaorm.core.sharding.TableRouter<?> router) {
+        if (statement != null) {
+            statement.setShardingRouter(router);
+        }
+        return this;
+    }
+
+    public SelectBuilder<T> sharding(Class<? extends com.javaorm.core.sharding.TableRouter<?>> routerClass) {
+        if (routerClass != null) {
+            try {
+                sharding(routerClass.getDeclaredConstructor().newInstance());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate router " + routerClass.getName(), e);
+            }
+        }
+        return this;
+    }
+
+    public SelectBuilder<T> allowFullShardingScan(boolean allow) {
+        if (statement != null) {
+            statement.setAllowFullShardingScan(allow);
+        }
+        return this;
+    }
+
     public SelectBuilder(Cte<T> cte, DataSource dataSource, Dialect dialect, OrmConfig config) {
         this(new SqlEnv(dataSource, dialect, config), cte);
     }

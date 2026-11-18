@@ -34,4 +34,15 @@ public class InsertStatement implements Statement {
     public List<Object> getValues() {
         return values;
     }
+
+    public void setTableName(String tableName) {
+        this.tableName = tableName;
+    }
+
+    public InsertStatement copyWithTableName(String newTableName) {
+        InsertStatement copy = new InsertStatement(this.entityClass, newTableName);
+        copy.columns.addAll(this.columns);
+        copy.values.addAll(this.values);
+        return copy;
+    }
 }

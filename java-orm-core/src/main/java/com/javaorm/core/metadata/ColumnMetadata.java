@@ -16,6 +16,7 @@ public class ColumnMetadata {
     private Object logicDeleteNormalValue;
     private Object logicDeleteDeletedValue;
     private boolean tenant;
+    private boolean shardingKey;
     private boolean autoFill;
     private com.javaorm.core.annotation.AutoFillType autoFillType;
     private boolean ignored;
@@ -438,5 +439,13 @@ public class ColumnMetadata {
 
     public void setConverter(com.javaorm.core.converter.ValueConverter<?, ?> converter) {
         this.converter = converter;
+    }
+
+    public boolean isShardingKey() {
+        return shardingKey;
+    }
+
+    public void setShardingKey(boolean shardingKey) {
+        this.shardingKey = shardingKey;
     }
 }
