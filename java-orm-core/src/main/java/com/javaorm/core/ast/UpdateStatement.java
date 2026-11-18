@@ -50,6 +50,8 @@ public class UpdateStatement implements Statement {
     }
 
     private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
+    private com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter;
+    private String targetDataSource;
     private Boolean allowFullShardingScan;
 
     public void setTableName(String tableName) {
@@ -62,6 +64,22 @@ public class UpdateStatement implements Statement {
 
     public void setShardingRouter(com.javaorm.core.sharding.TableRouter<?> shardingRouter) {
         this.shardingRouter = shardingRouter;
+    }
+
+    public String getTargetDataSource() {
+        return targetDataSource;
+    }
+
+    public void setTargetDataSource(String targetDataSource) {
+        this.targetDataSource = targetDataSource;
+    }
+
+    public com.javaorm.core.sharding.DataSourceRouter<?> getDataSourceRouter() {
+        return dataSourceRouter;
+    }
+
+    public void setDataSourceRouter(com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter) {
+        this.dataSourceRouter = dataSourceRouter;
     }
 
     public Boolean getAllowFullShardingScan() {
@@ -78,6 +96,8 @@ public class UpdateStatement implements Statement {
         copy.systemConditions.addAll(this.systemConditions);
         copy.whereConditions.addAll(this.whereConditions);
         copy.shardingRouter = this.shardingRouter;
+        copy.dataSourceRouter = this.dataSourceRouter;
+        copy.targetDataSource = this.targetDataSource;
         copy.allowFullShardingScan = this.allowFullShardingScan;
         return copy;
     }

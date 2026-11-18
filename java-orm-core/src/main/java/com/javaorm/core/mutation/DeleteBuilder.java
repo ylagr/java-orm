@@ -69,6 +69,43 @@ public class DeleteBuilder<T> {
         return this;
     }
 
+    public DeleteBuilder<T> tableRouter(com.javaorm.core.sharding.TableRouter<?> router) {
+        return sharding(router);
+    }
+
+    public DeleteBuilder<T> tableRouter(Class<? extends com.javaorm.core.sharding.TableRouter<?>> routerClass) {
+        return sharding(routerClass);
+    }
+
+    public DeleteBuilder<T> dataSource(String name) {
+        if (statement != null) {
+            statement.setTargetDataSource(name);
+        }
+        return this;
+    }
+
+    public DeleteBuilder<T> dataSource(com.javaorm.core.sharding.DataSourceRouter<?> router) {
+        if (statement != null) {
+            statement.setDataSourceRouter(router);
+        }
+        return this;
+    }
+
+    public DeleteBuilder<T> dataSource(Class<? extends com.javaorm.core.sharding.DataSourceRouter<?>> routerClass) {
+        if (routerClass != null) {
+            try {
+                dataSource(routerClass.getDeclaredConstructor().newInstance());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate DataSourceRouter " + routerClass.getName(), e);
+            }
+        }
+        return this;
+    }
+
+    public DeleteBuilder<T> sharding(com.javaorm.core.sharding.DataSourceRouter<?> router) {
+        return dataSource(router);
+    }
+
     public DeleteBuilder<T> allowFullShardingScan(boolean allow) {
         if (statement != null) {
             statement.setAllowFullShardingScan(allow);

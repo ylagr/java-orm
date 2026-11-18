@@ -85,6 +85,43 @@ public class UpdateBuilder<T> {
         return this;
     }
 
+    public UpdateBuilder<T> tableRouter(com.javaorm.core.sharding.TableRouter<?> router) {
+        return sharding(router);
+    }
+
+    public UpdateBuilder<T> tableRouter(Class<? extends com.javaorm.core.sharding.TableRouter<?>> routerClass) {
+        return sharding(routerClass);
+    }
+
+    public UpdateBuilder<T> dataSource(String name) {
+        if (statement != null) {
+            statement.setTargetDataSource(name);
+        }
+        return this;
+    }
+
+    public UpdateBuilder<T> dataSource(com.javaorm.core.sharding.DataSourceRouter<?> router) {
+        if (statement != null) {
+            statement.setDataSourceRouter(router);
+        }
+        return this;
+    }
+
+    public UpdateBuilder<T> dataSource(Class<? extends com.javaorm.core.sharding.DataSourceRouter<?>> routerClass) {
+        if (routerClass != null) {
+            try {
+                dataSource(routerClass.getDeclaredConstructor().newInstance());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate DataSourceRouter " + routerClass.getName(), e);
+            }
+        }
+        return this;
+    }
+
+    public UpdateBuilder<T> sharding(com.javaorm.core.sharding.DataSourceRouter<?> router) {
+        return dataSource(router);
+    }
+
     public UpdateBuilder<T> allowFullShardingScan(boolean allow) {
         if (statement != null) {
             statement.setAllowFullShardingScan(allow);

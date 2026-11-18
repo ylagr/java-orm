@@ -27,6 +27,8 @@ public class InsertBuilder<T> {
     private final SqlEnv env;
     private final T entity;
     private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
+    private String targetDataSource;
+    private com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter;
 
     public InsertBuilder(SqlEnv env, T entity) {
         this.env = env != null ? env : new SqlEnv(null, null, null);
@@ -53,8 +55,49 @@ public class InsertBuilder<T> {
         return this;
     }
 
+    public InsertBuilder<T> tableRouter(com.javaorm.core.sharding.TableRouter<?> router) {
+        return sharding(router);
+    }
+
+    public InsertBuilder<T> tableRouter(Class<? extends com.javaorm.core.sharding.TableRouter<?>> routerClass) {
+        return sharding(routerClass);
+    }
+
+    public InsertBuilder<T> dataSource(String name) {
+        this.targetDataSource = name;
+        return this;
+    }
+
+    public InsertBuilder<T> dataSource(com.javaorm.core.sharding.DataSourceRouter<?> router) {
+        this.dataSourceRouter = router;
+        return this;
+    }
+
+    public InsertBuilder<T> dataSource(Class<? extends com.javaorm.core.sharding.DataSourceRouter<?>> routerClass) {
+        if (routerClass != null) {
+            try {
+                dataSource(routerClass.getDeclaredConstructor().newInstance());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate DataSourceRouter " + routerClass.getName(), e);
+            }
+        }
+        return this;
+    }
+
+    public InsertBuilder<T> sharding(com.javaorm.core.sharding.DataSourceRouter<?> router) {
+        return dataSource(router);
+    }
+
     public com.javaorm.core.sharding.TableRouter<?> getShardingRouter() {
         return shardingRouter;
+    }
+
+    public String getTargetDataSource() {
+        return targetDataSource;
+    }
+
+    public com.javaorm.core.sharding.DataSourceRouter<?> getDataSourceRouter() {
+        return dataSourceRouter;
     }
 
     public SqlEnv getEnv() {
@@ -87,6 +130,15 @@ public class InsertBuilder<T> {
         EntityMetadata metadata = EntityMetadataManager.get(entityClass, getConfig());
 
         InsertStatement stmt = new InsertStatement(entityClass, metadata.getTableName());
+        if (this.shardingRouter != null) {
+            stmt.setShardingRouter(this.shardingRouter);
+        }
+        if (this.targetDataSource != null) {
+            stmt.setTargetDataSource(this.targetDataSource);
+        }
+        if (this.dataSourceRouter != null) {
+            stmt.setDataSourceRouter(this.dataSourceRouter);
+        }
 
         // 遍历所有列
         for (ColumnMetadata col : metadata.getColumns()) {

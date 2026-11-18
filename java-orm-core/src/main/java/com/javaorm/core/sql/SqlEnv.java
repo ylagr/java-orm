@@ -544,10 +544,12 @@ public class SqlEnv {
         Class<?> entityClass = statement.getEntityClass();
         EntityMetadata metadata = entityClass != null ? (config != null ? config.getMetadata(entityClass) : EntityMetadataManager.get(entityClass, config)) : null;
         com.javaorm.core.sharding.TableRouter<?> effRouter = routerOverride != null ? routerOverride : statement.getShardingRouter();
+        com.javaorm.core.sharding.DataSourceRouter<?> effDsRouter = statement.getDataSourceRouter();
+        String effDsOverride = statement.getTargetDataSource();
         Boolean effAllowFullScan = allowFullScanOverride != null ? allowFullScanOverride : statement.getAllowFullShardingScan();
 
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeUpdate(null, statement, metadata, effRouter, effAllowFullScan, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter, effDsRouter, effDsOverride)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeUpdate(null, statement, metadata, effRouter, effDsRouter, effDsOverride, effAllowFullScan, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
         }
         SqlAndParams sqlAndParams = dialect.buildUpdate(statement);
         logSql(sqlAndParams, "UPDATE");
@@ -562,10 +564,12 @@ public class SqlEnv {
         Class<?> entityClass = statement.getEntityClass();
         EntityMetadata metadata = entityClass != null ? (config != null ? config.getMetadata(entityClass) : EntityMetadataManager.get(entityClass, config)) : null;
         com.javaorm.core.sharding.TableRouter<?> effRouter = routerOverride != null ? routerOverride : statement.getShardingRouter();
+        com.javaorm.core.sharding.DataSourceRouter<?> effDsRouter = statement.getDataSourceRouter();
+        String effDsOverride = statement.getTargetDataSource();
         Boolean effAllowFullScan = allowFullScanOverride != null ? allowFullScanOverride : statement.getAllowFullShardingScan();
 
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeDelete(null, statement, metadata, effRouter, effAllowFullScan, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter, effDsRouter, effDsOverride)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeDelete(null, statement, metadata, effRouter, effDsRouter, effDsOverride, effAllowFullScan, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
         }
         SqlAndParams sqlAndParams = dialect.buildDelete(statement);
         logSql(sqlAndParams, "DELETE");
@@ -601,8 +605,12 @@ public class SqlEnv {
 
     public int executeInsert(Connection conn, com.javaorm.core.ast.InsertStatement statement, EntityMetadata metadata,
                              boolean returnKeys, Object entity, com.javaorm.core.sharding.TableRouter<?> routerOverride) {
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, routerOverride)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeInsert(conn, statement, metadata, returnKeys, entity, routerOverride, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
+        com.javaorm.core.sharding.TableRouter<?> effRouter = routerOverride != null ? routerOverride : (statement != null ? statement.getShardingRouter() : null);
+        com.javaorm.core.sharding.DataSourceRouter<?> effDsRouter = statement != null ? statement.getDataSourceRouter() : null;
+        String effDsOverride = statement != null ? statement.getTargetDataSource() : null;
+
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter, effDsRouter, effDsOverride)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeInsert(conn, statement, metadata, returnKeys, entity, effRouter, effDsRouter, effDsOverride, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
         }
         return getSqlExecutor().executeInsert(conn, statement, metadata, returnKeys, entity, dialect, getEffectiveConfig(), dataSource);
     }

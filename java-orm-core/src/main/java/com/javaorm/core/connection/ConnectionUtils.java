@@ -15,10 +15,22 @@ public class ConnectionUtils {
         if (txConn != null && !txConn.isClosed()) {
             return txConn;
         }
-        if (config != null && config.getConnectionProvider() != null) {
-            return config.getConnectionProvider().getConnection(dataSource);
+        DataSource effectiveDs = dataSource;
+        if (config != null && config.getDataSourceManager() != null) {
+            String currentDsName = com.javaorm.core.datasource.DataSourceContext.getDataSource();
+            if (currentDsName != null && !currentDsName.isEmpty()) {
+                effectiveDs = config.getDataSourceManager().getDataSource(currentDsName);
+            } else if (effectiveDs == null) {
+                effectiveDs = config.getDataSourceManager().getDefaultDataSource();
+            }
         }
-        return dataSource.getConnection();
+        if (config != null && config.getConnectionProvider() != null) {
+            return config.getConnectionProvider().getConnection(effectiveDs);
+        }
+        if (effectiveDs == null) {
+            throw new IllegalStateException("No DataSource available to obtain connection");
+        }
+        return effectiveDs.getConnection();
     }
 
     public static boolean isTransactionConnection(Connection conn) {

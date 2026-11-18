@@ -157,10 +157,38 @@ public class EntityMetadata {
     private ColumnMetadata shardingColumn;
     private com.javaorm.core.sharding.JoSharding shardingAnnotation;
     private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
+    private com.javaorm.core.sharding.DataSourceRouter<?> shardingDataSourceRouter;
+    private String shardingDataSource;
     private boolean allowFullShardingScan;
 
     public boolean isSharding() {
-        return shardingRouter != null || shardingAnnotation != null;
+        return shardingRouter != null || shardingDataSourceRouter != null
+                || (shardingDataSource != null && !shardingDataSource.isEmpty())
+                || shardingAnnotation != null;
+    }
+
+    public boolean isTableSharding() {
+        return shardingRouter != null;
+    }
+
+    public boolean isDataSourceSharding() {
+        return shardingDataSourceRouter != null || (shardingDataSource != null && !shardingDataSource.isEmpty());
+    }
+
+    public com.javaorm.core.sharding.DataSourceRouter<?> getShardingDataSourceRouter() {
+        return shardingDataSourceRouter;
+    }
+
+    public void setShardingDataSourceRouter(com.javaorm.core.sharding.DataSourceRouter<?> shardingDataSourceRouter) {
+        this.shardingDataSourceRouter = shardingDataSourceRouter;
+    }
+
+    public String getShardingDataSource() {
+        return shardingDataSource;
+    }
+
+    public void setShardingDataSource(String shardingDataSource) {
+        this.shardingDataSource = shardingDataSource;
     }
 
     public ColumnMetadata getShardingColumn() {

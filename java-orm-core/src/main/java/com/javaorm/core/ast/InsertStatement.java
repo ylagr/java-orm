@@ -35,6 +35,34 @@ public class InsertStatement implements Statement {
         return values;
     }
 
+    private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
+    private com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter;
+    private String targetDataSource;
+
+    public com.javaorm.core.sharding.TableRouter<?> getShardingRouter() {
+        return shardingRouter;
+    }
+
+    public void setShardingRouter(com.javaorm.core.sharding.TableRouter<?> shardingRouter) {
+        this.shardingRouter = shardingRouter;
+    }
+
+    public com.javaorm.core.sharding.DataSourceRouter<?> getDataSourceRouter() {
+        return dataSourceRouter;
+    }
+
+    public void setDataSourceRouter(com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter) {
+        this.dataSourceRouter = dataSourceRouter;
+    }
+
+    public String getTargetDataSource() {
+        return targetDataSource;
+    }
+
+    public void setTargetDataSource(String targetDataSource) {
+        this.targetDataSource = targetDataSource;
+    }
+
     public void setTableName(String tableName) {
         this.tableName = tableName;
     }
@@ -43,6 +71,9 @@ public class InsertStatement implements Statement {
         InsertStatement copy = new InsertStatement(this.entityClass, newTableName);
         copy.columns.addAll(this.columns);
         copy.values.addAll(this.values);
+        copy.targetDataSource = this.targetDataSource;
+        copy.shardingRouter = this.shardingRouter;
+        copy.dataSourceRouter = this.dataSourceRouter;
         return copy;
     }
 }

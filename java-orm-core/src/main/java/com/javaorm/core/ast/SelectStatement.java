@@ -21,6 +21,8 @@ public class SelectStatement implements Statement {
     private Integer offset;
     private boolean distinct;
     private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
+    private com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter;
+    private String targetDataSource;
     private Boolean allowFullShardingScan;
 
     public SelectStatement(Class<?> rootEntityClass, String rootTableName, String rootTableAlias) {
@@ -190,6 +192,22 @@ public class SelectStatement implements Statement {
         this.allowFullShardingScan = allowFullShardingScan;
     }
 
+    public String getTargetDataSource() {
+        return targetDataSource;
+    }
+
+    public void setTargetDataSource(String targetDataSource) {
+        this.targetDataSource = targetDataSource;
+    }
+
+    public com.javaorm.core.sharding.DataSourceRouter<?> getDataSourceRouter() {
+        return dataSourceRouter;
+    }
+
+    public void setDataSourceRouter(com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter) {
+        this.dataSourceRouter = dataSourceRouter;
+    }
+
     public SelectStatement copyWithTableName(String newTableName) {
         SelectStatement copy = new SelectStatement(this.rootEntityClass, newTableName, this.rootTableAlias);
         copy.selectColumns.addAll(this.selectColumns);
@@ -206,6 +224,8 @@ public class SelectStatement implements Statement {
         copy.offset = this.offset;
         copy.distinct = this.distinct;
         copy.shardingRouter = this.shardingRouter;
+        copy.dataSourceRouter = this.dataSourceRouter;
+        copy.targetDataSource = this.targetDataSource;
         copy.allowFullShardingScan = this.allowFullShardingScan;
         return copy;
     }

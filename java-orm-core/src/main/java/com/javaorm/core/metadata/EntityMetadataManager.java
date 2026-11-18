@@ -193,9 +193,24 @@ public class EntityMetadataManager {
         if (shardingAnn != null) {
             metadata.setShardingAnnotation(shardingAnn);
             metadata.setAllowFullShardingScan(shardingAnn.allowFullScan());
-            try {
-                metadata.setShardingRouter(shardingAnn.router().getDeclaredConstructor().newInstance());
-            } catch (Exception ignored) {
+            if (shardingAnn.dataSource() != null && !shardingAnn.dataSource().isEmpty()) {
+                metadata.setShardingDataSource(shardingAnn.dataSource());
+            }
+            if (shardingAnn.dataSourceRouter() != null && shardingAnn.dataSourceRouter() != com.javaorm.core.sharding.DefaultDataSourceRouter.class) {
+                try {
+                    metadata.setShardingDataSourceRouter(shardingAnn.dataSourceRouter().getDeclaredConstructor().newInstance());
+                } catch (Exception ignored) {
+                }
+            }
+            Class<? extends com.javaorm.core.sharding.TableRouter<?>> tableRouterClass = shardingAnn.tableRouter();
+            if (tableRouterClass == com.javaorm.core.sharding.DefaultTableRouter.class) {
+                tableRouterClass = shardingAnn.router();
+            }
+            if (tableRouterClass != null && tableRouterClass != com.javaorm.core.sharding.DefaultTableRouter.class) {
+                try {
+                    metadata.setShardingRouter(tableRouterClass.getDeclaredConstructor().newInstance());
+                } catch (Exception ignored) {
+                }
             }
         }
 
@@ -238,6 +253,12 @@ public class EntityMetadataManager {
             if (colMeta != null && !colMeta.isIgnored()) {
                 metadata.addColumn(colMeta);
             }
+        }
+ 
+        // 自动降级：若实体启用了分库/分表但未显式标注 @JoShardingKey，默认将 @JoId 主键列作为分片键
+        if (metadata.isSharding() && metadata.getShardingColumn() == null && metadata.getIdColumn() != null) {
+            metadata.setShardingColumn(metadata.getIdColumn());
+            metadata.getIdColumn().setShardingKey(true);
         }
 
         return metadata;

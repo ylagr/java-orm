@@ -127,4 +127,15 @@ public class OrmConfig {
         this.sqlExecutor = sqlExecutor;
         return this;
     }
+
+    private com.javaorm.core.datasource.DataSourceManager dataSourceManager = null;
+
+    public com.javaorm.core.datasource.DataSourceManager getDataSourceManager() {
+        return dataSourceManager;
+    }
+
+    public OrmConfig setDataSourceManager(com.javaorm.core.datasource.DataSourceManager dataSourceManager) {
+        this.dataSourceManager = dataSourceManager;
+        return this;
+    }
 }

@@ -34,7 +34,43 @@ public class JavaOrm {
         }
         this.dataSource = dataSource;
         this.config = config != null ? config : new OrmConfig();
+        if (this.config.getDataSourceManager() == null) {
+            this.config.setDataSourceManager(new com.javaorm.core.datasource.DataSourceManager(dataSource));
+        } else if (this.config.getDataSourceManager().getDefaultDataSource() == null) {
+            this.config.getDataSourceManager().setDefaultDataSource(dataSource);
+        }
         this.dialect = dialect != null ? dialect : detectDialect(dataSource);
+    }
+
+    /**
+     * 获取多数据源管理器
+     */
+    public com.javaorm.core.datasource.DataSourceManager getDataSourceManager() {
+        return this.config.getDataSourceManager();
+    }
+
+    /**
+     * 注册命名物理数据源（支持链式配置）
+     */
+    public JavaOrm registerDataSource(String name, DataSource ds) {
+        if (this.config.getDataSourceManager() != null) {
+            this.config.getDataSourceManager().register(name, ds);
+        }
+        return this;
+    }
+
+    /**
+     * 在指定物理数据源上下文中执行代码块（无返回值）
+     */
+    public void useDataSource(String dataSourceName, Runnable action) {
+        com.javaorm.core.datasource.DataSourceContext.use(dataSourceName, action);
+    }
+
+    /**
+     * 在指定物理数据源上下文中执行代码块（带返回值）
+     */
+    public <R> R useDataSource(String dataSourceName, java.util.function.Supplier<R> action) {
+        return com.javaorm.core.datasource.DataSourceContext.use(dataSourceName, action);
     }
 
     public static JavaOrm create(DataSource dataSource) {
