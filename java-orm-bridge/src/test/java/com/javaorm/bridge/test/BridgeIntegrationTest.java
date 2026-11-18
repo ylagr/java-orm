@@ -1,10 +1,12 @@
 package com.javaorm.bridge.test;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.IEnum;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.easy.query.core.annotation.Column;
 import com.easy.query.core.annotation.LogicDelete;
 import com.easy.query.core.annotation.Table;
@@ -14,10 +16,15 @@ import com.javaorm.core.annotation.JoColumn;
 import com.javaorm.core.annotation.JoId;
 import com.javaorm.core.annotation.JoTable;
 import com.javaorm.core.annotation.JoVersion;
+import com.javaorm.core.config.OrmConfig;
+import com.javaorm.core.dialect.Dialect;
+import com.javaorm.core.dialect.SqlAndParams;
 import com.javaorm.core.exception.OptimisticLockException;
+import com.javaorm.core.interceptor.SqlInterceptor;
 import com.javaorm.core.metadata.ColumnMetadata;
 import com.javaorm.core.metadata.EntityMetadata;
 import com.javaorm.core.metadata.EntityMetadataManager;
+import com.javaorm.core.pagination.PageResult;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSession;
@@ -32,14 +39,52 @@ import org.junit.Test;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class BridgeIntegrationTest {
 
     private static DataSource dataSource;
     private static JavaOrm orm;
     private static SqlSessionFactory sqlSessionFactory;
+
+    // 枚举 1：实现 MyBatis-Plus IEnum 接口
+    public enum UserStatus implements IEnum<Integer> {
+        ACTIVE(1, "激活"),
+        DISABLED(0, "禁用");
+
+        private final int value;
+        private final String desc;
+
+        UserStatus(int value, String desc) {
+            this.value = value;
+            this.desc = desc;
+        }
+
+        @Override
+        public Integer getValue() {
+            return value;
+        }
+    }
+
+    // 枚举 2：使用 MyBatis-Plus @EnumValue 注解
+    public enum UserGrade {
+        VIP(10),
+        NORMAL(1);
+
+        @com.baomidou.mybatisplus.annotation.EnumValue
+        private final int grade;
+
+        UserGrade(int grade) {
+            this.grade = grade;
+        }
+
+        public int getGrade() {
+            return grade;
+        }
+    }
 
     // 1. MyBatis-Plus 注解实体
     @TableName("t_mp_user")
@@ -61,6 +106,12 @@ public class BridgeIntegrationTest {
         @TableField("is_deleted")
         private Integer deleted;
 
+        @TableField("user_status")
+        private UserStatus status;
+
+        @TableField("user_grade")
+        private UserGrade grade;
+
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
         public String getName() { return name; }
@@ -71,6 +122,10 @@ public class BridgeIntegrationTest {
         public void setVersion(Integer version) { this.version = version; }
         public Integer getDeleted() { return deleted; }
         public void setDeleted(Integer deleted) { this.deleted = deleted; }
+        public UserStatus getStatus() { return status; }
+        public void setStatus(UserStatus status) { this.status = status; }
+        public UserGrade getGrade() { return grade; }
+        public void setGrade(UserGrade grade) { this.grade = grade; }
     }
 
     // 2. EasyQuery 注解实体
@@ -124,6 +179,26 @@ public class BridgeIntegrationTest {
         public void setVersion(Integer version) { this.version = version; }
     }
 
+    // 4. 用户自定义无侵入业务 Page 类（完全不依赖 JavaORM 或第三方接口）
+    public static class CustomResultVo<T> {
+        private final long total;
+        private final List<T> items;
+        private final long page;
+        private final long size;
+
+        public CustomResultVo(long total, List<T> items, long page, long size) {
+            this.total = total;
+            this.items = items;
+            this.page = page;
+            this.size = size;
+        }
+
+        public long getTotal() { return total; }
+        public List<T> getItems() { return items; }
+        public long getPage() { return page; }
+        public long getSize() { return size; }
+    }
+
     @BeforeClass
     public static void setUp() throws Exception {
         JdbcDataSource ds = new JdbcDataSource();
@@ -141,7 +216,9 @@ public class BridgeIntegrationTest {
                     "user_name VARCHAR(50), " +
                     "user_age INT, " +
                     "user_version INT DEFAULT 1, " +
-                    "is_deleted INT DEFAULT 0)");
+                    "is_deleted INT DEFAULT 0, " +
+                    "user_status INT, " +
+                    "user_grade INT)");
 
             stmt.execute("DROP TABLE IF EXISTS t_eq_product");
             stmt.execute("CREATE TABLE t_eq_product (" +
@@ -165,13 +242,9 @@ public class BridgeIntegrationTest {
 
     @Test
     public void testMetadataDeduplicationAndPriority() {
-        // 验证混合实体的元数据去重与优先级合并
         EntityMetadata meta = EntityMetadataManager.get(MixedOrder.class);
         Assert.assertNotNull(meta);
-        // 表名由更高优先级的 MyBatis-Plus 注解生效
         Assert.assertEquals("t_mixed_order_mp", meta.getTableName());
-
-        // 字段列表去重：必须只有 3 个字段 (id, orderNo, version)，不能因为两个注解产生两份
         Assert.assertEquals(3, meta.getColumns().size());
 
         ColumnMetadata idCol = meta.getIdColumn();
@@ -191,14 +264,21 @@ public class BridgeIntegrationTest {
 
     @Test
     public void testMyBatisPlusAnnotationsAndOptimisticLock() {
-        // 插入 MP 实体
         MpUser user = new MpUser();
         user.setName("Alice");
         user.setAge(20);
+        user.setStatus(UserStatus.ACTIVE);
+        user.setGrade(UserGrade.VIP);
         int rows = orm.insert(user);
         Assert.assertEquals(1, rows);
         Assert.assertNotNull(user.getId());
         Assert.assertEquals(Integer.valueOf(1), user.getVersion());
+
+        // 验证持久化值成功存取
+        MpUser queried = orm.findById(MpUser.class, user.getId());
+        Assert.assertNotNull(queried);
+        Assert.assertEquals(UserStatus.ACTIVE, queried.getStatus());
+        Assert.assertEquals(UserGrade.VIP, queried.getGrade());
 
         // 更新 MP 实体，触发乐观锁自增
         user.setAge(21);
@@ -206,12 +286,12 @@ public class BridgeIntegrationTest {
         Assert.assertEquals(1, updated);
         Assert.assertEquals(Integer.valueOf(2), user.getVersion());
 
-        // 模拟并发更新冲突：使用陈旧的版本号更新
+        // 模拟并发冲突
         MpUser staleUser = new MpUser();
         staleUser.setId(user.getId());
         staleUser.setName("Bob");
         staleUser.setAge(22);
-        staleUser.setVersion(1); // 此时数据库版本已经是 2
+        staleUser.setVersion(1);
 
         try {
             orm.update(staleUser);
@@ -224,14 +304,12 @@ public class BridgeIntegrationTest {
         int deleted = orm.delete(user);
         Assert.assertEquals(1, deleted);
 
-        // 逻辑删除后查询应该查不到
         MpUser found = orm.findById(MpUser.class, user.getId());
         Assert.assertNull(found);
     }
 
     @Test
     public void testEasyQueryAnnotationsAndOptimisticLock() {
-        // 插入 EasyQuery 实体
         EqProduct prod = new EqProduct();
         prod.setName("Phone");
         int rows = orm.insert(prod);
@@ -239,13 +317,11 @@ public class BridgeIntegrationTest {
         Assert.assertNotNull(prod.getId());
         Assert.assertEquals(Integer.valueOf(1), prod.getVersion());
 
-        // 更新
         prod.setName("SmartPhone");
         int updated = orm.update(prod);
         Assert.assertEquals(1, updated);
         Assert.assertEquals(Integer.valueOf(2), prod.getVersion());
 
-        // 逻辑删除
         orm.delete(prod);
         EqProduct found = orm.findById(EqProduct.class, prod.getId());
         Assert.assertNull(found);
@@ -253,7 +329,6 @@ public class BridgeIntegrationTest {
 
     @Test
     public void testMyBatisIntegration() {
-        // 通过 SqlSession 开启 JavaORM 实例 (autoCommit = true)
         try (SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
             JavaOrm mybatisOrm = JavaOrmMyBatisSupport.from(sqlSession);
 
@@ -268,7 +343,6 @@ public class BridgeIntegrationTest {
             Assert.assertNotNull(found);
             Assert.assertEquals("MyBatisUser", found.getName());
 
-            // 批处理插入测试
             MpUser u1 = new MpUser();
             u1.setName("Batch1");
             u1.setAge(25);
@@ -285,5 +359,89 @@ public class BridgeIntegrationTest {
                     .list();
             Assert.assertEquals(2, list.size());
         }
+    }
+
+    @Test
+    public void testPaginationWithCustomPageAndMyBatisPlusPage() {
+        // 先插入若干条测试记录
+        List<MpUser> batch = new ArrayList<>();
+        for (int i = 1; i <= 7; i++) {
+            MpUser u = new MpUser();
+            u.setName("PageUser_" + i);
+            u.setAge(20 + i);
+            batch.add(u);
+        }
+        orm.insertBatch(batch).execute();
+
+        // 1. 测试内置通用 PageResult
+        PageResult<MpUser> standardPage = orm.select(MpUser.class)
+                .where()
+                .like(MpUser::getName, "PageUser_%")
+                .toPage(1, 3);
+        Assert.assertEquals(7, standardPage.getTotal());
+        Assert.assertEquals(3, standardPage.getRecords().size());
+        Assert.assertEquals(3, standardPage.getTotalPages());
+        Assert.assertTrue(standardPage.hasNext());
+
+        // 2. 测试完全零侵入返回用户自定义业务 VO（通过函数式引用 CustomResultVo::new）
+        CustomResultVo<MpUser> customPage = orm.select(MpUser.class)
+                .where()
+                .like(MpUser::getName, "PageUser_%")
+                .toPage(2, 3, CustomResultVo::new);
+        Assert.assertEquals(7, customPage.getTotal());
+        Assert.assertEquals(3, customPage.getItems().size());
+        Assert.assertEquals(2, customPage.getPage());
+        Assert.assertEquals(3, customPage.getSize());
+        Assert.assertEquals("PageUser_4", customPage.getItems().get(0).getName());
+
+        // 3. 测试传入 MyBatis-Plus 官方 Page 对象实例自动回填并返回
+        Page<MpUser> mpPage = new Page<>(3, 3);
+        Page<MpUser> resultPage = orm.select(MpUser.class)
+                .where()
+                .like(MpUser::getName, "PageUser_%")
+                .toPage(mpPage);
+        Assert.assertSame(mpPage, resultPage);
+        Assert.assertEquals(7, mpPage.getTotal());
+        Assert.assertEquals(1, mpPage.getRecords().size());
+        Assert.assertEquals("PageUser_7", mpPage.getRecords().get(0).getName());
+    }
+
+    @Test
+    public void testSqlInterceptor() {
+        AtomicInteger queryCount = new AtomicInteger(0);
+        AtomicInteger updateCount = new AtomicInteger(0);
+        List<String> executedSqls = new ArrayList<>();
+
+        OrmConfig config = new OrmConfig();
+        config.addInterceptor(new SqlInterceptor() {
+            @Override
+            public SqlAndParams beforeQuery(SqlAndParams sqlAndParams, EntityMetadata metadata, Dialect dialect) {
+                queryCount.incrementAndGet();
+                return sqlAndParams;
+            }
+
+            @Override
+            public SqlAndParams beforeUpdate(SqlAndParams sqlAndParams, EntityMetadata metadata, Dialect dialect) {
+                updateCount.incrementAndGet();
+                return sqlAndParams;
+            }
+
+            @Override
+            public void afterExecution(String sql, List<Object> params, long elapsedMillis, Throwable throwable) {
+                executedSqls.add(sql);
+            }
+        });
+
+        JavaOrm interceptorOrm = JavaOrm.create(dataSource, config);
+
+        MpUser user = new MpUser();
+        user.setName("InterceptorUser");
+        user.setAge(18);
+        interceptorOrm.insert(user);
+        Assert.assertEquals(1, updateCount.get());
+
+        interceptorOrm.select(MpUser.class).where().eq(MpUser::getName, "InterceptorUser").first();
+        Assert.assertEquals(1, queryCount.get());
+        Assert.assertTrue(executedSqls.size() >= 2);
     }
 }

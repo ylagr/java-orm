@@ -58,11 +58,19 @@ public class MyBatisPlusBridge implements MetadataBridge {
         Version version = getAnnotation(field, getter, Version.class);
         TableLogic tableLogic = getAnnotation(field, getter, TableLogic.class);
 
-        if (tableField == null && tableId == null && version == null && tableLogic == null) {
+        MyBatisPlusEnumConverter enumConverter = null;
+        if (field != null && field.getType().isEnum()) {
+            enumConverter = MyBatisPlusEnumConverter.tryCreate(field.getType());
+        }
+
+        if (tableField == null && tableId == null && version == null && tableLogic == null && enumConverter == null) {
             return null;
         }
 
         ColumnInfo info = new ColumnInfo();
+        if (enumConverter != null) {
+            info.setConverter(enumConverter);
+        }
 
         if (tableId != null) {
             info.setPrimaryKey(true);

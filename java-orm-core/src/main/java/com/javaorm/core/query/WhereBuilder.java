@@ -2942,6 +2942,38 @@ public class WhereBuilder<T> implements Query<T> {
         return (l != null && !l.isEmpty()) ? l.get(0) : null;
     }
 
+    @SuppressWarnings("unchecked")
+    public com.javaorm.core.pagination.PageResult<T> toPage(long pageNum, long pageSize) {
+        if (rootQuery != null) {
+            return (com.javaorm.core.pagination.PageResult<T>) rootQuery.toPage(pageNum, pageSize);
+        }
+        throw new UnsupportedOperationException("toPage() requires a root select query");
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <P> P toPage(long pageNum, long pageSize, com.javaorm.core.pagination.PageFactory<T, P> pageFactory) {
+        if (rootQuery != null) {
+            return (P) ((SelectBuilder) rootQuery).toPage(pageNum, pageSize, pageFactory);
+        }
+        throw new UnsupportedOperationException("toPage() requires a root select query");
+    }
+
+    @SuppressWarnings("unchecked")
+    public <P> P toPage(P page) {
+        if (rootQuery != null) {
+            return (P) rootQuery.toPage(page);
+        }
+        throw new UnsupportedOperationException("toPage() requires a root select query");
+    }
+
+    @SuppressWarnings("unchecked")
+    public <P> P toPage(P page, com.javaorm.core.pagination.PageAdapter<P> adapter) {
+        if (rootQuery != null) {
+            return (P) rootQuery.toPage(page, adapter);
+        }
+        throw new UnsupportedOperationException("toPage() requires a root select query");
+    }
+
     @Override
     @SuppressWarnings("unchecked")
     public T firstOrNull() {

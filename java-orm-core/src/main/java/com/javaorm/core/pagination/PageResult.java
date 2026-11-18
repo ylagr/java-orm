@@ -9,7 +9,7 @@ import java.util.List;
  *
  * @param <T> 数据实体或 DTO 类型
  */
-public class PageResult<T> implements Serializable {
+public class PageResult<T> implements Page<T> {
 
     private static final long serialVersionUID = 1L;
 
@@ -25,6 +25,11 @@ public class PageResult<T> implements Serializable {
         this.pageSize = pageSize;
     }
 
+    public PageResult(long total, List<T> data, long pageNum, long pageSize) {
+        this(total, data, (int) pageNum, (int) pageSize);
+    }
+
+    @Override
     public long getTotal() {
         return total;
     }
@@ -33,11 +38,18 @@ public class PageResult<T> implements Serializable {
         return data;
     }
 
-    public int getPageNum() {
+    @Override
+    public List<T> getRecords() {
+        return data;
+    }
+
+    @Override
+    public long getPageNum() {
         return pageNum;
     }
 
-    public int getPageSize() {
+    @Override
+    public long getPageSize() {
         return pageSize;
     }
 

@@ -30,13 +30,15 @@ public class EntityHydrator {
             List<T> mapList = (List<T>) (List<?>) queryMaps(conn, stmt, dialect, config);
             return mapList;
         }
-        SqlAndParams sqlAndParams = dialect.buildSelect(stmt);
+        SqlAndParams sqlAndParams = applyQueryInterceptors(dialect.buildSelect(stmt), metadata, dialect, config);
         if (config.isPrintSql()) {
             log.info("==>  Preparing: {}", sqlAndParams.getSql());
             log.info("==> Parameters: {}", sqlAndParams.getParams());
         }
 
         List<T> list = new ArrayList<>();
+        long start = System.currentTimeMillis();
+        Throwable err = null;
         try (PreparedStatement ps = prepareStatement(conn, sqlAndParams, dialect, stmt != null && !stmt.getCtes().isEmpty())) {
             try (ResultSet rs = ps.executeQuery()) {
                 ResultSetMetaData rsmd = rs.getMetaData();
@@ -65,6 +67,12 @@ public class EntityHydrator {
                     list.add(entity);
                 }
             }
+        } catch (Throwable t) {
+            err = t;
+            if (t instanceof RuntimeException) throw (RuntimeException) t;
+            throw new RuntimeException("Failed to execute query", t);
+        } finally {
+            notifyAfterExecution(sqlAndParams, System.currentTimeMillis() - start, err, config);
         }
         return list;
     }
@@ -302,5 +310,18 @@ public class EntityHydrator {
             ps.setObject(i + 1, sqlAndParams.getParams().get(i));
         }
         return ps;
+    }
+
+    public static SqlAndParams applyQueryInterceptors(SqlAndParams sqlAndParams, EntityMetadata metadata, Dialect dialect, OrmConfig config) {
+        if (config != null && config.getInterceptorChain() != null && !config.getInterceptorChain().isEmpty()) {
+            return config.getInterceptorChain().pluginQuery(sqlAndParams, metadata, dialect);
+        }
+        return sqlAndParams;
+    }
+
+    public static void notifyAfterExecution(SqlAndParams sqlAndParams, long elapsedMillis, Throwable err, OrmConfig config) {
+        if (config != null && config.getInterceptorChain() != null && !config.getInterceptorChain().isEmpty()) {
+            config.getInterceptorChain().triggerAfterExecution(sqlAndParams.getSql(), sqlAndParams.getParams(), elapsedMillis, err);
+        }
     }
 }

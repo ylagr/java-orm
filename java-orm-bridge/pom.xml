@@ -43,6 +43,22 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- MyBatis-Plus 核心契约 (IPage, IEnum 等) (provided/optional) -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-core</artifactId>
+            <version>${mybatis-plus.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- MyBatis-Plus 扩展 (Page 实现类，测试用) -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-extension</artifactId>
+            <version>${mybatis-plus.version}</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- EasyQuery 核心 (provided/optional) -->
         <dependency>
             <groupId>com.easy-query</groupId>

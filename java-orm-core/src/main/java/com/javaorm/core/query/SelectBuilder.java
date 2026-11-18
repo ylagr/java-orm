@@ -1104,11 +1104,47 @@ public class SelectBuilder<T> implements Query<T> {
         return this;
     }
 
-    public com.javaorm.core.pagination.PageResult<T> toPageResult(int pageNum, int pageSize) {
+    public com.javaorm.core.pagination.PageResult<T> toPage(long pageNum, long pageSize) {
+        return toPage(pageNum, pageSize, com.javaorm.core.pagination.PageResult::new);
+    }
+
+    public <P> P toPage(long pageNum, long pageSize, com.javaorm.core.pagination.PageFactory<T, P> pageFactory) {
+        if (pageFactory == null) {
+            throw new IllegalArgumentException("PageFactory must not be null");
+        }
         long total = count();
-        page(pageNum, pageSize);
+        page((int) pageNum, (int) pageSize);
         List<T> data = (total > 0) ? list() : Collections.<T>emptyList();
-        return new com.javaorm.core.pagination.PageResult<>(total, data, pageNum, pageSize);
+        return pageFactory.create(total, data, pageNum, pageSize);
+    }
+
+    public <P> P toPage(P page) {
+        if (page == null) {
+            throw new IllegalArgumentException("Page instance must not be null");
+        }
+        com.javaorm.core.pagination.PageAdapter<P> adapter = com.javaorm.core.pagination.PageAdapterRegistry.getAdapter(page);
+        if (adapter == null) {
+            throw new IllegalArgumentException("No PageAdapter registered for type: " + page.getClass().getName());
+        }
+        return toPage(page, adapter);
+    }
+
+    public <P> P toPage(P page, com.javaorm.core.pagination.PageAdapter<P> adapter) {
+        if (page == null || adapter == null) {
+            throw new IllegalArgumentException("Page and PageAdapter must not be null");
+        }
+        long pageNum = adapter.getPageNum(page);
+        long pageSize = adapter.getPageSize(page);
+        long total = count();
+        page((int) pageNum, (int) pageSize);
+        List<T> data = (total > 0) ? list() : Collections.<T>emptyList();
+        adapter.setTotal(page, total);
+        adapter.setRecords(page, data);
+        return page;
+    }
+
+    public com.javaorm.core.pagination.PageResult<T> toPageResult(int pageNum, int pageSize) {
+        return toPage(pageNum, pageSize);
     }
 
     public com.javaorm.core.pagination.PageResult<T> toPageResult() {
@@ -1116,9 +1152,7 @@ public class SelectBuilder<T> implements Query<T> {
         int offset = statement.getOffset();
         int pageSize = limit > 0 ? limit : 20;
         int pageNum = offset > 0 ? (offset / pageSize + 1) : 1;
-        long total = count();
-        List<T> data = (total > 0) ? list() : Collections.<T>emptyList();
-        return new com.javaorm.core.pagination.PageResult<>(total, data, pageNum, pageSize);
+        return toPage(pageNum, pageSize);
     }
 
     public SelectBuilder<T> limit(int limit) {

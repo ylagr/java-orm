@@ -18,6 +18,9 @@
 - 🌉 **多框架无缝桥接模块（java-orm-bridge）**：
   - **注解支持列表动态获取与去重合并**：基于 SPI 动态加载外部元数据，核心模块零硬编码。引入桥接包后，同时支持 **MyBatis-Plus**（`@TableName`, `@TableId`, `@TableField`, `@Version`, `@TableLogic`）、**EasyQuery**（`@Table`, `@Column`, `@Version`, `@LogicDelete` 等）、**JPA**（`@Table`, `@Id`, `@Column`, `@Version`）等注解，多注解并存时按优先级智能去重合并为一个属性。
   - **MyBatis 深度执行器集成**：提供 `MyBatisSqlExecutor` 与 `JavaOrmMyBatisSupport`，Java-ORM 的流式 DSL 直接运行在 MyBatis 的 `SqlSession` / Spring 事务管理上下文中！
+- 📄 **通用无侵入分页模式（Zero-Invasive Pagination）**：提供统一的 `toPage(pageNum, pageSize)` 入口，支持函数式工厂引用（如 `toPage(1, 10, MyCustomVoPage::new)`）零侵入返回业务自定义 Page 对象；通过 SPI 原生无缝适配 MyBatis-Plus 的 `IPage<T>` 实例传参并就地回写返回。
+- 🔍 **SQL 切面与执行拦截器（SqlInterceptor）**：支持对所有查询与增删改操作进行 `beforeQuery`、`beforeUpdate`、`afterExecution` 环绕切面监控、SQL 动态改写与慢查询耗时统计，并提供 `MyBatisSqlInterceptorBridge` 无缝桥接 MyBatis 插件生态。
+- 🎯 **第三方枚举原生桥接（IEnum & @EnumValue）**：自动识别 MyBatis-Plus 的 `IEnum` 接口与 `@EnumValue` 注解，预热静态反射缓存，实现 O(1) 零反射耗时持久化与反序列化。
 - 🚀 **零 APT 编译依赖**：无需在 `pom.xml` 中配置任何 annotation processor，无须生成 `QUser` 或 `UserProxy` 冗余代码，代码随写随测，实体即改即用。
 - 🔍 **多级字段感知与 IDE 原生重构**：直接写 `s -> s.getTeacher().getAge()` 或 `Student::getAge`，IDE 原生自动补全字段，重命名时全局安全重构。
 - 🌊 **扁平流畅的 SQL 条件流**：支持 `where().eq([condition, ]column, value)`，自带布尔判断参数，无需繁复的 `if` 拼接。
@@ -353,6 +356,63 @@ try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
         .gt(User::getAge, 18)
         .list();
 }
+```
+
+### 8. 通用无侵入分页（Zero-Invasive Pagination）
+
+Java-ORM 采用统一的入口模式，不强制绑定任何分页实现类：
+
+```java
+// 模式 1：开箱即用内置 PageResult（完全兼容 Page<T> 标准契约与 records / list 访问）
+Page<User> page = orm.select(User.class)
+    .where().gt(User::getAge, 18)
+    .toPage(1, 10);
+
+// 模式 2：零侵入返回业务自定义 VO / DTO 分页类（通过构造引用 (page, size, total, list) -> CustomPage）
+public class MyVoPage<T> {
+    public MyVoPage(long current, long size, long total, List<T> data) { ... }
+}
+
+MyVoPage<User> voPage = orm.select(User.class)
+    .where().gt(User::getAge, 18)
+    .toPage(1, 10, MyVoPage::new); // 零框架依赖，直接强类型返回！
+
+// 模式 3：无缝对接 MyBatis-Plus 的 IPage 实例（就地回写，零侵入）
+IPage<User> mpPage = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, 10);
+IPage<User> result = orm.select(User.class)
+    .where().gt(User::getAge, 18)
+    .toPage(mpPage); // 框架通过 SPI 自动适配 IPage，回填 total/records 后返回
+```
+
+### 9. SQL 切面与拦截器（SqlInterceptor）
+
+支持对查询、新增、修改、删除等所有 SQL 操作进行统一切面拦截与耗时监控：
+
+```java
+OrmConfig config = new OrmConfig();
+config.addInterceptor(new SqlInterceptor() {
+    @Override
+    public SqlAndParams beforeQuery(SqlAndParams sqlAndParams, EntityMetadata metadata, Dialect dialect) {
+        // 动态改写查询 SQL 或追加租户参数
+        return sqlAndParams;
+    }
+
+    @Override
+    public SqlAndParams beforeUpdate(SqlAndParams sqlAndParams, EntityMetadata metadata, Dialect dialect) {
+        // 动态改写新增/修改/删除 SQL
+        return sqlAndParams;
+    }
+
+    @Override
+    public void afterExecution(String sql, List<Object> params, long elapsedMillis, Throwable throwable) {
+        // 统计慢 SQL、输出耗时日志或接入链路追踪
+        if (elapsedMillis > 1000) {
+            System.err.println("Slow SQL: " + sql + ", cost: " + elapsedMillis + "ms");
+        }
+    }
+});
+
+JavaOrm orm = JavaOrm.create(dataSource, config);
 ```
 
 ---

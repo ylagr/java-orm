@@ -138,4 +138,15 @@ public class OrmConfig {
         this.dataSourceManager = dataSourceManager;
         return this;
     }
+
+    private final com.javaorm.core.interceptor.InterceptorChain interceptorChain = new com.javaorm.core.interceptor.InterceptorChain();
+
+    public com.javaorm.core.interceptor.InterceptorChain getInterceptorChain() {
+        return interceptorChain;
+    }
+
+    public OrmConfig addInterceptor(com.javaorm.core.interceptor.SqlInterceptor interceptor) {
+        interceptorChain.addInterceptor(interceptor);
+        return this;
+    }
 }
