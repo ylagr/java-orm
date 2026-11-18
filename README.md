@@ -18,6 +18,7 @@
 - 🌉 **多框架无缝桥接模块（java-orm-bridge）**：
   - **注解支持列表动态获取与去重合并**：基于 SPI 动态加载外部元数据，核心模块零硬编码。引入桥接包后，同时支持 **MyBatis-Plus**（`@TableName`, `@TableId`, `@TableField`, `@Version`, `@TableLogic`）、**EasyQuery**（`@Table`, `@Column`, `@Version`, `@LogicDelete` 等）、**JPA**（`@Table`, `@Id`, `@Column`, `@Version`）等注解，多注解并存时按优先级智能去重合并为一个属性。
   - **MyBatis 深度执行器集成**：提供 `MyBatisSqlExecutor` 与 `JavaOrmMyBatisSupport`，Java-ORM 的流式 DSL 直接运行在 MyBatis 的 `SqlSession` / Spring 事务管理上下文中！
+  - **MyBatis-Plus 原生插件体系全兼容（MyBatisPlusInterceptorBridge）**：全面适配 MyBatis-Plus 的 `InnerInterceptor` 生态，支持多租户（`TenantLineInnerInterceptor`）、动态表名（`DynamicTableNameInnerInterceptor`）、防全表更新删除（`BlockAttackInnerInterceptor`）等；支持从 `SqlSession` 自动继承现有 MP 插件！
 - 📄 **通用无侵入分页模式（Zero-Invasive Pagination）**：提供统一的 `toPage(pageNum, pageSize)` 入口，支持函数式工厂引用（如 `toPage(1, 10, MyCustomVoPage::new)`）零侵入返回业务自定义 Page 对象；通过 SPI 原生无缝适配 MyBatis-Plus 的 `IPage<T>` 实例传参并就地回写返回。
 - 🔍 **SQL 切面与执行拦截器（SqlInterceptor）**：支持对所有查询与增删改操作进行 `beforeQuery`、`beforeUpdate`、`afterExecution` 环绕切面监控、SQL 动态改写与慢查询耗时统计，并提供 `MyBatisSqlInterceptorBridge` 无缝桥接 MyBatis 插件生态。
 - 🎯 **第三方枚举原生桥接（IEnum & @EnumValue）**：自动识别 MyBatis-Plus 的 `IEnum` 接口与 `@EnumValue` 注解，预热静态反射缓存，实现 O(1) 零反射耗时持久化与反序列化。
@@ -413,6 +414,49 @@ config.addInterceptor(new SqlInterceptor() {
 });
 
 JavaOrm orm = JavaOrm.create(dataSource, config);
+```
+
+### 10. MyBatis-Plus 原生插件生态适配（MyBatisPlusInterceptorBridge）
+
+Java-ORM 深度兼容 MyBatis-Plus 原生的 `InnerInterceptor` 插件生态：
+
+```java
+// 1. 创建 MyBatis-Plus 原生插件（可组合任意 InnerInterceptor）
+MybatisPlusInterceptor mpInterceptor = new MybatisPlusInterceptor();
+
+// 1.1 动态表名插件（根据规则动态改写物理表名）
+DynamicTableNameInnerInterceptor dynamicTableInterceptor = new DynamicTableNameInnerInterceptor();
+dynamicTableInterceptor.setTableNameHandler((sql, tableName) -> {
+    return "t_user".equals(tableName) ? "t_user_2026" : tableName;
+});
+mpInterceptor.addInnerInterceptor(dynamicTableInterceptor);
+
+// 1.2 多租户行级隔离插件（自动向 SELECT/UPDATE/DELETE 注入租户条件，向 INSERT 注入租户列）
+mpInterceptor.addInnerInterceptor(new TenantLineInnerInterceptor(new TenantLineHandler() {
+    @Override
+    public Expression getTenantId() { return new LongValue(1001L); }
+    @Override
+    public String getTenantIdColumn() { return "tenant_id"; }
+    @Override
+    public boolean ignoreTable(String tableName) { return false; }
+}));
+
+// 1.3 防全表更新/删除攻击插件（阻止无 WHERE 条件的危险更新与删除）
+mpInterceptor.addInnerInterceptor(new BlockAttackInnerInterceptor());
+
+// 方式 A：独立使用 Java-ORM 时直接挂载
+OrmConfig config = new OrmConfig();
+config.addInterceptor(new MyBatisPlusInterceptorBridge(mpInterceptor));
+JavaOrm orm = JavaOrm.create(dataSource, config);
+
+// 方式 B：在 MyBatis / MyBatis-Plus 环境下自动继承（零额外配置！）
+try (SqlSession session = sqlSessionFactory.openSession()) {
+    // 自动探测并继承 MyBatis Configuration 中已配置的所有 MP 拦截器插件！
+    JavaOrm mybatisOrm = JavaOrmMyBatisSupport.from(session);
+    
+    // 全表更新无 WHERE 条件时，将自动被 BlockAttackInnerInterceptor 拦截并抛出异常
+    mybatisOrm.update(User.class).set(User::getAge, 18).execute();
+}
 ```
 
 ---

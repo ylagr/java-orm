@@ -30,6 +30,7 @@ public class JavaOrmMyBatisSupport {
 
         OrmConfig config = new OrmConfig();
         config.setSqlExecutor(new MyBatisSqlExecutor(sqlSession));
+        autoRegisterInterceptors(config, configuration);
 
         return JavaOrm.create(dataSource, config);
     }
@@ -46,8 +47,23 @@ public class JavaOrmMyBatisSupport {
 
         OrmConfig config = new OrmConfig();
         config.setSqlExecutor(new MyBatisSqlExecutor(sqlSessionFactory));
+        autoRegisterInterceptors(config, configuration);
 
         return JavaOrm.create(dataSource, config);
+    }
+
+    private static void autoRegisterInterceptors(OrmConfig config, Configuration configuration) {
+        if (configuration == null || configuration.getInterceptors() == null) {
+            return;
+        }
+        for (org.apache.ibatis.plugin.Interceptor interceptor : configuration.getInterceptors()) {
+            if (interceptor instanceof com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor) {
+                config.addInterceptor(new com.javaorm.bridge.mp.MyBatisPlusInterceptorBridge(
+                        (com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor) interceptor));
+            } else if (interceptor instanceof com.javaorm.core.interceptor.SqlInterceptor) {
+                config.addInterceptor((com.javaorm.core.interceptor.SqlInterceptor) interceptor);
+            }
+        }
     }
 
     private static DataSource resolveDataSource(Configuration configuration) {

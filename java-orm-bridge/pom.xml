@@ -51,12 +51,12 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- MyBatis-Plus 扩展 (Page 实现类，测试用) -->
+        <!-- MyBatis-Plus 扩展 (Page 实现类, InnerInterceptor 等插件) (provided/optional) -->
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-extension</artifactId>
             <version>${mybatis-plus.version}</version>
-            <scope>test</scope>
+            <optional>true</optional>
         </dependency>
 
         <!-- EasyQuery 核心 (provided/optional) -->

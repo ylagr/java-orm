@@ -48,6 +48,13 @@ public class MyBatisPlusBridge implements MetadataBridge {
             info.setSchema(schema);
         }
 
+        try {
+            com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+                    new org.apache.ibatis.builder.MapperBuilderAssistant(new org.apache.ibatis.session.Configuration(), ""),
+                    entityClass);
+        } catch (Throwable ignored) {
+        }
+
         return info;
     }
 

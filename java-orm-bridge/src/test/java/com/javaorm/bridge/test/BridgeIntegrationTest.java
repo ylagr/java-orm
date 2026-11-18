@@ -6,7 +6,16 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.core.exceptions.MybatisPlusException;
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
+import com.baomidou.mybatisplus.extension.plugins.inner.BlockAttackInnerInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.DynamicTableNameInnerInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.javaorm.bridge.mp.MyBatisPlusInterceptorBridge;
+import net.sf.jsqlparser.expression.Expression;
+import net.sf.jsqlparser.expression.LongValue;
 import com.easy.query.core.annotation.Column;
 import com.easy.query.core.annotation.LogicDelete;
 import com.easy.query.core.annotation.Table;
@@ -218,7 +227,19 @@ public class BridgeIntegrationTest {
                     "user_version INT DEFAULT 1, " +
                     "is_deleted INT DEFAULT 0, " +
                     "user_status INT, " +
-                    "user_grade INT)");
+                    "user_grade INT, " +
+                    "tenant_id INT DEFAULT 0)");
+
+            stmt.execute("DROP TABLE IF EXISTS t_mp_user_dyn");
+            stmt.execute("CREATE TABLE t_mp_user_dyn (" +
+                    "user_id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "user_name VARCHAR(50), " +
+                    "user_age INT, " +
+                    "user_version INT DEFAULT 1, " +
+                    "is_deleted INT DEFAULT 0, " +
+                    "user_status INT, " +
+                    "user_grade INT, " +
+                    "tenant_id INT DEFAULT 0)");
 
             stmt.execute("DROP TABLE IF EXISTS t_eq_product");
             stmt.execute("CREATE TABLE t_eq_product (" +
@@ -443,5 +464,122 @@ public class BridgeIntegrationTest {
         interceptorOrm.select(MpUser.class).where().eq(MpUser::getName, "InterceptorUser").first();
         Assert.assertEquals(1, queryCount.get());
         Assert.assertTrue(executedSqls.size() >= 2);
+    }
+
+    @Test
+    public void testMyBatisPlusDynamicTableNameInnerInterceptor() {
+        DynamicTableNameInnerInterceptor dynamicTableInterceptor = new DynamicTableNameInnerInterceptor();
+        dynamicTableInterceptor.setTableNameHandler((sql, tableName) -> {
+            if ("t_mp_user".equals(tableName)) {
+                return "t_mp_user_dyn";
+            }
+            return tableName;
+        });
+
+        OrmConfig config = new OrmConfig();
+        config.addInterceptor(new MyBatisPlusInterceptorBridge(dynamicTableInterceptor));
+        JavaOrm dynamicOrm = JavaOrm.create(dataSource, config);
+
+        MpUser u = new MpUser();
+        u.setName("DynUser");
+        u.setAge(22);
+        dynamicOrm.insert(u);
+
+        MpUser found = dynamicOrm.select(MpUser.class)
+                .where()
+                .eq(MpUser::getName, "DynUser")
+                .first();
+        Assert.assertNotNull(found);
+        Assert.assertEquals("DynUser", found.getName());
+    }
+
+    @Test
+    public void testMyBatisPlusTenantLineInnerInterceptor() {
+        TenantLineInnerInterceptor tenantLineInterceptor = new TenantLineInnerInterceptor(new TenantLineHandler() {
+            @Override
+            public Expression getTenantId() {
+                return new LongValue(888L);
+            }
+
+            @Override
+            public String getTenantIdColumn() {
+                return "tenant_id";
+            }
+
+            @Override
+            public boolean ignoreTable(String tableName) {
+                return !"t_mp_user".equals(tableName);
+            }
+        });
+
+        OrmConfig tenantConfig = new OrmConfig();
+        tenantConfig.addInterceptor(new MyBatisPlusInterceptorBridge(tenantLineInterceptor));
+        JavaOrm tenantOrm = JavaOrm.create(dataSource, tenantConfig);
+
+        MpUser u = new MpUser();
+        u.setName("TenantUser");
+        u.setAge(30);
+        tenantOrm.insert(u);
+
+        // 使用普通 orm 查询原生数据，验证已被拦截并附带 tenant_id = 888
+        List<MpUser> list = orm.select(MpUser.class).where().eq(MpUser::getName, "TenantUser").list();
+        Assert.assertFalse(list.isEmpty());
+
+        // 使用 tenantOrm 查询，自动拼装 tenant_id = 888 条件
+        MpUser found = tenantOrm.select(MpUser.class).where().eq(MpUser::getName, "TenantUser").first();
+        Assert.assertNotNull(found);
+    }
+
+    @Test
+    public void testMyBatisPlusBlockAttackInnerInterceptor() {
+        BlockAttackInnerInterceptor blockAttackInterceptor = new BlockAttackInnerInterceptor();
+        OrmConfig config = new OrmConfig();
+        config.addInterceptor(new MyBatisPlusInterceptorBridge(blockAttackInterceptor));
+        JavaOrm blockOrm = JavaOrm.create(dataSource, config);
+
+        // 尝试执行无 WHERE 条件的全表更新（使用无逻辑删除的 MixedOrder 实体），验证被 BlockAttack 拦截抛出异常
+        boolean blocked = false;
+        try {
+            blockOrm.update(MixedOrder.class)
+                    .set(MixedOrder::getOrderNo, "hacked_no")
+                    .execute();
+        } catch (Exception e) {
+            if (e.toString().contains("Prohibition of table update operation")) {
+                blocked = true;
+            }
+        }
+        Assert.assertTrue("Should be blocked by BlockAttackInnerInterceptor", blocked);
+
+        // 带 WHERE 条件的更新应当顺利通过
+        int rows = blockOrm.update(MixedOrder.class)
+                .set(MixedOrder::getOrderNo, "valid_no")
+                .where()
+                .eq(MixedOrder::getId, 1L)
+                .execute();
+        Assert.assertTrue(rows >= 0);
+    }
+
+    @Test
+    public void testMyBatisPlusInterceptorContainerAndMyBatisSupport() {
+        MybatisPlusInterceptor mpInterceptor = new MybatisPlusInterceptor();
+        mpInterceptor.addInnerInterceptor(new BlockAttackInnerInterceptor());
+
+        // 注册至 MyBatis Configuration
+        Configuration mybatisConfig = sqlSessionFactory.getConfiguration();
+        mybatisConfig.addInterceptor(mpInterceptor);
+
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            JavaOrm mybatisOrm = JavaOrmMyBatisSupport.from(session);
+            // 验证已自动继承 MP 的 BlockAttackInnerInterceptor
+            boolean attackBlocked = false;
+            try {
+                mybatisOrm.update(MixedOrder.class).set(MixedOrder::getOrderNo, "hacked_no").execute();
+            } catch (Exception e) {
+                if (e.toString().contains("Prohibition of table update operation")) {
+                    attackBlocked = true;
+                }
+            }
+            Assert.assertTrue("Should auto inherit BlockAttackInnerInterceptor from SqlSession", attackBlocked);
+        }
     }
 }

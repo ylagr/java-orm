@@ -29,13 +29,21 @@ import java.util.Properties;
 public class MyBatisSqlInterceptorBridge implements SqlInterceptor, Interceptor {
 
     private final Interceptor mybatisInterceptor;
+    private final com.javaorm.bridge.mp.MyBatisPlusInterceptorBridge mpBridge;
 
     public MyBatisSqlInterceptorBridge() {
         this.mybatisInterceptor = null;
+        this.mpBridge = null;
     }
 
     public MyBatisSqlInterceptorBridge(Interceptor mybatisInterceptor) {
         this.mybatisInterceptor = mybatisInterceptor;
+        if (mybatisInterceptor instanceof com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor) {
+            this.mpBridge = new com.javaorm.bridge.mp.MyBatisPlusInterceptorBridge(
+                    (com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor) mybatisInterceptor);
+        } else {
+            this.mpBridge = null;
+        }
     }
 
     @Override
@@ -45,16 +53,25 @@ public class MyBatisSqlInterceptorBridge implements SqlInterceptor, Interceptor 
 
     @Override
     public SqlAndParams beforeQuery(SqlAndParams sqlAndParams, EntityMetadata metadata, Dialect dialect) {
+        if (mpBridge != null) {
+            return mpBridge.beforeQuery(sqlAndParams, metadata, dialect);
+        }
         return sqlAndParams;
     }
 
     @Override
     public SqlAndParams beforeUpdate(SqlAndParams sqlAndParams, EntityMetadata metadata, Dialect dialect) {
+        if (mpBridge != null) {
+            return mpBridge.beforeUpdate(sqlAndParams, metadata, dialect);
+        }
         return sqlAndParams;
     }
 
     @Override
     public void afterExecution(String sql, List<Object> params, long elapsedMillis, Throwable throwable) {
+        if (mpBridge != null) {
+            mpBridge.afterExecution(sql, params, elapsedMillis, throwable);
+        }
     }
 
     @Override
