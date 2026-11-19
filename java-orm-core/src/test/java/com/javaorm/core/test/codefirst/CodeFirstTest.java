@@ -20,6 +20,9 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import com.javaorm.core.codefirst.PhysicalColumnDesc;
+import com.javaorm.core.codefirst.SchemaInspector;
 
 /**
  * Code-First 架构同步全面测试套件：
@@ -114,6 +117,70 @@ public class CodeFirstTest {
         private Integer age;
 
         @JoColumn(defaultValue = "'default_nick'")
+        private String nickname;
+
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public Integer getAge() {
+            return age;
+        }
+
+        public void setAge(Integer age) {
+            this.age = age;
+        }
+
+        public String getNickname() {
+            return nickname;
+        }
+
+        public void setNickname(String nickname) {
+            this.nickname = nickname;
+        }
+    }
+
+    /**
+     * 演示实体演进模型 V2：
+     * 1. username 字段长度从原本的 50 扩容变更为 150
+     * 2. nickname 字段默认值从原本的 'default_nick' 变更为 'vip_user'
+     */
+    @JoTable(name = "t_cf_user")
+    public static class UserEntityV2 {
+        @JoId
+        private Long id;
+
+        // 长度从 50 变更至 150
+        @JoColumn(length = 150)
+        private String username;
+
+        @JoColumn(length = 128)
+        private String email;
+
+        private Integer age;
+
+        // 默认值变更至 'vip_user'
+        @JoColumn(defaultValue = "'vip_user'")
         private String nickname;
 
         public Long getId() {
@@ -323,5 +390,67 @@ public class CodeFirstTest {
         try (Connection conn = dataSource.getConnection()) {
             Assert.assertTrue(com.javaorm.core.codefirst.SchemaInspector.getExistingColumns(conn, null, "t_cf_user").contains("email"));
         }
+    }
+
+    /**
+     * 6. 测试 UPDATE 模式下已有字段的长度变更与默认值变更自动检测与同步（ALTER COLUMN SET DATA TYPE / SET DEFAULT）
+     */
+    @Test
+    public void testAlterColumnLengthAndDefaultValue() throws Exception {
+        OrmConfig config = new OrmConfig()
+                .setCodeFirstMode(CodeFirstMode.UPDATE)
+                .setPrintSql(true);
+        JavaOrm orm = JavaOrm.create(dataSource, new H2Dialect(), config);
+
+        // 1. 验证初始表结构：t_cf_user 的 username 长度为 50
+        try (Connection conn = dataSource.getConnection()) {
+            Map<String, PhysicalColumnDesc> details = SchemaInspector.getExistingColumnDetails(conn, null, "t_cf_user");
+            Assert.assertEquals(50, details.get("username").getColumnSize());
+        }
+
+        // 2. 先同步 UserEntity 补齐基础字段（如 nickname 带有默认值 'default_nick'）
+        orm.codeFirst().syncTable(UserEntity.class);
+
+        // 验证补齐后 nickname 默认值包含 'default_nick'
+        try (Connection conn = dataSource.getConnection()) {
+            Map<String, PhysicalColumnDesc> details = SchemaInspector.getExistingColumnDetails(conn, null, "t_cf_user");
+            Assert.assertNotNull(details.get("nickname").getDefaultValue());
+            Assert.assertTrue(details.get("nickname").getDefaultValue().contains("default_nick"));
+        }
+
+        // 3. 使用实体演进版本 UserEntityV2 生成 DDL 预览
+        // 变更点：
+        //   - username: 长度从 50 变更到 150
+        //   - nickname: 默认值从 'default_nick' 变更到 'vip_user'
+        List<String> alterDdls = orm.codeFirst().generateDdl(UserEntityV2.class);
+        System.out.println("Generated Alter DDLs: " + alterDdls);
+
+        boolean hasLengthAlter = alterDdls.stream().anyMatch(sql -> sql.toUpperCase().contains("SET DATA TYPE") && sql.contains("150"));
+        Assert.assertTrue("DDL 列表中应包含 username 长度扩容到 150 的 ALTER 语句", hasLengthAlter);
+
+        boolean hasDefaultAlter = alterDdls.stream().anyMatch(sql -> sql.toUpperCase().contains("SET DEFAULT") && sql.contains("vip_user"));
+        Assert.assertTrue("DDL 列表中应包含 nickname 默认值变更到 vip_user 的 ALTER 语句", hasDefaultAlter);
+
+        // 4. 执行架构同步
+        orm.codeFirst().syncTable(UserEntityV2.class);
+
+        // 5. 校验数据库物理元数据是否已成功更新
+        try (Connection conn = dataSource.getConnection()) {
+            Map<String, PhysicalColumnDesc> details = SchemaInspector.getExistingColumnDetails(conn, null, "t_cf_user");
+            Assert.assertEquals("username 字段长度应该已变更为 150", 150, details.get("username").getColumnSize());
+            Assert.assertTrue("nickname 字段默认值应该已变更为 vip_user", details.get("nickname").getDefaultValue().contains("vip_user"));
+        }
+
+        // 6. 验证执行后数据读写完好，默认值生效
+        orm.sql(e -> {
+            UserEntityV2 u = e.table(UserEntityV2.class);
+            e.update(u)
+                    .set(u.getUsername(), "a_very_long_username_that_exceeds_fifty_characters_0123456789_abcdefg")
+                    .where().eq(u.getId(), 1L);
+        }).exec();
+
+        UserEntityV2 alice = orm.select(UserEntityV2.class).where().eq(UserEntityV2::getId, 1L).first();
+        Assert.assertNotNull(alice);
+        Assert.assertEquals("a_very_long_username_that_exceeds_fifty_characters_0123456789_abcdefg", alice.getUsername());
     }
 }

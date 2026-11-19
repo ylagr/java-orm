@@ -51,7 +51,14 @@ public class SchemaInspector {
      * 获取指定表中已存在的所有字段列名（大小写不敏感 Set）
      */
     public static Set<String> getExistingColumns(Connection conn, String schema, String tableName) throws SQLException {
-        Set<String> columns = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        return getExistingColumnDetails(conn, schema, tableName).keySet();
+    }
+
+    /**
+     * 获取指定表中已存在的所有字段详细属性（大小写不敏感 Map，包含列名、类型、长度、标度、默认值、可空性等）
+     */
+    public static java.util.Map<String, PhysicalColumnDesc> getExistingColumnDetails(Connection conn, String schema, String tableName) throws SQLException {
+        java.util.Map<String, PhysicalColumnDesc> columns = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         DatabaseMetaData meta = conn.getMetaData();
         String catalog = null;
         try {
@@ -67,7 +74,18 @@ public class SchemaInspector {
                 while (rs.next()) {
                     String col = rs.getString("COLUMN_NAME");
                     if (col != null) {
-                        columns.add(col);
+                        int dataType = rs.getInt("DATA_TYPE");
+                        String typeName = rs.getString("TYPE_NAME");
+                        int columnSize = rs.getInt("COLUMN_SIZE");
+                        int decimalDigits = rs.getInt("DECIMAL_DIGITS");
+                        int nullable = rs.getInt("NULLABLE");
+                        String defaultValue = rs.getString("COLUMN_DEF");
+                        String remarks = rs.getString("REMARKS");
+
+                        PhysicalColumnDesc desc = new PhysicalColumnDesc(
+                                col, dataType, typeName, columnSize, decimalDigits, nullable, defaultValue, remarks
+                        );
+                        columns.put(col, desc);
                         found = true;
                     }
                 }

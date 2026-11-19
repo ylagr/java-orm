@@ -265,4 +265,276 @@ public class DdlBuilder {
         if (val == null) return "";
         return val.replace("'", "''");
     }
+
+    /**
+     * 去除默认值中的冗余字符（首尾单双引号、PostgreSQL类型后缀如 ::text、MySQL外层括号等），以便精准对比差异
+     */
+    public static String normalizeDefaultValue(String val) {
+        if (val == null) return null;
+        String s = val.trim();
+        // 处理 PostgreSQL 类型后缀，如 'foo'::character varying 或 '1'::integer
+        int castIdx = s.indexOf("::");
+        if (castIdx > 0) {
+            s = s.substring(0, castIdx).trim();
+        }
+        // 处理 MySQL / H2 括号，如 ((1)) 或 (1)
+        while (s.startsWith("(") && s.endsWith(")") && s.length() >= 2) {
+            s = s.substring(1, s.length() - 1).trim();
+        }
+        // 处理包围的单引号或双引号
+        if ((s.startsWith("'") && s.endsWith("'")) || (s.startsWith("\"") && s.endsWith("\""))) {
+            if (s.length() >= 2) {
+                s = s.substring(1, s.length() - 1);
+            }
+        }
+        return s.trim();
+    }
+
+    /**
+     * 字段差异描述符
+     */
+    public static class ColumnDiff {
+        private boolean lengthChanged;
+        private boolean precisionChanged;
+        private boolean scaleChanged;
+        private boolean defaultValueChanged;
+        private boolean nullableChanged;
+        private boolean typeChanged;
+        private boolean commentChanged;
+
+        public boolean hasChange() {
+            return lengthChanged || precisionChanged || scaleChanged
+                    || defaultValueChanged || nullableChanged || typeChanged || commentChanged;
+        }
+
+        public boolean isLengthChanged() {
+            return lengthChanged;
+        }
+
+        public void setLengthChanged(boolean lengthChanged) {
+            this.lengthChanged = lengthChanged;
+        }
+
+        public boolean isPrecisionChanged() {
+            return precisionChanged;
+        }
+
+        public void setPrecisionChanged(boolean precisionChanged) {
+            this.precisionChanged = precisionChanged;
+        }
+
+        public boolean isScaleChanged() {
+            return scaleChanged;
+        }
+
+        public void setScaleChanged(boolean scaleChanged) {
+            this.scaleChanged = scaleChanged;
+        }
+
+        public boolean isDefaultValueChanged() {
+            return defaultValueChanged;
+        }
+
+        public void setDefaultValueChanged(boolean defaultValueChanged) {
+            this.defaultValueChanged = defaultValueChanged;
+        }
+
+        public boolean isNullableChanged() {
+            return nullableChanged;
+        }
+
+        public void setNullableChanged(boolean nullableChanged) {
+            this.nullableChanged = nullableChanged;
+        }
+
+        public boolean isTypeChanged() {
+            return typeChanged;
+        }
+
+        public void setTypeChanged(boolean typeChanged) {
+            this.typeChanged = typeChanged;
+        }
+
+        public boolean isCommentChanged() {
+            return commentChanged;
+        }
+
+        public void setCommentChanged(boolean commentChanged) {
+            this.commentChanged = commentChanged;
+        }
+    }
+
+    /**
+     * 对比实体定义与物理库列的差异（检测长度、精度、默认值、可空性等）
+     */
+    public static ColumnDiff diffColumn(Dialect dialect, ColumnMetadata col, PhysicalColumnDesc existing) {
+        ColumnDiff diff = new ColumnDiff();
+        if (col == null || existing == null) {
+            return diff;
+        }
+        if (col.isPrimaryKey()) {
+            return diff; // 主键列通常由自增或唯一索引管理，不随意执行结构微调
+        }
+
+        // 1. 字段长度变更检测（针对 String/字符类型）
+        if (col.getPropertyType() == String.class) {
+            int targetLength = col.getLength() > 0 ? col.getLength() : 255;
+            int dbLength = existing.getColumnSize();
+            if (dbLength > 0 && targetLength > 0 && dbLength != targetLength) {
+                diff.setLengthChanged(true);
+            }
+        }
+
+        // 2. 精度与标度变更检测（针对 BigDecimal）
+        if (col.getPropertyType() == BigDecimal.class) {
+            if (col.getPrecision() > 0 && existing.getColumnSize() > 0 && existing.getColumnSize() != col.getPrecision()) {
+                diff.setPrecisionChanged(true);
+            }
+            if (col.getScale() >= 0 && existing.getDecimalDigits() != col.getScale()) {
+                diff.setScaleChanged(true);
+            }
+        }
+
+        // 3. 默认值变更检测
+        if (col.getDefaultValue() != null && !col.getDefaultValue().trim().isEmpty()) {
+            String targetDef = normalizeDefaultValue(col.getDefaultValue());
+            String dbDef = normalizeDefaultValue(existing.getDefaultValue());
+            if (dbDef == null || !targetDef.equalsIgnoreCase(dbDef)) {
+                diff.setDefaultValueChanged(true);
+            }
+        }
+
+        // 4. 可空性变更检测（实体要求 NOT NULL，但数据库允许 NULL）
+        if (!col.isNullable() && existing.getNullable() == java.sql.DatabaseMetaData.columnNullable) {
+            diff.setNullableChanged(true);
+        }
+
+        // 5. 自定义 columnDefinition 变更检测
+        if (col.getColumnDefinition() != null && !col.getColumnDefinition().trim().isEmpty()) {
+            String targetDef = col.getColumnDefinition().trim();
+            if (existing.getTypeName() != null && !targetDef.equalsIgnoreCase(existing.getTypeName())) {
+                diff.setTypeChanged(true);
+            }
+        }
+
+        // 6. 注释变更检测
+        if (col.getComment() != null && !col.getComment().trim().isEmpty()) {
+            if (existing.getRemarks() == null || !existing.getRemarks().trim().equals(col.getComment().trim())) {
+                diff.setCommentChanged(true);
+            }
+        }
+
+        return diff;
+    }
+
+    /**
+     * 生成变更已有字段属性的 DDL 语句（ALTER TABLE MODIFY/ALTER COLUMN）
+     */
+    public static List<String> buildAlterColumn(Dialect dialect, EntityMetadata metadata, ColumnMetadata column, PhysicalColumnDesc existing, ColumnDiff diff) {
+        if (dialect == null || metadata == null || column == null || diff == null || !diff.hasChange()) {
+            return Collections.emptyList();
+        }
+        if (isSQLite(dialect)) {
+            // SQLite 存储层不强制类型长度且不支持 ALTER COLUMN，安全跳过
+            return Collections.emptyList();
+        }
+
+        String tableName = dialect.quote(metadata.getTableName());
+        String colName = dialect.quote(column.getColumnName());
+        String colType = getColumnType(dialect, column);
+        List<String> list = new ArrayList<>();
+
+        if (isMySQL(dialect)) {
+            // MySQL: ALTER TABLE `tbl` MODIFY COLUMN `col` colType [NOT NULL | NULL] [DEFAULT ...] [COMMENT '...']
+            StringBuilder sb = new StringBuilder();
+            sb.append("ALTER TABLE ").append(tableName).append(" MODIFY COLUMN ").append(colName).append(" ").append(colType);
+            if (!column.isNullable()) {
+                sb.append(" NOT NULL");
+            } else {
+                sb.append(" NULL");
+            }
+            if (column.getDefaultValue() != null && !column.getDefaultValue().trim().isEmpty()) {
+                sb.append(" DEFAULT ").append(column.getDefaultValue().trim());
+            }
+            if (column.getComment() != null && !column.getComment().trim().isEmpty()) {
+                sb.append(" COMMENT '").append(escapeSql(column.getComment().trim())).append("'");
+            }
+            list.add(sb.toString());
+            return list;
+        }
+
+        if (isPostgreSQL(dialect)) {
+            // PostgreSQL: ALTER TABLE "tbl" ALTER COLUMN "col" TYPE ... / SET DEFAULT ... / SET NOT NULL
+            if (diff.isLengthChanged() || diff.isPrecisionChanged() || diff.isScaleChanged() || diff.isTypeChanged()) {
+                list.add("ALTER TABLE " + tableName + " ALTER COLUMN " + colName + " TYPE " + colType);
+            }
+            if (diff.isDefaultValueChanged() && column.getDefaultValue() != null && !column.getDefaultValue().trim().isEmpty()) {
+                list.add("ALTER TABLE " + tableName + " ALTER COLUMN " + colName + " SET DEFAULT " + column.getDefaultValue().trim());
+            }
+            if (diff.isNullableChanged()) {
+                if (!column.isNullable()) {
+                    list.add("ALTER TABLE " + tableName + " ALTER COLUMN " + colName + " SET NOT NULL");
+                } else {
+                    list.add("ALTER TABLE " + tableName + " ALTER COLUMN " + colName + " DROP NOT NULL");
+                }
+            }
+            if (diff.isCommentChanged() && column.getComment() != null && !column.getComment().trim().isEmpty()) {
+                list.add("COMMENT ON COLUMN " + tableName + "." + colName + " IS '" + escapeSql(column.getComment().trim()) + "'");
+            }
+            return list;
+        }
+
+        if (isH2(dialect)) {
+            // H2: ALTER TABLE "tbl" ALTER COLUMN "col" SET DATA TYPE ... / SET DEFAULT ... / SET NOT NULL
+            if (diff.isLengthChanged() || diff.isPrecisionChanged() || diff.isScaleChanged() || diff.isTypeChanged()) {
+                list.add("ALTER TABLE " + tableName + " ALTER COLUMN " + colName + " SET DATA TYPE " + colType);
+            }
+            if (diff.isDefaultValueChanged() && column.getDefaultValue() != null && !column.getDefaultValue().trim().isEmpty()) {
+                list.add("ALTER TABLE " + tableName + " ALTER COLUMN " + colName + " SET DEFAULT " + column.getDefaultValue().trim());
+            }
+            if (diff.isNullableChanged()) {
+                if (!column.isNullable()) {
+                    list.add("ALTER TABLE " + tableName + " ALTER COLUMN " + colName + " SET NOT NULL");
+                } else {
+                    list.add("ALTER TABLE " + tableName + " ALTER COLUMN " + colName + " DROP NOT NULL");
+                }
+            }
+            if (diff.isCommentChanged() && column.getComment() != null && !column.getComment().trim().isEmpty()) {
+                list.add("COMMENT ON COLUMN " + tableName + "." + colName + " IS '" + escapeSql(column.getComment().trim()) + "'");
+            }
+            return list;
+        }
+
+        if (isOracle(dialect)) {
+            // Oracle: ALTER TABLE "tbl" MODIFY ("col" colType [DEFAULT ...] [NOT NULL | NULL])
+            StringBuilder modifySb = new StringBuilder();
+            modifySb.append("ALTER TABLE ").append(tableName).append(" MODIFY (").append(colName).append(" ").append(colType);
+            if (diff.isDefaultValueChanged() && column.getDefaultValue() != null && !column.getDefaultValue().trim().isEmpty()) {
+                modifySb.append(" DEFAULT ").append(column.getDefaultValue().trim());
+            }
+            if (diff.isNullableChanged()) {
+                if (!column.isNullable()) {
+                    modifySb.append(" NOT NULL");
+                } else {
+                    modifySb.append(" NULL");
+                }
+            }
+            modifySb.append(")");
+            list.add(modifySb.toString());
+
+            if (diff.isCommentChanged() && column.getComment() != null && !column.getComment().trim().isEmpty()) {
+                list.add("COMMENT ON COLUMN " + tableName + "." + colName + " IS '" + escapeSql(column.getComment().trim()) + "'");
+            }
+            return list;
+        }
+
+        // 默认 ANSI SQL 回退
+        if (diff.isLengthChanged() || diff.isPrecisionChanged() || diff.isScaleChanged() || diff.isTypeChanged()) {
+            list.add("ALTER TABLE " + tableName + " ALTER COLUMN " + colName + " SET DATA TYPE " + colType);
+        }
+        if (diff.isDefaultValueChanged() && column.getDefaultValue() != null && !column.getDefaultValue().trim().isEmpty()) {
+            list.add("ALTER TABLE " + tableName + " ALTER COLUMN " + colName + " SET DEFAULT " + column.getDefaultValue().trim());
+        }
+        return list;
+    }
 }

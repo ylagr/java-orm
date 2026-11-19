@@ -651,15 +651,16 @@ orm.useDataSource("ds_slave", () -> {
 
 Java-ORM 内置智能的 Code-First 架构迁移同步引擎，支持自动识别实体类、读取 `@JoTable` / `@JoColumn`（或 JPA / MyBatis-Plus 对应字段属性），与数据库系统元数据进行双向差分比对：
 - **表不存在时**：自动生成对应方言的 `CREATE TABLE` 语句并执行创建（包含自增主键、列定义、字段注释等）。
-- **表已存在时**：智能比对已有物理列，自动增量生成并执行 `ALTER TABLE ... ADD COLUMN ...` 语句，补齐新增字段。
+- **表已存在时（增量补列）**：智能比对物理列，自动生成并执行 `ALTER TABLE ... ADD COLUMN ...` 补齐新增字段。
+- **表已存在时（列属性演进）**：在 `UPDATE` 模式下，系统深度检测物理列属性差异，**自动检测并执行字段长度变更（如 VARCHAR(50) 扩容至 VARCHAR(150)）、数值精度/标度变更（DECIMAL）、默认值变更（DEFAULT）、可空性变更（NOT NULL / NULL）与注释更新**（自动适配 MySQL `MODIFY COLUMN`、PostgreSQL / H2 `ALTER COLUMN SET DATA TYPE / SET DEFAULT`、Oracle `MODIFY` 等）。
 - **安全第一**：默认绝不执行危险的 `DROP COLUMN` 操作；支持独立配置开关与多级执行模式。
 
 #### 同步模式（CodeFirstMode）
 参考 JPA `hbm2ddl.auto` 与 EasyQuery 的设计，提供 5 种执行模式：
 - `NONE`（默认）：完全关闭 Code-First 同步，零额外元数据探测与开销。
-- `VALIDATE`：仅校验数据库表与列是否完整，缺少表或列时抛出明确异常，绝不执行任何 DDL。
+- `VALIDATE`：仅校验数据库表与列是否完整，缺少表、列或属性不符时抛出明确异常，绝不执行任何 DDL。
 - `CREATE_ONLY`：仅当表不存在时执行建表 `CREATE TABLE`，已有表不执行任何修改。
-- `UPDATE`（推荐开发环境使用）：表不存在时自动建表；表已存在时自动补齐缺失的新增列。
+- `UPDATE`（推荐开发环境使用）：表不存在时自动建表；表已存在时自动补齐缺失的新增列，并同步字段长度扩容、默认值变更与可空性约束。
 - `DROP_CREATE`：危险模式（仅限全新临时测试），先 `DROP TABLE IF EXISTS`，再重新建表。
 
 #### 配置方式（Fluent API / OrmConfig）
