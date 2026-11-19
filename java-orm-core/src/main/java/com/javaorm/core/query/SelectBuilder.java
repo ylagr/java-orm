@@ -1674,4 +1674,27 @@ public class SelectBuilder<T> implements Query<T> {
     public SelectStatement getStatement() {
         return statement;
     }
+
+    @Override
+    public SelectBuilder<T> forUpdate() {
+        return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE);
+    }
+
+    @Override
+    public SelectBuilder<T> forUpdate(com.javaorm.core.ast.LockMode lockMode) {
+        if (this.statement != null) {
+            this.statement.setLockMode(lockMode != null ? lockMode : com.javaorm.core.ast.LockMode.FOR_UPDATE);
+        }
+        return this;
+    }
+
+    @Override
+    public SelectBuilder<T> forUpdateNowait() {
+        return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE_NOWAIT);
+    }
+
+    @Override
+    public SelectBuilder<T> forUpdateSkipLocked() {
+        return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE_SKIP_LOCKED);
+    }
 }

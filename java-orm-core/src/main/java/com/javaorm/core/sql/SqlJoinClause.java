@@ -187,4 +187,10 @@ public class SqlJoinClause<T> implements Query<T> {
     public SqlAndParams toSqlAndParams() {
         return selectStream.toSqlAndParams();
     }
+
+    @Override
+    public Query<T> forUpdate(com.javaorm.core.ast.LockMode lockMode) {
+        selectStream.forUpdate(lockMode);
+        return this;
+    }
 }

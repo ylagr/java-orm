@@ -570,4 +570,26 @@ public class SqlSelectStream<T> implements Query<T> {
         ensureQuery();
         return query.toSqlAndParams();
     }
+
+    @Override
+    public SqlSelectStream<T> forUpdate() {
+        return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE);
+    }
+
+    @Override
+    public SqlSelectStream<T> forUpdate(com.javaorm.core.ast.LockMode lockMode) {
+        ensureQuery();
+        this.query.forUpdate(lockMode);
+        return this;
+    }
+
+    @Override
+    public SqlSelectStream<T> forUpdateNowait() {
+        return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE_NOWAIT);
+    }
+
+    @Override
+    public SqlSelectStream<T> forUpdateSkipLocked() {
+        return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE_SKIP_LOCKED);
+    }
 }

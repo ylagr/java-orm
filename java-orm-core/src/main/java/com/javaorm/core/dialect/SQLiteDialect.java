@@ -331,4 +331,9 @@ public class SQLiteDialect extends AbstractDialect {
             sql.append(" AS ").append(type).append(")");
         });
     }
+
+    @Override
+    protected void renderLockMode(StringBuilder sql, com.javaorm.core.ast.LockMode lockMode) {
+        // SQLite operates on database-level file locks and does not support row-level SELECT ... FOR UPDATE syntax.
+    }
 }

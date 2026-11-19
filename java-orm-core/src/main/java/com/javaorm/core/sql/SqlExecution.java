@@ -399,4 +399,17 @@ public class SqlExecution<T> implements Query<T> {
     public String toString() {
         return toSql();
     }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Query<T> forUpdate(com.javaorm.core.ast.LockMode lockMode) {
+        if (operation instanceof Query<?>) {
+            ((Query<T>) operation).forUpdate(lockMode);
+        } else if (operation instanceof SqlSelectStream<?>) {
+            ((SqlSelectStream<T>) operation).forUpdate(lockMode);
+        } else if (operation instanceof SelectBuilder<?>) {
+            ((SelectBuilder<T>) operation).forUpdate(lockMode);
+        }
+        return this;
+    }
 }

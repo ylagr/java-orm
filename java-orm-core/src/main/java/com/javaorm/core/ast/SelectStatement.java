@@ -20,6 +20,7 @@ public class SelectStatement implements Statement {
     private Integer limit;
     private Integer offset;
     private boolean distinct;
+    private LockMode lockMode = LockMode.NONE;
     private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
     private com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter;
     private String targetDataSource;
@@ -223,10 +224,19 @@ public class SelectStatement implements Statement {
         copy.limit = this.limit;
         copy.offset = this.offset;
         copy.distinct = this.distinct;
+        copy.lockMode = this.lockMode;
         copy.shardingRouter = this.shardingRouter;
         copy.dataSourceRouter = this.dataSourceRouter;
         copy.targetDataSource = this.targetDataSource;
         copy.allowFullShardingScan = this.allowFullShardingScan;
         return copy;
+    }
+
+    public LockMode getLockMode() {
+        return lockMode;
+    }
+
+    public void setLockMode(LockMode lockMode) {
+        this.lockMode = lockMode != null ? lockMode : LockMode.NONE;
     }
 }

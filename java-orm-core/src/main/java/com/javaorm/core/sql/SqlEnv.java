@@ -423,6 +423,16 @@ public class SqlEnv {
         return new com.javaorm.core.mutation.InsertBuilder<>(this, entity);
     }
 
+    // ========== 4.6 UPSERT 工厂 ==========
+
+    public <T> com.javaorm.core.mutation.UpsertBuilder<T> upsert(T entity) {
+        return createUpsert(entity);
+    }
+
+    public <T> com.javaorm.core.mutation.UpsertBuilder<T> createUpsert(T entity) {
+        return new com.javaorm.core.mutation.UpsertBuilder<>(this, entity);
+    }
+
     // ========== 5. 输出统一执行门面 ==========
 
     @SuppressWarnings("unchecked")
@@ -613,6 +623,18 @@ public class SqlEnv {
             return com.javaorm.core.sharding.ShardingHandler.executeInsert(conn, statement, metadata, returnKeys, entity, effRouter, effDsRouter, effDsOverride, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
         }
         return getSqlExecutor().executeInsert(conn, statement, metadata, returnKeys, entity, dialect, getEffectiveConfig(), dataSource);
+    }
+
+    public int executeUpsert(Connection conn, com.javaorm.core.ast.UpsertStatement statement, EntityMetadata metadata,
+                             boolean returnKeys, Object entity, com.javaorm.core.sharding.TableRouter<?> routerOverride) {
+        com.javaorm.core.sharding.TableRouter<?> effRouter = routerOverride != null ? routerOverride : (statement != null ? statement.getShardingRouter() : null);
+        com.javaorm.core.sharding.DataSourceRouter<?> effDsRouter = statement != null ? statement.getDataSourceRouter() : null;
+        String effDsOverride = statement != null ? statement.getTargetDataSource() : null;
+
+        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter, effDsRouter, effDsOverride)) {
+            return com.javaorm.core.sharding.ShardingHandler.executeInsert(conn, statement, metadata, returnKeys, entity, effRouter, effDsRouter, effDsOverride, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
+        }
+        return getSqlExecutor().executeUpsert(conn, statement, metadata, returnKeys, entity, dialect, getEffectiveConfig(), dataSource);
     }
 
     public <R> List<R> executeSelectList(Connection conn, SelectStatement statement, EntityMetadata metadata, List<IncludeSpec> includes) {

@@ -29,6 +29,8 @@ public interface Dialect {
 
     SqlAndParams buildInsert(InsertStatement stmt);
 
+    SqlAndParams buildUpsert(com.javaorm.core.ast.UpsertStatement stmt);
+
     /**
      * 注册或替换特定 SQL 函数的方言渲染器。
      */

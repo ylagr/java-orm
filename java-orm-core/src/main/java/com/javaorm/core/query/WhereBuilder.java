@@ -3008,26 +3008,40 @@ public class WhereBuilder<T> implements Query<T> {
     }
 
     public com.javaorm.core.dialect.SqlAndParams toSqlAndParams() {
-        if (sqlAndParamsSupplier != null) {
+        return toSqlAndParams(null);
+    }
+
+    public com.javaorm.core.dialect.SqlAndParams toSqlAndParams(com.javaorm.core.dialect.Dialect targetDialect) {
+        if (targetDialect == null && env != null) {
+            targetDialect = env.getDialect();
+        }
+        if (sqlAndParamsSupplier != null && (targetDialect == null || (env != null && targetDialect == env.getDialect()))) {
             return sqlAndParamsSupplier.get();
         }
         if (rootQuery != null) {
-            return rootQuery.toSqlAndParams();
+            return targetDialect != null ? rootQuery.toSqlAndParams(targetDialect) : rootQuery.toSqlAndParams();
         }
-        if (env != null && statement != null) {
+        if (statement != null && targetDialect != null) {
             if (statement instanceof SelectStatement) {
-                return env.getDialect().buildSelect((SelectStatement) statement);
+                return targetDialect.buildSelect((SelectStatement) statement);
             } else if (statement instanceof UpdateStatement) {
-                return env.getDialect().buildUpdate((UpdateStatement) statement);
+                return targetDialect.buildUpdate((UpdateStatement) statement);
             } else if (statement instanceof DeleteStatement) {
-                return env.getDialect().buildDelete((DeleteStatement) statement);
+                return targetDialect.buildDelete((DeleteStatement) statement);
             }
+        }
+        if (sqlAndParamsSupplier != null) {
+            return sqlAndParamsSupplier.get();
         }
         throw new UnsupportedOperationException("toSqlAndParams() is not supported on this builder");
     }
 
     public String toSql() {
         return toSqlAndParams().getSql();
+    }
+
+    public String toSql(com.javaorm.core.dialect.Dialect targetDialect) {
+        return toSqlAndParams(targetDialect).getSql();
     }
 
     @Override
@@ -3128,5 +3142,30 @@ public class WhereBuilder<T> implements Query<T> {
 
     public <C> Cte<C> asCteRecursive(String name, Class<C> cteClass) {
         return new Cte<>(name, cteClass, this, true);
+    }
+
+    @Override
+    public WhereBuilder<T> forUpdate() {
+        return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE);
+    }
+
+    @Override
+    public WhereBuilder<T> forUpdate(com.javaorm.core.ast.LockMode lockMode) {
+        if (rootQuery != null) {
+            rootQuery.forUpdate(lockMode);
+        } else if (statement instanceof SelectStatement) {
+            ((SelectStatement) statement).setLockMode(lockMode != null ? lockMode : com.javaorm.core.ast.LockMode.FOR_UPDATE);
+        }
+        return this;
+    }
+
+    @Override
+    public WhereBuilder<T> forUpdateNowait() {
+        return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE_NOWAIT);
+    }
+
+    @Override
+    public WhereBuilder<T> forUpdateSkipLocked() {
+        return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE_SKIP_LOCKED);
     }
 }

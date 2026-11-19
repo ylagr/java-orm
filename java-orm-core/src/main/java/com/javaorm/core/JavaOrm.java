@@ -355,6 +355,67 @@ public class JavaOrm {
     }
 
     /**
+     * 实体级 UPSERT（存在即更新，不存在即插入，跨方言自适应）
+     */
+    public <T> int insertOrUpdate(T entity) {
+        try {
+            return env().createUpsert(entity).execute();
+        } finally {
+            SelectBuilder.resetAliasSeq();
+        }
+    }
+
+    /**
+     * 实体级 UPSERT 别名（等价于 insertOrUpdate(entity)）
+     */
+    public <T> int upsert(T entity) {
+        return insertOrUpdate(entity);
+    }
+
+    /**
+     * 批量实体 UPSERT（默认分批执行，每批 500 条）
+     */
+    public <T> int insertOrUpdate(java.util.Collection<T> entities) {
+        if (entities == null || entities.isEmpty()) return 0;
+        return insertOrUpdateBatch(entities).execute();
+    }
+
+    /**
+     * 批量实体 UPSERT 别名（等价于 insertOrUpdate(entities)）
+     */
+    public <T> int upsert(java.util.Collection<T> entities) {
+        return insertOrUpdate(entities);
+    }
+
+    /**
+     * 开启实体级 UPSERT 构建器（支持指定 onConflict 列、updateColumns、ignoreColumns、doNothing 等）
+     */
+    public <T> com.javaorm.core.mutation.UpsertBuilder<T> insertOrUpdateable(T entity) {
+        return env().createUpsert(entity);
+    }
+
+    /**
+     * 开启实体级 UPSERT 构建器别名
+     */
+    public <T> com.javaorm.core.mutation.UpsertBuilder<T> upsertable(T entity) {
+        return insertOrUpdateable(entity);
+    }
+
+    /**
+     * 开启批量 UPSERT 构建器（支持自定义 batchSize、onConflict、updateColumns、ignoreColumns 等）
+     */
+    public <T> com.javaorm.core.batch.BatchUpsertBuilder<T> insertOrUpdateBatch(java.util.Collection<T> entities) {
+        return new com.javaorm.core.batch.BatchUpsertBuilder<>(env(), entities);
+    }
+
+    /**
+     * 开启批量 UPSERT 构建器别名
+     */
+    public <T> com.javaorm.core.batch.BatchUpsertBuilder<T> upsertBatch(java.util.Collection<T> entities) {
+        return insertOrUpdateBatch(entities);
+    }
+
+    /**
      * 实体级选择性更新（按主键更新非 null 属性）
      */
     public <T> int update(T entity) {

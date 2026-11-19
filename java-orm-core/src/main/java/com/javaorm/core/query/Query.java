@@ -83,4 +83,30 @@ public interface Query<T> {
      * 获取生成的 SQL 字符串与参数列表
      */
     SqlAndParams toSqlAndParams();
+
+    /**
+     * 添加悲观排他锁 (FOR UPDATE)
+     */
+    default Query<T> forUpdate() {
+        return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE);
+    }
+
+    /**
+     * 指定锁定模式（FOR UPDATE / NOWAIT / SKIP LOCKED）
+     */
+    Query<T> forUpdate(com.javaorm.core.ast.LockMode lockMode);
+
+    /**
+     * 添加非阻塞悲观排他锁 (FOR UPDATE NOWAIT)
+     */
+    default Query<T> forUpdateNowait() {
+        return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE_NOWAIT);
+    }
+
+    /**
+     * 跳过锁定行的高并发悲观锁 (FOR UPDATE SKIP LOCKED)
+     */
+    default Query<T> forUpdateSkipLocked() {
+        return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE_SKIP_LOCKED);
+    }
 }

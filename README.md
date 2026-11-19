@@ -434,6 +434,9 @@ orm.insert(s);
 s.setAge(21);
 orm.update(s);
 
+// 实体级 UPSERT（存在即更新，不存在即插入，跨方言自适应）
+orm.insertOrUpdate(s);
+
 // 实体级删除（标有 @JoLogicDelete 则自动执行 UPDATE is_deleted = 1）
 orm.delete(s);
 ```
@@ -896,6 +899,108 @@ orm.insert(user);
 // 执行更新：updateTime, updateBy 自动更新注入
 user.setUsername("developer_updated");
 orm.update(user);
+```
+
+### 12. 悲观排他锁（Pessimistic Locking / forUpdate）
+
+Java-ORM 在流式查询中全面原生支持悲观行级锁，并提供各主流数据库方言的自适应与降级保护机制：
+
+- `forUpdate()`: 标准行级排他锁（`FOR UPDATE`）。
+- `forUpdateNowait()`: 非阻塞式排他锁（`FOR UPDATE NOWAIT`），获取不到锁立即抛出异常，防止并发请求堆积打爆线程池。
+- `forUpdateSkipLocked()`: 高并发跳锁（`FOR UPDATE SKIP LOCKED`），天然契约化支持基于数据库的任务调度队列，自动跳过被其他事务锁定的行。
+
+#### 跨方言自适应与降级保护矩阵：
+| 数据库方言 | `forUpdate()` | `forUpdateNowait()` | `forUpdateSkipLocked()` | 特性与降级行为 |
+| :--- | :--- | :--- | :--- | :--- |
+| **MySQL 8.0+** | `FOR UPDATE` | `FOR UPDATE NOWAIT` | `FOR UPDATE SKIP LOCKED` | 原生完整支持 |
+| **PostgreSQL** | `FOR UPDATE` | `FOR UPDATE NOWAIT` | `FOR UPDATE SKIP LOCKED` | 原生完整支持 |
+| **Oracle 11g/12c+**| `FOR UPDATE` | `FOR UPDATE NOWAIT` | `FOR UPDATE SKIP LOCKED` | 原生完整支持（含 Oracle 11g 子查询包装适配） |
+| **H2 Database** | `FOR UPDATE` | `FOR UPDATE` *(降级)* | `FOR UPDATE` *(降级)* | 遇到不支持高级锁特性时安全降级为标准 FOR UPDATE |
+| **SQLite** | *(静默忽略)* | *(静默忽略)* | *(静默忽略)* | SQLite 为库级排他锁，安全退化避免引发语法报错 |
+
+#### 使用示例：
+```java
+// 1. 标准悲观锁点查（秒杀防超卖、账户转账强一致性场景）
+Account account = orm.select(Account.class)
+    .where().eq(Account::getId, accountId)
+    .forUpdate()
+    .first();
+
+// 2. 高并发非阻塞锁（若已被其他并发事务锁定，立即响应失败或重试，不堵塞连接池）
+Order order = orm.select(Order.class)
+    .where().eq(Order::getOrderNo, "ORD20261119001")
+    .forUpdateNowait()
+    .first();
+
+// 3. 基于数据库的分布式任务派发队列（多个 Worker 节点并发拉取任务，互不加锁阻塞）
+List<Task> pendingTasks = orm.select(Task.class)
+    .where().eq(Task::getStatus, "PENDING")
+    .limit(10)
+    .forUpdateSkipLocked()
+    .toList();
+```
+
+---
+
+### 13. 跨方言幂等 UPSERT（insertOrUpdate / 批量批处理）
+
+在多节点高并发、外部数据同步、定时任务批量拉取等场景下，通常要求**“存在即更新，不存在即插入”**的原子幂等写入，传统“先 SELECT 再 IF-ELSE”容易产生严重并发幻读且成倍浪费网络往返（RTT）。
+
+Java-ORM 提供了极度精炼、跨数据库全自动适配的单条与批量 UPSERT 解决方案：
+
+#### 跨数据库方言原子实现矩阵：
+- **MySQL**: 自动生成 `INSERT INTO ... ON DUPLICATE KEY UPDATE col = VALUES(col)`。
+- **PostgreSQL / SQLite**: 自动生成 `INSERT INTO ... ON CONFLICT (cols) DO UPDATE SET col = EXCLUDED.col` / `DO NOTHING`。
+- **Oracle / H2**: 自动生成高效标准的 `MERGE INTO ... USING (SELECT ... FROM DUAL) ... ON ... WHEN MATCHED THEN UPDATE ... WHEN NOT MATCHED THEN INSERT ...` 或原生 MERGE。
+
+#### 核心能力：
+1. **自动主键与唯一键感知**：自动探测实体的 `@JoId` 主键或 `@JoIndex(unique = true)` 唯一索引作为冲突判定列。
+2. **审计字段安全保护**：默认在更新分支中安全保护 `create_time`、`create_by`、`gmt_create` 等创建时间/创建人字段不被覆盖。
+3. **DO NOTHING 纯幂等模式**：支持存在冲突时不做任何更新（完全幂等插入）。
+4. **精细化更新列指定**：支持显式指定只更新某些字段，或忽略某些字段。
+5. **高性能批处理（Batch UPSERT）**：支持千级、万级实体批量 UPSERT，自动分批（默认 batchSize=500）与物理分库分表节点自动路由。
+
+#### 使用示例：
+```java
+// 1. 简单实体级 UPSERT（根据主键或唯一索引原子插入或更新）
+User user = new User();
+user.setId(100L);
+user.setUserCode("U100");
+user.setUserName("Charlie");
+user.setBalance(500.0);
+user.setCreateTime(LocalDateTime.now());
+
+// 首次调用：不存在 -> 执行 INSERT，并回填自增主键
+orm.insertOrUpdate(user);
+
+// 二次调用：已存在 -> 执行 UPDATE，更新 user_name 和 balance，创建时间字段受保护不被覆盖
+user.setUserName("Charlie Modified");
+user.setBalance(888.0);
+orm.insertOrUpdate(user);
+
+// 2. 链式构建器：指定冲突判定列、仅更新指定字段或忽略字段
+orm.insertOrUpdateable(user)
+    .onConflict(User::getUserCode)        // 显式指定依据唯一业务编号冲突判定
+    .updateColumns(User::getBalance)       // 发生冲突时仅更新 balance 余额字段
+    .ignoreColumns("user_name")            // 忽略更新 user_name 字段
+    .execute();
+
+// 3. 冲突时 DO NOTHING 纯幂等插入（已有记录不修改任何内容）
+orm.insertOrUpdateable(user)
+    .onConflict(User::getUserCode)
+    .doNothing()
+    .execute();
+
+// 4. 高性能批量 UPSERT（支持自定义 batchSize 与分库分表）
+List<User> userList = ...; // 混合了新增与变更的大量用户数据
+orm.insertOrUpdate(userList); // 默认每批 500 条分批执行
+
+// 或者使用批量构建器定制批大小：
+orm.insertOrUpdateBatch(userList)
+    .batchSize(1000)
+    .onConflict(User::getUserCode)
+    .updateColumns(User::getBalance, User::getUpdateTime)
+    .execute();
 ```
 
 ---

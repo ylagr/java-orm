@@ -72,4 +72,12 @@ public interface SqlExecutor {
      */
     int[] executeBatchUpdate(Connection conn, String sql, List<List<Object>> batchParams,
                              Dialect dialect, OrmConfig config, DataSource dataSource);
+
+    /**
+     * 执行实体 UPSERT（存在即更新，不存在即插入）
+     */
+    default int executeUpsert(Connection conn, com.javaorm.core.ast.UpsertStatement statement, EntityMetadata metadata,
+                              boolean returnKeys, Object entity, Dialect dialect, OrmConfig config, DataSource dataSource) {
+        return executeInsert(conn, statement, metadata, returnKeys, entity, dialect, config, dataSource);
+    }
 }

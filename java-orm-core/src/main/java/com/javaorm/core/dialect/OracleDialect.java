@@ -55,14 +55,17 @@ public class OracleDialect extends AbstractDialect {
     private SqlAndParams buildOracle11Select(SelectStatement stmt) {
         Integer limit = stmt.getLimit();
         Integer offset = stmt.getOffset();
+        com.javaorm.core.ast.LockMode lockMode = stmt.getLockMode();
         stmt.setLimit(null);
         stmt.setOffset(null);
+        stmt.setLockMode(com.javaorm.core.ast.LockMode.NONE);
         SqlAndParams inner;
         try {
             inner = super.buildSelect(stmt, false);
         } finally {
             stmt.setLimit(limit);
             stmt.setOffset(offset);
+            stmt.setLockMode(lockMode);
         }
 
         StringBuilder sql = new StringBuilder();
@@ -111,6 +114,7 @@ public class OracleDialect extends AbstractDialect {
         } else {
             return inner;
         }
+        renderLockMode(sql, lockMode);
         return new SqlAndParams(sql.toString(), params);
     }
 
@@ -494,5 +498,57 @@ public class OracleDialect extends AbstractDialect {
             d.renderArg(args.get(0), sql, params);
             sql.append(" AS ").append(type).append(")");
         });
+    }
+
+    @Override
+    public SqlAndParams buildUpsert(com.javaorm.core.ast.UpsertStatement stmt) {
+        StringBuilder sql = new StringBuilder("MERGE INTO ");
+        List<Object> params = new ArrayList<>();
+
+        String targetAlias = "t";
+        String sourceAlias = "s";
+
+        sql.append(quote(stmt.getTableName())).append(" ").append(targetAlias);
+        sql.append(" USING (SELECT ");
+        for (int i = 0; i < stmt.getColumns().size(); i++) {
+            if (i > 0) sql.append(", ");
+            sql.append("? AS c_").append(i);
+            params.add(stmt.getValues().get(i));
+        }
+        sql.append(" FROM DUAL) ").append(sourceAlias).append(" ON (");
+
+        for (int i = 0; i < stmt.getConflictColumns().size(); i++) {
+            if (i > 0) sql.append(" AND ");
+            String conflictCol = stmt.getConflictColumns().get(i);
+            int colIdx = stmt.getColumns().indexOf(conflictCol);
+            sql.append(targetAlias).append(".").append(quote(conflictCol))
+                    .append(" = ").append(sourceAlias).append(".c_").append(colIdx >= 0 ? colIdx : i);
+        }
+        sql.append(")");
+
+        if (!stmt.isDoNothing() && !stmt.getUpdateColumns().isEmpty()) {
+            sql.append(" WHEN MATCHED THEN UPDATE SET ");
+            for (int i = 0; i < stmt.getUpdateColumns().size(); i++) {
+                if (i > 0) sql.append(", ");
+                String updateCol = stmt.getUpdateColumns().get(i);
+                int colIdx = stmt.getColumns().indexOf(updateCol);
+                sql.append(targetAlias).append(".").append(quote(updateCol))
+                        .append(" = ").append(sourceAlias).append(".c_").append(colIdx >= 0 ? colIdx : i);
+            }
+        }
+
+        sql.append(" WHEN NOT MATCHED THEN INSERT (");
+        for (int i = 0; i < stmt.getColumns().size(); i++) {
+            if (i > 0) sql.append(", ");
+            sql.append(quote(stmt.getColumns().get(i)));
+        }
+        sql.append(") VALUES (");
+        for (int i = 0; i < stmt.getColumns().size(); i++) {
+            if (i > 0) sql.append(", ");
+            sql.append(sourceAlias).append(".c_").append(i);
+        }
+        sql.append(")");
+
+        return new SqlAndParams(sql.toString(), params);
     }
 }

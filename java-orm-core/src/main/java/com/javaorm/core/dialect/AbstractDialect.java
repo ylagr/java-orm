@@ -281,7 +281,10 @@ public abstract class AbstractDialect implements Dialect {
         // 8. LIMIT / OFFSET 分页渲染
         renderPagination(sql, params, stmt.getLimit(), stmt.getOffset());
 
-        // 9. UNION / UNION ALL
+        // 9. 悲观行级锁渲染 (FOR UPDATE / NOWAIT / SKIP LOCKED)
+        renderLockMode(sql, stmt.getLockMode());
+
+        // 10. UNION / UNION ALL
         if (!stmt.getUnions().isEmpty()) {
             for (UnionClause union : stmt.getUnions()) {
                 sql.append(union.isUnionAll() ? " UNION ALL " : " UNION ");
@@ -290,6 +293,25 @@ public abstract class AbstractDialect implements Dialect {
         }
 
         return new SqlAndParams(sql.toString(), params);
+    }
+
+    protected void renderLockMode(StringBuilder sql, LockMode lockMode) {
+        if (lockMode == null || lockMode == LockMode.NONE) {
+            return;
+        }
+        switch (lockMode) {
+            case FOR_UPDATE:
+                sql.append(" FOR UPDATE");
+                break;
+            case FOR_UPDATE_NOWAIT:
+                sql.append(" FOR UPDATE NOWAIT");
+                break;
+            case FOR_UPDATE_SKIP_LOCKED:
+                sql.append(" FOR UPDATE SKIP LOCKED");
+                break;
+            default:
+                break;
+        }
     }
 
     protected void renderPagination(StringBuilder sql, List<Object> params, Integer limit, Integer offset) {
@@ -367,6 +389,49 @@ public abstract class AbstractDialect implements Dialect {
         sql.append(")");
 
         return new SqlAndParams(sql.toString(), params);
+    }
+
+    @Override
+    public SqlAndParams buildUpsert(com.javaorm.core.ast.UpsertStatement stmt) {
+        StringBuilder sql = new StringBuilder("INSERT INTO ");
+        List<Object> params = new ArrayList<>();
+
+        sql.append(quote(stmt.getTableName())).append(" (");
+        for (int i = 0; i < stmt.getColumns().size(); i++) {
+            if (i > 0) sql.append(", ");
+            sql.append(quote(stmt.getColumns().get(i)));
+        }
+        sql.append(") VALUES (");
+        for (int i = 0; i < stmt.getValues().size(); i++) {
+            if (i > 0) sql.append(", ");
+            sql.append("?");
+            params.add(stmt.getValues().get(i));
+        }
+        sql.append(")");
+
+        renderOnConflictClause(stmt, sql, params);
+
+        return new SqlAndParams(sql.toString(), params);
+    }
+
+    protected void renderOnConflictClause(com.javaorm.core.ast.UpsertStatement stmt, StringBuilder sql, List<Object> params) {
+        sql.append(" ON CONFLICT (");
+        for (int i = 0; i < stmt.getConflictColumns().size(); i++) {
+            if (i > 0) sql.append(", ");
+            sql.append(quote(stmt.getConflictColumns().get(i)));
+        }
+        sql.append(")");
+
+        if (stmt.isDoNothing() || stmt.getUpdateColumns().isEmpty()) {
+            sql.append(" DO NOTHING");
+        } else {
+            sql.append(" DO UPDATE SET ");
+            for (int i = 0; i < stmt.getUpdateColumns().size(); i++) {
+                if (i > 0) sql.append(", ");
+                String col = quote(stmt.getUpdateColumns().get(i));
+                sql.append(col).append(" = EXCLUDED.").append(col);
+            }
+        }
     }
 
     protected final Map<String, String> quoteCache = new ConcurrentHashMap<>();

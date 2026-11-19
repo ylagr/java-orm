@@ -174,4 +174,36 @@ public class MySQLDialect extends AbstractDialect {
             sql.append(" AS ").append(type).append(")");
         });
     }
+
+    @Override
+    public SqlAndParams buildUpsert(com.javaorm.core.ast.UpsertStatement stmt) {
+        StringBuilder sql = new StringBuilder("INSERT INTO ");
+        java.util.List<Object> params = new java.util.ArrayList<>();
+
+        sql.append(quote(stmt.getTableName())).append(" (");
+        for (int i = 0; i < stmt.getColumns().size(); i++) {
+            if (i > 0) sql.append(", ");
+            sql.append(quote(stmt.getColumns().get(i)));
+        }
+        sql.append(") VALUES (");
+        for (int i = 0; i < stmt.getValues().size(); i++) {
+            if (i > 0) sql.append(", ");
+            sql.append("?");
+            params.add(stmt.getValues().get(i));
+        }
+        sql.append(") ON DUPLICATE KEY UPDATE ");
+
+        if (stmt.isDoNothing() || stmt.getUpdateColumns().isEmpty()) {
+            String noopCol = !stmt.getConflictColumns().isEmpty() ? stmt.getConflictColumns().get(0) : stmt.getColumns().get(0);
+            sql.append(quote(noopCol)).append(" = ").append(quote(noopCol));
+        } else {
+            for (int i = 0; i < stmt.getUpdateColumns().size(); i++) {
+                if (i > 0) sql.append(", ");
+                String col = quote(stmt.getUpdateColumns().get(i));
+                sql.append(col).append(" = VALUES(").append(col).append(")");
+            }
+        }
+
+        return new SqlAndParams(sql.toString(), params);
+    }
 }
