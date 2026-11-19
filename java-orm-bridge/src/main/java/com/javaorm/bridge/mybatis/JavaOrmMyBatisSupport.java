@@ -52,7 +52,7 @@ public class JavaOrmMyBatisSupport {
         return JavaOrm.create(dataSource, config);
     }
 
-    private static void autoRegisterInterceptors(OrmConfig config, Configuration configuration) {
+    public static void autoRegisterInterceptors(OrmConfig config, Configuration configuration) {
         if (configuration == null || configuration.getInterceptors() == null) {
             return;
         }

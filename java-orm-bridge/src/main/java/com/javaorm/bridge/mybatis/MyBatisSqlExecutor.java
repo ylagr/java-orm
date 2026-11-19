@@ -38,6 +38,18 @@ public class MyBatisSqlExecutor implements SqlExecutor {
         this.sqlSessionFactory = sqlSessionFactory;
     }
 
+    private static final java.lang.reflect.Method GET_SQL_SESSION_METHOD;
+
+    static {
+        java.lang.reflect.Method getMethod = null;
+        try {
+            Class<?> utilsClass = Class.forName("org.mybatis.spring.SqlSessionUtils");
+            getMethod = utilsClass.getMethod("getSqlSession", SqlSessionFactory.class);
+        } catch (Throwable ignored) {
+        }
+        GET_SQL_SESSION_METHOD = getMethod;
+    }
+
     private Connection getEffectiveConnection(Connection conn) {
         if (conn != null) {
             return conn;
@@ -45,9 +57,14 @@ public class MyBatisSqlExecutor implements SqlExecutor {
         if (sqlSession != null) {
             return sqlSession.getConnection();
         }
-        if (sqlSessionFactory != null) {
-            SqlSession session = sqlSessionFactory.openSession();
-            return session.getConnection();
+        if (sqlSessionFactory != null && GET_SQL_SESSION_METHOD != null) {
+            try {
+                SqlSession springSession = (SqlSession) GET_SQL_SESSION_METHOD.invoke(null, sqlSessionFactory);
+                if (springSession != null) {
+                    return springSession.getConnection();
+                }
+            } catch (Throwable ignored) {
+            }
         }
         return null;
     }

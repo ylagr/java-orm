@@ -582,4 +582,45 @@ public class BridgeIntegrationTest {
             Assert.assertTrue("Should auto inherit BlockAttackInnerInterceptor from SqlSession", attackBlocked);
         }
     }
+
+    @Test
+    public void testMyBatisPlusAdapterEndToEnd() {
+        // 1. 在项目入口仅配置 MyBatisPlusAdapter，生成统一的 JavaOrm 实例
+        JavaOrm adapterOrm = com.javaorm.bridge.mp.MyBatisPlusAdapter.create(sqlSessionFactory);
+
+        // 2. 后续业务代码 100% 仅使用 JavaOrm！
+        // 2.1 插入实体（自动识别 MP @TableId 自增, @Version 初始版本, @TableLogic 初始值, @EnumValue 枚举映射）
+        MpUser user = new MpUser();
+        user.setName("AdapterUser");
+        user.setAge(28);
+        user.setStatus(UserStatus.ACTIVE);
+        user.setGrade(UserGrade.VIP);
+        adapterOrm.insert(user);
+        Assert.assertNotNull(user.getId());
+        Assert.assertEquals(Integer.valueOf(1), user.getVersion());
+        Assert.assertEquals(Integer.valueOf(0), user.getDeleted());
+
+        // 2.2 流式查询 + 分页（完全使用 JavaORM DSL）
+        com.javaorm.core.pagination.Page<MpUser> page = adapterOrm.select(MpUser.class)
+                .where()
+                .eq(MpUser::getName, "AdapterUser")
+                .toPage(1, 10);
+        Assert.assertEquals(1, page.getTotal());
+        Assert.assertEquals(1, page.getRecords().size());
+        Assert.assertEquals(UserStatus.ACTIVE, page.getRecords().get(0).getStatus());
+        Assert.assertEquals(UserGrade.VIP, page.getRecords().get(0).getGrade());
+
+        // 2.3 乐观锁更新（自动检测 MP @Version 并递增版本号）
+        user.setAge(29);
+        adapterOrm.update(user);
+        Assert.assertEquals(Integer.valueOf(2), user.getVersion());
+
+        // 2.4 逻辑删除（自动使用 MP @TableLogic）
+        adapterOrm.delete(user);
+        MpUser afterDel = adapterOrm.select(MpUser.class)
+                .where()
+                .eq(MpUser::getId, user.getId())
+                .firstOrNull();
+        Assert.assertNull(afterDel); // 已逻辑删除，普通查询自动过滤
+    }
 }
