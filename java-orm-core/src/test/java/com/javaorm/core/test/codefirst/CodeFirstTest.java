@@ -21,6 +21,7 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import com.javaorm.core.codefirst.CodeFirstAlterMode;
 import com.javaorm.core.codefirst.PhysicalColumnDesc;
 import com.javaorm.core.codefirst.SchemaInspector;
 
@@ -393,7 +394,7 @@ public class CodeFirstTest {
     }
 
     /**
-     * 6. 测试 UPDATE 模式下已有字段的长度变更与默认值变更自动检测与同步（ALTER COLUMN SET DATA TYPE / SET DEFAULT）
+     * 6. 测试 UPDATE 模式下已有字段的长度变更与默认值变更受 CodeFirstAlterMode 细粒度位掩码安全控制
      */
     @Test
     public void testAlterColumnLengthAndDefaultValue() throws Exception {
@@ -408,22 +409,33 @@ public class CodeFirstTest {
             Assert.assertEquals(50, details.get("username").getColumnSize());
         }
 
-        // 2. 先同步 UserEntity 补齐基础字段（如 nickname 带有默认值 'default_nick'）
+        // 2. 默认模式下（CodeFirstAlterMode.NONE），只增量补齐缺失字段，绝不修改已有字段
         orm.codeFirst().syncTable(UserEntity.class);
 
-        // 验证补齐后 nickname 默认值包含 'default_nick'
-        try (Connection conn = dataSource.getConnection()) {
-            Map<String, PhysicalColumnDesc> details = SchemaInspector.getExistingColumnDetails(conn, null, "t_cf_user");
-            Assert.assertNotNull(details.get("nickname").getDefaultValue());
-            Assert.assertTrue(details.get("nickname").getDefaultValue().contains("default_nick"));
-        }
+        // 3. 验证默认 NONE 模式下，针对已存在的 username/nickname，即使 UserEntityV2 发生了长度和默认值变更，也不会生成任何 ALTER
+        List<String> noneDdls = orm.codeFirst().generateDdl(UserEntityV2.class);
+        Assert.assertTrue("默认 NONE 模式下不应产生任何修改已有列的 DDL", noneDdls.isEmpty());
 
-        // 3. 使用实体演进版本 UserEntityV2 生成 DDL 预览
-        // 变更点：
-        //   - username: 长度从 50 变更到 150
-        //   - nickname: 默认值从 'default_nick' 变更到 'vip_user'
+        // 4. 测试位运算单个控制：仅允许长度扩容 LENGTH_EXPAND
+        config.codeFirstAlterMode(CodeFirstAlterMode.LENGTH_EXPAND);
+        List<String> lengthOnlyDdls = orm.codeFirst().generateDdl(UserEntityV2.class);
+        Assert.assertEquals(1, lengthOnlyDdls.size());
+        Assert.assertTrue("仅允许长度扩容时应生成 username 扩容语句", lengthOnlyDdls.get(0).contains("150"));
+
+        // 5. 测试位运算多选组合：通过按位或（|）同时允许长度扩容与默认值变更
+        // 方式 A：varargs 多参数传入
+        config.codeFirstAlterMode(CodeFirstAlterMode.LENGTH_EXPAND, CodeFirstAlterMode.DEFAULT_VALUE);
+        List<String> combinedDdls = orm.codeFirst().generateDdl(UserEntityV2.class);
+        Assert.assertEquals(2, combinedDdls.size());
+
+        // 方式 B：通过 or() 位运算方法组合
+        config.codeFirstAlterMode(CodeFirstAlterMode.LENGTH_EXPAND.or(CodeFirstAlterMode.DEFAULT_VALUE));
+        List<String> orDdls = orm.codeFirst().generateDdl(UserEntityV2.class);
+        Assert.assertEquals(2, orDdls.size());
+
+        // 方式 C：使用常用预设枚举 EXPAND_ONLY / SAFE
+        config.codeFirstAlterMode(CodeFirstAlterMode.EXPAND_ONLY);
         List<String> alterDdls = orm.codeFirst().generateDdl(UserEntityV2.class);
-        System.out.println("Generated Alter DDLs: " + alterDdls);
 
         boolean hasLengthAlter = alterDdls.stream().anyMatch(sql -> sql.toUpperCase().contains("SET DATA TYPE") && sql.contains("150"));
         Assert.assertTrue("DDL 列表中应包含 username 长度扩容到 150 的 ALTER 语句", hasLengthAlter);
@@ -431,17 +443,17 @@ public class CodeFirstTest {
         boolean hasDefaultAlter = alterDdls.stream().anyMatch(sql -> sql.toUpperCase().contains("SET DEFAULT") && sql.contains("vip_user"));
         Assert.assertTrue("DDL 列表中应包含 nickname 默认值变更到 vip_user 的 ALTER 语句", hasDefaultAlter);
 
-        // 4. 执行架构同步
+        // 6. 执行架构同步
         orm.codeFirst().syncTable(UserEntityV2.class);
 
-        // 5. 校验数据库物理元数据是否已成功更新
+        // 7. 校验数据库物理元数据是否已成功更新
         try (Connection conn = dataSource.getConnection()) {
             Map<String, PhysicalColumnDesc> details = SchemaInspector.getExistingColumnDetails(conn, null, "t_cf_user");
             Assert.assertEquals("username 字段长度应该已变更为 150", 150, details.get("username").getColumnSize());
             Assert.assertTrue("nickname 字段默认值应该已变更为 vip_user", details.get("nickname").getDefaultValue().contains("vip_user"));
         }
 
-        // 6. 验证执行后数据读写完好，默认值生效
+        // 8. 验证执行后数据读写完好，超过 50 字符的用户名正常入库
         orm.sql(e -> {
             UserEntityV2 u = e.table(UserEntityV2.class);
             e.update(u)

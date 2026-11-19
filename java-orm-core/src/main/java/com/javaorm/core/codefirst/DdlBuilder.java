@@ -365,66 +365,93 @@ public class DdlBuilder {
     }
 
     /**
-     * 对比实体定义与物理库列的差异（检测长度、精度、默认值、可空性等）
+     * 对比实体定义与物理库列的差异（受 CodeFirstAlterMode 位掩码安全控制）
      */
-    public static ColumnDiff diffColumn(Dialect dialect, ColumnMetadata col, PhysicalColumnDesc existing) {
+    public static ColumnDiff diffColumn(Dialect dialect, ColumnMetadata col, PhysicalColumnDesc existing, int alterModeMask) {
         ColumnDiff diff = new ColumnDiff();
-        if (col == null || existing == null) {
-            return diff;
+        if (col == null || existing == null || alterModeMask == 0) {
+            return diff; // 掩码为 0 (NONE) 时，完全禁止修改任何已有列
         }
         if (col.isPrimaryKey()) {
             return diff; // 主键列通常由自增或唯一索引管理，不随意执行结构微调
         }
 
-        // 1. 字段长度变更检测（针对 String/字符类型）
+        // 1. 字段长度变更检测（针对 String/字符类型，区分扩容与缩减）
         if (col.getPropertyType() == String.class) {
             int targetLength = col.getLength() > 0 ? col.getLength() : 255;
             int dbLength = existing.getColumnSize();
             if (dbLength > 0 && targetLength > 0 && dbLength != targetLength) {
-                diff.setLengthChanged(true);
+                if (targetLength > dbLength && CodeFirstAlterMode.isAnyEnabled(alterModeMask, CodeFirstAlterMode.LENGTH_EXPAND)) {
+                    diff.setLengthChanged(true); // 允许长度扩容
+                } else if (targetLength < dbLength && CodeFirstAlterMode.isAnyEnabled(alterModeMask, CodeFirstAlterMode.LENGTH_SHRINK)) {
+                    diff.setLengthChanged(true); // 允许长度缩短
+                }
             }
         }
 
         // 2. 精度与标度变更检测（针对 BigDecimal）
         if (col.getPropertyType() == BigDecimal.class) {
             if (col.getPrecision() > 0 && existing.getColumnSize() > 0 && existing.getColumnSize() != col.getPrecision()) {
-                diff.setPrecisionChanged(true);
+                if (col.getPrecision() > existing.getColumnSize() && CodeFirstAlterMode.isAnyEnabled(alterModeMask, CodeFirstAlterMode.LENGTH_EXPAND)) {
+                    diff.setPrecisionChanged(true);
+                } else if (col.getPrecision() < existing.getColumnSize() && CodeFirstAlterMode.isAnyEnabled(alterModeMask, CodeFirstAlterMode.LENGTH_SHRINK)) {
+                    diff.setPrecisionChanged(true);
+                }
             }
             if (col.getScale() >= 0 && existing.getDecimalDigits() != col.getScale()) {
-                diff.setScaleChanged(true);
+                if (col.getScale() > existing.getDecimalDigits() && CodeFirstAlterMode.isAnyEnabled(alterModeMask, CodeFirstAlterMode.LENGTH_EXPAND)) {
+                    diff.setScaleChanged(true);
+                } else if (col.getScale() < existing.getDecimalDigits() && CodeFirstAlterMode.isAnyEnabled(alterModeMask, CodeFirstAlterMode.LENGTH_SHRINK)) {
+                    diff.setScaleChanged(true);
+                }
             }
         }
 
         // 3. 默认值变更检测
-        if (col.getDefaultValue() != null && !col.getDefaultValue().trim().isEmpty()) {
-            String targetDef = normalizeDefaultValue(col.getDefaultValue());
-            String dbDef = normalizeDefaultValue(existing.getDefaultValue());
-            if (dbDef == null || !targetDef.equalsIgnoreCase(dbDef)) {
-                diff.setDefaultValueChanged(true);
+        if (CodeFirstAlterMode.isAnyEnabled(alterModeMask, CodeFirstAlterMode.DEFAULT_VALUE)) {
+            if (col.getDefaultValue() != null && !col.getDefaultValue().trim().isEmpty()) {
+                String targetDef = normalizeDefaultValue(col.getDefaultValue());
+                String dbDef = normalizeDefaultValue(existing.getDefaultValue());
+                if (dbDef == null || !targetDef.equalsIgnoreCase(dbDef)) {
+                    diff.setDefaultValueChanged(true);
+                }
             }
         }
 
         // 4. 可空性变更检测（实体要求 NOT NULL，但数据库允许 NULL）
-        if (!col.isNullable() && existing.getNullable() == java.sql.DatabaseMetaData.columnNullable) {
-            diff.setNullableChanged(true);
+        if (CodeFirstAlterMode.isAnyEnabled(alterModeMask, CodeFirstAlterMode.NULLABLE)) {
+            if (!col.isNullable() && existing.getNullable() == java.sql.DatabaseMetaData.columnNullable) {
+                diff.setNullableChanged(true);
+            }
         }
 
-        // 5. 自定义 columnDefinition 变更检测
-        if (col.getColumnDefinition() != null && !col.getColumnDefinition().trim().isEmpty()) {
-            String targetDef = col.getColumnDefinition().trim();
-            if (existing.getTypeName() != null && !targetDef.equalsIgnoreCase(existing.getTypeName())) {
-                diff.setTypeChanged(true);
+        // 5. 自定义 columnDefinition / 数据类型变更检测
+        if (CodeFirstAlterMode.isAnyEnabled(alterModeMask, CodeFirstAlterMode.DATA_TYPE)) {
+            if (col.getColumnDefinition() != null && !col.getColumnDefinition().trim().isEmpty()) {
+                String targetDef = col.getColumnDefinition().trim();
+                if (existing.getTypeName() != null && !targetDef.equalsIgnoreCase(existing.getTypeName())) {
+                    diff.setTypeChanged(true);
+                }
             }
         }
 
         // 6. 注释变更检测
-        if (col.getComment() != null && !col.getComment().trim().isEmpty()) {
-            if (existing.getRemarks() == null || !existing.getRemarks().trim().equals(col.getComment().trim())) {
-                diff.setCommentChanged(true);
+        if (CodeFirstAlterMode.isAnyEnabled(alterModeMask, CodeFirstAlterMode.COMMENT)) {
+            if (col.getComment() != null && !col.getComment().trim().isEmpty()) {
+                if (existing.getRemarks() == null || !existing.getRemarks().trim().equals(col.getComment().trim())) {
+                    diff.setCommentChanged(true);
+                }
             }
         }
 
         return diff;
+    }
+
+    /**
+     * 重载版本（默认使用 ALL 模式）
+     */
+    public static ColumnDiff diffColumn(Dialect dialect, ColumnMetadata col, PhysicalColumnDesc existing) {
+        return diffColumn(dialect, col, existing, CodeFirstAlterMode.ALL.getMask());
     }
 
     /**

@@ -660,8 +660,34 @@ Java-ORM 内置智能的 Code-First 架构迁移同步引擎，支持自动识�
 - `NONE`（默认）：完全关闭 Code-First 同步，零额外元数据探测与开销。
 - `VALIDATE`：仅校验数据库表与列是否完整，缺少表、列或属性不符时抛出明确异常，绝不执行任何 DDL。
 - `CREATE_ONLY`：仅当表不存在时执行建表 `CREATE TABLE`，已有表不执行任何修改。
-- `UPDATE`（推荐开发环境使用）：表不存在时自动建表；表已存在时自动补齐缺失的新增列，并同步字段长度扩容、默认值变更与可空性约束。
+- `UPDATE`（推荐开发环境使用）：表不存在时自动建表；表已存在时自动补齐缺失的新增列。已有列的修改受 `CodeFirstAlterMode` 控制。
 - `DROP_CREATE`：危险模式（仅限全新临时测试），先 `DROP TABLE IF EXISTS`，再重新建表。
+
+#### 已有列属性变更安全控制（CodeFirstAlterMode 位掩码）
+由于对生产数据库已有字段执行 `ALTER/MODIFY COLUMN` 具有较高风险（例如锁表、字段缩短导致数据截断等），Java-ORM 提供了基于**位运算（Bitmask）**的细粒度安全控制机制：
+- **`NONE`（默认安全）**：禁止修改任何已有字段的属性，仅做安全的增量加列。
+- **原子权限位**：
+  - `LENGTH_EXPAND` (1)：仅允许字段长度/精度扩容（如 50 -> 150），绝不缩短。
+  - `LENGTH_SHRINK` (2)：允许字段长度缩减（高危：可能导致数据截断）。
+  - `DEFAULT_VALUE` (4)：允许修改字段默认值（SET DEFAULT / DROP DEFAULT）。
+  - `NULLABLE` (8)：允许修改字段可空性约束（SET NOT NULL / DROP NOT NULL）。
+  - `COMMENT` (16)：允许修改字段注释。
+  - `DATA_TYPE` (32)：允许修改字段类型定义（如 VARCHAR -> TEXT）。
+- **常用组合预设（Presets）**：
+  - `EXPAND_ONLY` / `SAFE`（推荐开发环境）：`LENGTH_EXPAND | DEFAULT_VALUE | COMMENT`，仅允许安全扩容与默认值更新，禁止缩减字段。
+  - `LENGTH`：`LENGTH_EXPAND | LENGTH_SHRINK`，允许所有长度变动。
+  - `ALL`：开放所有已有列属性变更。
+- **自定义按位或（|）组合**：
+  ```java
+  // 方式 1：使用预设组合
+  config.codeFirstAlterMode(CodeFirstAlterMode.EXPAND_ONLY);
+
+  // 方式 2：使用 varargs 多选组合
+  config.codeFirstAlterMode(CodeFirstAlterMode.LENGTH_EXPAND, CodeFirstAlterMode.DEFAULT_VALUE);
+
+  // 方式 3：通过 or() 位运算方法组合
+  config.codeFirstAlterMode(CodeFirstAlterMode.LENGTH_EXPAND.or(CodeFirstAlterMode.DEFAULT_VALUE));
+  ```
 
 #### 配置方式（Fluent API / OrmConfig）
 ```java
@@ -669,6 +695,8 @@ OrmConfig config = OrmConfig.create()
     .setDataSource(dataSource)
     // 开启自动同步模式（开发与测试环境推荐 UPDATE，生产环境推荐 NONE 或 VALIDATE）
     .codeFirstMode(CodeFirstMode.UPDATE)
+    // 配置已有列变更安全控制（默认 NONE，推荐开发环境配置 EXPAND_ONLY）
+    .codeFirstAlterMode(CodeFirstAlterMode.EXPAND_ONLY)
     // 配置实体类包扫描路径（支持递归扫描）
     .codeFirstPackageNames("com.example.entity", "com.example.domain")
     // 或者显式追加指定实体类

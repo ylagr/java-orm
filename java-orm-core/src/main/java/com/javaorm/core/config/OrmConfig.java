@@ -202,4 +202,46 @@ public class OrmConfig {
         this.codeFirstDropUnusedColumns = codeFirstDropUnusedColumns;
         return this;
     }
+
+    public OrmConfig codeFirstMode(com.javaorm.core.codefirst.CodeFirstMode mode) {
+        return setCodeFirstMode(mode);
+    }
+
+    public OrmConfig codeFirstPackageNames(String... packageNames) {
+        return addCodeFirstPackages(packageNames);
+    }
+
+    public OrmConfig codeFirstEntities(Class<?>... entityClasses) {
+        return addCodeFirstEntities(entityClasses);
+    }
+
+    public OrmConfig codeFirstDropUnusedColumns(boolean drop) {
+        return setCodeFirstDropUnusedColumns(drop);
+    }
+
+    private int codeFirstAlterModeMask = com.javaorm.core.codefirst.CodeFirstAlterMode.NONE.getMask();
+
+    public int getCodeFirstAlterModeMask() {
+        return codeFirstAlterModeMask;
+    }
+
+    public OrmConfig setCodeFirstAlterModeMask(int mask) {
+        this.codeFirstAlterModeMask = mask;
+        return this;
+    }
+
+    public OrmConfig codeFirstAlterMode(com.javaorm.core.codefirst.CodeFirstAlterMode mode) {
+        this.codeFirstAlterModeMask = mode != null ? mode.getMask() : com.javaorm.core.codefirst.CodeFirstAlterMode.NONE.getMask();
+        return this;
+    }
+
+    public OrmConfig codeFirstAlterMode(com.javaorm.core.codefirst.CodeFirstAlterMode... modes) {
+        this.codeFirstAlterModeMask = com.javaorm.core.codefirst.CodeFirstAlterMode.combine(modes);
+        return this;
+    }
+
+    public OrmConfig codeFirstAlterMode(int bitmask) {
+        this.codeFirstAlterModeMask = bitmask;
+        return this;
+    }
 }

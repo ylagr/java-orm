@@ -137,17 +137,18 @@ public class CodeFirst {
                     // 表不存在，生成建表语句
                     ddlList.add(DdlBuilder.buildCreateTable(dialect, meta));
                 } else if (mode == CodeFirstMode.UPDATE || mode == CodeFirstMode.VALIDATE) {
-                    // 表已存在，检测缺失的列以及已有列的属性变更（如长度变更、默认值变更等）
+                    // 表已存在，检测缺失的列以及已有列的属性变更（如长度变更、默认值变更等，受 codeFirstAlterMode 安全位掩码控制）
                     Map<String, PhysicalColumnDesc> existingColumns = SchemaInspector.getExistingColumnDetails(conn, meta.getSchema(), tableName);
+                    int alterModeMask = config.getCodeFirstAlterModeMask();
                     for (ColumnMetadata col : meta.getColumns()) {
                         if (col.isIgnored()) continue;
                         PhysicalColumnDesc existing = existingColumns.get(col.getColumnName());
                         if (existing == null) {
                             // 字段在物理表中不存在，生成 ADD COLUMN
                             ddlList.add(DdlBuilder.buildAddColumn(dialect, meta, col));
-                        } else {
-                            // 字段已存在，检测属性差异（长度、精度、默认值、可空性、注释等）
-                            DdlBuilder.ColumnDiff diff = DdlBuilder.diffColumn(dialect, col, existing);
+                        } else if (alterModeMask != 0) {
+                            // 字段已存在，且配置允许修改已有列，按掩码检测属性差异（长度、精度、默认值、可空性、注释等）
+                            DdlBuilder.ColumnDiff diff = DdlBuilder.diffColumn(dialect, col, existing, alterModeMask);
                             if (diff.hasChange()) {
                                 ddlList.addAll(DdlBuilder.buildAlterColumn(dialect, meta, col, existing, diff));
                             }
