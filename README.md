@@ -1,13 +1,18 @@
 # Java-ORM：现代无 APT 字段感知与级联流式 ORM
 
 [![Java 8+](https://img.shields.io/badge/Java-8%2B-blue.svg)](#)
+[![Status](https://img.shields.io/badge/Status-Demo%20%2F%20Experimental-yellow.svg)](#)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Maven Central](https://img.shields.io/badge/Maven-1.0.0-green.svg)](#)
 [![Zero-APT](https://img.shields.io/badge/APT-None-orange.svg)](#)
 
 > **Java-ORM** 是一个面向 Java 8+ 的轻量级现代关系型数据库 ORM 框架。
 > 它借鉴了 **Easy-Query** 的设计哲学，但**彻底摒弃了编译期 APT（代码生成器）技术**。
 > 通过基于 **ByteBuddy 的运行时代理调用录制（Invocation Recording）**，实现了类似 `s.getTeacher().getAge()` 的多级级联字段感知、编译期类型安全与纯粹的 SQL 链式流，实体保持纯净 POJO。
+
+> [!WARNING]
+> **项目状态声明（Project Status）**
+> 本项目当前处于 **Demo 概念验证与技术架构探索阶段（Preview / Experimental）**，**尚未正式上线大规模生产环境（Production）**。
+> 当前版本主要用于展示无 APT 运行时代理调用录制与现代流式 SQL 设计理念。欢迎各位开发者交流、体验、提出 Issue / PR 共同探讨；如需在生产环境使用，请务必经过充分的场景评估与完备的自动化回归测试。
 
 ---
 
