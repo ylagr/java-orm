@@ -18,7 +18,9 @@ public class PageAdapterRegistry {
         for (PageAdapter adapter : loader) {
             ADAPTERS.add(adapter);
         }
-        // 默认注册通用反射探测适配器（零侵入兜底）
+        // 注册基于 FastBean 机制的高性能零反射探测适配器（零反射调用，按类型全局缓存）
+        ADAPTERS.add(new FastBeanPageAdapter());
+        // 默认反射兜底适配器
         ADAPTERS.add(new ReflectivePageAdapter());
     }
 
