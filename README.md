@@ -65,34 +65,29 @@
 
 ---
 
-## 💡 AI 时代的核心价值：相比 MyBatis-Plus 的维度对比
+## 💡 AI 时代的核心价值：为什么 Java-ORM 是为 AI Coding Agent 量身打造的？
 
-在由大模型（LLM）与自主编程智能体（AI Coding Agent，如 Cursor、Devin、Antigravity、Copilot）主导的研发时代，ORM 框架的核心竞争力已经发生质的转变：**从过去“帮人类少敲几次键盘”，演变为“为 AI 提供强类型闭环、零幻觉惩罚、极低 Token 消耗、以及通过编译器反馈实现 100% 自我纠错（Self-Correction）的确定性契约”。**
-
-### 核心维度对比一览
-
-| 核心维度 | MyBatis / MyBatis-Plus | Java-ORM (现代无 APT 流式 ORM) | AI 时代的决定性差异 |
-| :--- | :--- | :--- | :--- |
-| **多表/联表类型安全** | 仅单表有简单 LambdaWrapper；多表/聚合**必须退化为手写 SQL 或 XML** | **全场景 100% 强类型方法感知**（`s.getTeacher().getAge()`） | AI 在手写 XML/SQL 时极易臆造字段或写错标签；Java-ORM 全链路受类型系统保护，**从根本杜绝字段幻觉** |
-| **AI 自动化纠错与自愈** | **极差**。XML 语法错误或字段拼错无法被 `javac` 拦截，CI/CD 盲目通过，运行时报错崩溃 | **极强（秒级闭环）**。全链路纯 Java 语法，AI 生成代码后仅需一次本地 `javac` 即可**捕获错误并在下一轮无缝自愈** | 降低人类排错心智负担，AI 无需连接数据库即可在本地完成编译纠错闭环 |
-| **Token 消耗与上下文窗口** | **臃肿冗长**。需同时生成/读取 Entity、Mapper 接口、Mapper XML、Service 继承树等 | **极致精简（直降 60%~80%）**。实体即全部元数据，所有业务内聚在一段 `orm.sql(...)` 中 | 节省庞大的 Prompt Token 成本，彻底消除长上下文导致的 AI 注意力漂移（Attention Loss） |
-| **代码生成器（APT）摩擦** | 竞品（如 EasyQuery / QueryDSL）依赖 APT 编译生成 `Q` 类，类未生成导致符号报错 | **彻底零 APT**。基于运行时动态代理与调用录制，实体即改即用，代码随写随测 | 避免 AI 在新增/修改实体字段时陷入“找不到生成类”、“IDE 缓存不一致”的编译死循环 |
-| **复杂 SQL（自连接/树形）心智** | 手写别名（`t1`, `t2`, `a`, `b`），AI 联表时常发生 `ON` 条件或 `WHERE` 逻辑颠倒 | `SqlEnv` 显式声明语义化变量（如 `parent`, `child`），由变量名天然驱动上下文 | 大模型底层注意力机制对有语义的表变量极其敏感，极大降低复杂 SQL 的逻辑颠倒率 |
-| **存量工程平滑接轨** | 切换框架通常需要推翻重写历史 XML、实体注解与插件体系，阻力巨大 | 提供 `MyBatisPlusAdapter` 一行代码无缝继承历史注解、MP 插件与事务 | **存量 100% 保持不动，增量 100% 享受纯 Java-ORM**，企业零成本、零风险让 AI 落地 |
+在由大模型（LLM）与自主编程智能体（AI Coding Agent，如 Cursor、Claude Code、Devin、Antigravity、Copilot）主导的研发时代，ORM 框架的技术评估标准已经发生质的颠覆：
+> **过去人类选 ORM**：比拼的是“人类少敲几次键盘”和“CRUD 模板代码生成插件”。
+> **AI 时代选 ORM**：核心价值完全聚焦于两大生死线：**【节省 Token（上下文成本与抗多文件失步）】** 与 **【编译检查（机器自愈的确定性契约）】**。
 
 ---
 
-### 为什么说 Java-ORM 是为 AI 智能体量身打造的？
+### 一、两大核心价值深度剖析
 
-#### 1. 彻底斩断 AI 幻觉，建立“编译器自愈闭环”（Compiler Feedback Loop）
-在 AI 编程流中，最可怕的不是编译报错，而是**“编译顺利通过，但运行时 SQL 语法或字段错误”**。MyBatis-Plus 在处理复杂查询时依赖 XML 或手写动态 SQL，AI 极易在 `<if test="...">` 或多表字符串中编造出不存在的列名。
-在 Java-ORM 中，无论是单表、多表 JOIN、自连接、流式更新还是删除，**全链路皆为纯正合法 Java 代码**。一旦实体字段重命名或 AI 产生幻觉，Java 编译器会在毫秒级直接亮红拦截，AI Agent 借由编译器的精准报错信息（File, Line, Symbol Not Found），无需任何人工介入即可自主在下一轮修正代码。
+#### 1. 极致节省 Token：干掉跨文件样板，彻底消除“注意力漂移与失步”
+* **传统模式（MyBatis / XML）的 Token 噩梦**：
+  让 AI 写一个稍微复杂的多表关联与分页统计，为了保证上下文完整，必须给 Prompt 塞入或让 AI 生成一整套文件：
+  `Order.java` + `User.java` + `OrderMapper.java` + `OrderMapper.xml`（包含 `<resultMap>`、`<sql>`、`<select id="...">`、动态 `<if>`、分页标签等）+ `OrderService`。
+  - **Prompt 输入 Token 暴增**：动辄占用 5,000 ~ 15,000 Token，极大增加 API 账单成本，并拖慢大模型推理首字延迟（TTFT）。
+  - **注意力漂移与跨文件失步（Attention Loss & Desynchronization）**：这是长上下文大模型极易出现的通病——实体属性叫 `createTime`，XML resultMap 映射成 `create_time`，条件 `<if test="createTime != null">` 稍不留神大小写写错，或者手写 SQL 别名不匹配。多个散落文件让 AI 的注意力严重稀释。
+  - **输出 Token 减半**：新增或修改一个字段，传统方案 AI 需要同时修改实体、Mapper 接口、XML 映射文件、Service 四处；Java-ORM 仅需在实体上声明一个属性，输出 Token 直降 70%~80%。
+* **Java-ORM 的降维打击（实体即元数据，单段纯 Java 业务全内聚）**：
+  在 Java-ORM 中，AI 只需要看实体定义，在单个业务方法中通过强类型 `orm.sql(e -> { ... })` 完成表声明、JOIN 关联、WHERE 条件、DTO 投影映射全流程。
+  **零多余文件、零 XML 标签、零 Mapper 接口，不仅为开发者节省巨额 API Token 账单，更让 AI 的全部注意力高度聚焦在纯粹的业务逻辑上！**
 
-#### 2. 告别庞大样板文件，单段 Java 代码实现业务全内聚
-AI 面对 MyBatis-Plus 时，为了新增一个稍微复杂点的查询，不得不生成 `XxxMapper.java`，然后在 `resources/mapper/XxxMapper.xml` 中编写繁琐的 XML 声明。这不仅大幅占用了原本宝贵的上下文 Token，更容易在两处文件同步时出现失步。
-Java-ORM 提倡**“实体即元数据”**，AI 仅需一段高内聚的 Java 代码即可闭环所有数据操作：
 ```java
-// AI 编写的代码极其聚焦，零多余文件，零 XML 模板：
+// AI 编写的代码极其聚焦，单段纯 Java 代码内聚所有业务逻辑，零 XML 样板：
 List<OrderVo> orders = orm.sql(e -> {
     Order o = e.table(Order.class, "o");
     User u = e.table(User.class, "u");
@@ -103,9 +98,59 @@ List<OrderVo> orders = orm.sql(e -> {
 }).toList();
 ```
 
-#### 3. 零 APT（Zero-APT）带来丝滑的即写即测体验
-许多主打类型安全的 ORM 依赖 APT（Annotation Processor）在编译期生成 `QUser.java` 冗余代码。但在 AI 自动化 Agent（如 Devin、Cursor Agent）的多轮交互中，AI 刚修改了实体类，生成的代理类往往还没生成或 IDE 索引尚未更新，导致 AI 反复遇到 `Cannot resolve symbol QUser` 的困境。
-Java-ORM 采用 ByteBuddy 运行时代理与调用录制，**从根本上不依赖任何编译期代码生成器**。实体改动即生效，无需额外编译等待，完美融入现代 Agentic 极速开发流水线。
+#### 2. 编译检查（强类型确定性）：构建“编译器毫秒级自愈闭环”（Compiler Feedback Loop）
+* **传统 SQL / XML 的“沉默杀手”**：
+  MyBatis 的 XML 标签、注解中的动态 SQL 字符串、OGNL 表达式对于 Java 编译器（`javac`）而言**全是不透明的无类型黑盒字符串**。
+  - 现象：AI 编写完代码，本地执行 `mvn compile` 顺利通过（返回 SUCCESS）；但一旦部署到测试环境或运行时，往往因为 XML 标签闭合错误、字段拼写错误、动态条件语法错而直接抛 `BadSqlGrammarException` 或 `ReflectionException`。
+  - **AI 无法自愈**：因为离线编译期编译器是盲目的，AI 无法在离线阶段自行发现语法错误，必须由人工启动应用、触发断点、把堆栈日志复制回给 AI，极度消耗人类精力。
+* **Java-ORM 的降维打击（全链路 100% 强类型 Java 语法，零黑盒）**：
+  在 Java-ORM 中，无论是单表、多表 JOIN、级联导航（`s.getTeacher().getAge()`）、流式条件、排序、分组还是投影，**全链路 100% 都是合法的 Java 强类型方法调用与方法引用**。
+  - 一旦实体属性重命名、或者 AI 产生了字段幻觉（捏造了不存在的字段），`javac` 编译器会在毫秒级直接精准拦截：
+    ```text
+    [ERROR] /src/main/java/.../OrderService.java:[42,28] 找不到符号
+      符号: 方法 getAmountTotal()
+      位置: 类 com.example.entity.Order
+    ```
+  - **智能体闭环（Agentic Self-Correction）**：AI Agent（如 Cursor、Antigravity、Devin）在修改完代码后，仅需在终端触发一次本地编译（`mvn test-compile`），就能拿到编译器给出的精准行号与符号报错。
+  - **AI 看到编译错误即可在单轮循环内 100% 自主修正，完全无需人类介入排错，实现真正的零人工“自愈开发”！**
+
+#### 3. 为什么“零 APT（Zero-APT）”是这两大价值的放大器？
+市面上一些强调类型安全的 ORM（如 QueryDSL、EasyQuery）虽然也具备编译检查，但由于**依赖 APT（编译期代码生成器）**，在 AI 编程流中会引发经典的**“先有鸡还是先有蛋”死循环**：
+1. AI 刚刚给实体新增了一个字段，业务代码需要调用生成类 `QUser.user.newField`；
+2. 由于编译期生成物尚未触发生成或 IDE 索引缓存未刷新，编译器报错 `Cannot resolve symbol QUser`；
+3. AI 误以为自己类名写错或导包错误，开始疯狂建类、反复修改 import，陷入严重的幻觉死循环，消耗大量 Token。
+> **Java-ORM 基于 ByteBuddy 运行时代理与调用录制，彻底消除了 APT**！
+> 实体即改即用，代码随写随测，实体一保存业务直接调，编译器立即认同，**彻底消除代码生成滞后的摩擦阻力**。
+
+---
+
+### 二、核心维度对比一览
+
+| 核心维度 | MyBatis / MyBatis-Plus | Java-ORM (现代无 APT 流式 ORM) | AI 时代的决定性差异 |
+| :--- | :--- | :--- | :--- |
+| **节省 Token 消耗** | **臃肿冗长**。需同时生成/读取 Entity、Mapper 接口、Mapper XML、Service 继承树等 | **极致精简（直降 60%~80%）**。实体即全部元数据，所有业务内聚在一段 `orm.sql(...)` 中 | 节省庞大 API 费用，消除长上下文导致的 AI 注意力漂移与跨文件失步 |
+| **编译期检查与自愈** | **极差（黑盒字符串）**。XML 语法错误或字段拼错无法被 `javac` 拦截，运行时崩溃 | **极强（秒级自愈闭环）**。全链路纯 Java 语法，AI 生成后一次 `javac` 即可**捕获错误并在下一轮无缝自愈** | 彻底斩断字段幻觉，AI 无需连接真实数据库即可在本地离线完成纠错闭环 |
+| **代码生成器（APT）摩擦** | 竞品（如 EasyQuery / QueryDSL）依赖 APT 编译生成 `Q` 类，类未生成导致符号报错 | **彻底零 APT**。基于运行时动态代理与调用录制，实体即改即用，代码随写随测 | 避免 AI 在新增/修改实体字段时陷入“找不到生成类”、“IDE 缓存不一致”的编译死循环 |
+| **多表/联表类型安全** | 仅单表有简单 LambdaWrapper；多表/聚合**必须退化为手写 SQL 或 XML** | **全场景 100% 强类型方法感知**（`s.getTeacher().getAge()`） | AI 在手写 XML/SQL 时极易臆造字段或写错标签；Java-ORM 全链路受类型系统保护 |
+| **复杂 SQL（自连接/树形）心智** | 手写别名（`t1`, `t2`, `a`, `b`），AI 联表时常发生 `ON` 条件或 `WHERE` 逻辑颠倒 | `SqlEnv` 显式声明语义化变量（如 `parent`, `child`），由变量名天然驱动上下文 | 大模型底层注意力机制对有语义的表变量极其敏感，极大降低复杂 SQL 的逻辑颠倒率 |
+| **存量工程平滑接轨** | 切换框架通常需要推翻重写历史 XML、实体注解与插件体系，阻力巨大 | 提供 `MyBatisPlusAdapter` 一行代码无缝继承历史注解、MP 插件与事务 | **存量 100% 保持不动，增量 100% 享受纯 Java-ORM**，企业零成本、零风险让 AI 落地 |
+
+---
+
+### 三、AI Coding Agent 推荐提示词模版（System Prompt Snippet）
+
+如果你在使用 **Cursor / Claude Code / Devin / Copilot / Antigravity** 等工具，可直接将以下规则注入你的 `.cursorrules` 或全局系统提示词中，让 AI 输出 100% 精准优雅的 Java-ORM 代码：
+
+```markdown
+# Java-ORM 编码准则 (用于 AI Coding Agent)
+1. 项目采用 Java-ORM 进行数据库操作，严禁编写任何 MyBatis XML 文件或手写 SQL 字符串拼接。
+2. 单表简单查询使用 `orm.select(Entity.class).where().eq(...).list()`。
+3. 任何涉及多表关联（JOIN）、聚合计算、自定义 DTO 投影或复杂流式更新，统一使用 `orm.sql(e -> { ... })` 环境模式：
+   - 显式声明表变量：`User u = e.table(User.class, "u");`
+   - 链式查询：`e.select(MyVo.class, ...).from(...).leftJoin(...).on(...).where()...`
+4. 全量字段感知与方法调用必须依赖实体 Getter 或方法引用（如 `u.getName()`、`User::getName`），严禁使用字符串硬编码列名。
+5. 编写完代码后，可通过执行 `mvn test-compile` 获得编译器的强类型反馈并自我纠错。
+```
 
 ---
 
