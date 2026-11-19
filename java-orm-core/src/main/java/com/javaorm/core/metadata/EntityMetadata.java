@@ -8,6 +8,7 @@ public class EntityMetadata {
     private Class<?> entityClass;
     private String tableName;
     private String schema;
+    private String comment;
     private ColumnMetadata idColumn;
     private final Map<String, ColumnMetadata> propertyColumns = new LinkedHashMap<>();
     private final Map<String, ColumnMetadata> columnToProperty = new LinkedHashMap<>();
@@ -118,6 +119,14 @@ public class EntityMetadata {
 
     public void setSchema(String schema) {
         this.schema = schema;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
     }
 
     public ColumnMetadata getIdColumn() {

@@ -149,4 +149,57 @@ public class OrmConfig {
         interceptorChain.addInterceptor(interceptor);
         return this;
     }
+
+    private com.javaorm.core.codefirst.CodeFirstMode codeFirstMode = com.javaorm.core.codefirst.CodeFirstMode.NONE;
+    private final java.util.Set<String> codeFirstPackageNames = new java.util.LinkedHashSet<>();
+    private final java.util.Set<Class<?>> codeFirstEntities = new java.util.LinkedHashSet<>();
+    private boolean codeFirstDropUnusedColumns = false;
+
+    public com.javaorm.core.codefirst.CodeFirstMode getCodeFirstMode() {
+        return codeFirstMode;
+    }
+
+    public OrmConfig setCodeFirstMode(com.javaorm.core.codefirst.CodeFirstMode codeFirstMode) {
+        this.codeFirstMode = codeFirstMode != null ? codeFirstMode : com.javaorm.core.codefirst.CodeFirstMode.NONE;
+        return this;
+    }
+
+    public java.util.Set<String> getCodeFirstPackageNames() {
+        return codeFirstPackageNames;
+    }
+
+    public OrmConfig addCodeFirstPackages(String... packageNames) {
+        if (packageNames != null) {
+            for (String pkg : packageNames) {
+                if (pkg != null && !pkg.trim().isEmpty()) {
+                    this.codeFirstPackageNames.add(pkg.trim());
+                }
+            }
+        }
+        return this;
+    }
+
+    public java.util.Set<Class<?>> getCodeFirstEntities() {
+        return codeFirstEntities;
+    }
+
+    public OrmConfig addCodeFirstEntities(Class<?>... entityClasses) {
+        if (entityClasses != null) {
+            for (Class<?> clazz : entityClasses) {
+                if (clazz != null) {
+                    this.codeFirstEntities.add(clazz);
+                }
+            }
+        }
+        return this;
+    }
+
+    public boolean isCodeFirstDropUnusedColumns() {
+        return codeFirstDropUnusedColumns;
+    }
+
+    public OrmConfig setCodeFirstDropUnusedColumns(boolean codeFirstDropUnusedColumns) {
+        this.codeFirstDropUnusedColumns = codeFirstDropUnusedColumns;
+        return this;
+    }
 }

@@ -23,6 +23,13 @@ public class ColumnInfo {
     private Boolean autoFill;
     private AutoFillType autoFillType;
     private ValueConverter<?, ?> converter;
+    private Boolean nullable;
+    private Integer length;
+    private Integer precision;
+    private Integer scale;
+    private String columnDefinition;
+    private String comment;
+    private String defaultValue;
 
     /**
      * 将另一个 ColumnInfo 中不为 null 的属性合并到当前实例中（已有值优先，保持高优先级生效）
@@ -43,6 +50,13 @@ public class ColumnInfo {
         if (this.autoFill == null) this.autoFill = other.autoFill;
         if (this.autoFillType == null) this.autoFillType = other.autoFillType;
         if (this.converter == null) this.converter = other.converter;
+        if (this.nullable == null) this.nullable = other.nullable;
+        if (this.length == null) this.length = other.length;
+        if (this.precision == null) this.precision = other.precision;
+        if (this.scale == null) this.scale = other.scale;
+        if (this.columnDefinition == null) this.columnDefinition = other.columnDefinition;
+        if (this.comment == null) this.comment = other.comment;
+        if (this.defaultValue == null) this.defaultValue = other.defaultValue;
     }
 
     public String getColumnName() {
@@ -155,5 +169,61 @@ public class ColumnInfo {
 
     public void setConverter(ValueConverter<?, ?> converter) {
         this.converter = converter;
+    }
+
+    public Boolean getNullable() {
+        return nullable;
+    }
+
+    public void setNullable(Boolean nullable) {
+        this.nullable = nullable;
+    }
+
+    public Integer getLength() {
+        return length;
+    }
+
+    public void setLength(Integer length) {
+        this.length = length;
+    }
+
+    public Integer getPrecision() {
+        return precision;
+    }
+
+    public void setPrecision(Integer precision) {
+        this.precision = precision;
+    }
+
+    public Integer getScale() {
+        return scale;
+    }
+
+    public void setScale(Integer scale) {
+        this.scale = scale;
+    }
+
+    public String getColumnDefinition() {
+        return columnDefinition;
+    }
+
+    public void setColumnDefinition(String columnDefinition) {
+        this.columnDefinition = columnDefinition;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
+    }
+
+    public String getDefaultValue() {
+        return defaultValue;
+    }
+
+    public void setDefaultValue(String defaultValue) {
+        this.defaultValue = defaultValue;
     }
 }

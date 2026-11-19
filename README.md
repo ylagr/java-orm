@@ -22,6 +22,8 @@
   通过 `orm.sql(e -> { ... })` 开启强类型、显式受控的 SQL 环境。显式声明表变量与别名（如 `e.table(Student.class, "s")`），彻底终结多表联查别名冲突；原生支持同表自连接（Self Join）、复杂多表 JOIN、全量字段/聚合函数计算与任意 DTO 投影映射；内置流式条件 UPDATE 与 DELETE；线程级安全隔离，执行完毕自动清理上下文，零污染、零泄漏。
 - ⚡ **高性能批量操作引擎（Batch Engine，参考 EasyQuery）**：
   原生支持 `insertBatch`、`updateBatch`、`deleteBatch`、`deleteByIds`，支持 `batchSize(n)` 批量分块分批，支持多值 VALUES 批量构造与 JDBC `addBatch()` 双模式，自动识别并分发到对应物理分库分表节点，支持主键安全回填与批量乐观锁。
+- 🏗️ **智能 Code-First 结构同步引擎（参考 EasyQuery / JPA）**：
+  支持实体驱动数据库架构自进化。系统自动反射或包扫描实体元数据，智能比对目标数据库元数据，**自动生成并执行建表 DDL（CREATE TABLE）与增量列补齐（ALTER TABLE ... ADD COLUMN ...）**。提供 `CodeFirstMode` 细粒度控制（`NONE`, `VALIDATE`, `CREATE_ONLY`, `UPDATE`, `DROP_CREATE`），支持跨方言 DDL（MySQL, PostgreSQL, H2, SQLite, Oracle 等），严格遵循安全生产原则（默认绝不执行危险的 DROP COLUMN 操作）。
 - 🌉 **MyBatis-Plus 一站式完整适配器（MyBatisPlusAdapter）**：
   在应用启动时（如 Spring Boot 配置类中）仅需配置一次 `MyBatisPlusAdapter.create(sqlSessionFactory)`，即可无缝继承 MyBatis-Plus 的所有能力（动态表名、多租户行级隔离、防全表更新删除 BlockAttack 插件、Spring 声明式事务、枚举转换、分页插件与注解），后续业务代码 **100% 仅使用纯粹的 JavaORM**，无需再写 Mapper XML 或 BaseMapper！
 - 🛡️ **多级乐观锁机制（Optimistic Locking）**：
@@ -643,6 +645,76 @@ Trade trade = orm.sql(e -> {
 orm.useDataSource("ds_slave", () -> {
     return orm.select(Report.class).toList();
 });
+```
+
+### 11. 自动化 Code-First 架构同步（参考 EasyQuery / JPA）
+
+Java-ORM 内置智能的 Code-First 架构迁移同步引擎，支持自动识别实体类、读取 `@JoTable` / `@JoColumn`（或 JPA / MyBatis-Plus 对应字段属性），与数据库系统元数据进行双向差分比对：
+- **表不存在时**：自动生成对应方言的 `CREATE TABLE` 语句并执行创建（包含自增主键、列定义、字段注释等）。
+- **表已存在时**：智能比对已有物理列，自动增量生成并执行 `ALTER TABLE ... ADD COLUMN ...` 语句，补齐新增字段。
+- **安全第一**：默认绝不执行危险的 `DROP COLUMN` 操作；支持独立配置开关与多级执行模式。
+
+#### 同步模式（CodeFirstMode）
+参考 JPA `hbm2ddl.auto` 与 EasyQuery 的设计，提供 5 种执行模式：
+- `NONE`（默认）：完全关闭 Code-First 同步，零额外元数据探测与开销。
+- `VALIDATE`：仅校验数据库表与列是否完整，缺少表或列时抛出明确异常，绝不执行任何 DDL。
+- `CREATE_ONLY`：仅当表不存在时执行建表 `CREATE TABLE`，已有表不执行任何修改。
+- `UPDATE`（推荐开发环境使用）：表不存在时自动建表；表已存在时自动补齐缺失的新增列。
+- `DROP_CREATE`：危险模式（仅限全新临时测试），先 `DROP TABLE IF EXISTS`，再重新建表。
+
+#### 配置方式（Fluent API / OrmConfig）
+```java
+OrmConfig config = OrmConfig.create()
+    .setDataSource(dataSource)
+    // 开启自动同步模式（开发与测试环境推荐 UPDATE，生产环境推荐 NONE 或 VALIDATE）
+    .codeFirstMode(CodeFirstMode.UPDATE)
+    // 配置实体类包扫描路径（支持递归扫描）
+    .codeFirstPackageNames("com.example.entity", "com.example.domain")
+    // 或者显式追加指定实体类
+    .codeFirstEntities(Order.class, User.class);
+
+// 初始化 JavaOrm 时自动按模式执行扫描与增量同步
+JavaOrm orm = JavaOrm.create(config);
+```
+
+#### 手动执行与 DDL 预览（CodeFirst 门面）
+你也可以在任意时刻通过 `orm.codeFirst()` 手动生成 DDL 预览、执行单表或特定包同步：
+```java
+// 1. 生成并预览增量 DDL 脚本（不直接执行）
+List<String> ddlList = orm.codeFirst().generateDdl(Order.class);
+ddlList.forEach(System.out::println);
+
+// 2. 手动指定针对某个实体执行同步
+orm.codeFirst().syncTable(Order.class);
+
+// 3. 手动同步指定包名下的所有实体
+orm.codeFirst().syncPackage("com.example.entity");
+```
+
+#### 实体定义与 DDL 属性定制
+```java
+@JoTable(name = "t_order", comment = "业务订单表")
+public class Order {
+    @JoId(autoIncrement = true)
+    private Long id;
+
+    @JoColumn(length = 64, nullable = false, comment = "订单编号")
+    private String orderNo;
+
+    @JoColumn(precision = 12, scale = 2, comment = "订单金额")
+    private BigDecimal totalAmount;
+
+    @JoColumn(defaultValue = "1", comment = "订单状态: 1-待支付 2-已支付")
+    private Integer status;
+
+    @JoColumn(name = "remark", columnDefinition = "TEXT", comment = "备注")
+    private String remark;
+
+    // 当实体类中新增字段（例如 email、age），启动或调用 sync 时会自动追加：
+    // ALTER TABLE "t_order" ADD COLUMN "email" VARCHAR(128)
+    @JoColumn(length = 128)
+    private String email;
+}
 ```
 
 ---

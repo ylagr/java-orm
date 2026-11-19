@@ -29,6 +29,13 @@ public class ColumnMetadata {
     private java.util.List<ValueObjectStep> valueObjectSteps;
     private java.lang.reflect.Type genericType;
     private com.javaorm.core.converter.ValueConverter<?, ?> converter;
+    private boolean nullable = true;
+    private int length = 255;
+    private int precision = 0;
+    private int scale = 0;
+    private String columnDefinition = "";
+    private String comment = "";
+    private String defaultValue = "";
 
     public java.util.List<ValueObjectStep> getValueObjectSteps() {
         return valueObjectSteps;
@@ -456,5 +463,61 @@ public class ColumnMetadata {
 
     public void setShardingKey(boolean shardingKey) {
         this.shardingKey = shardingKey;
+    }
+
+    public boolean isNullable() {
+        return nullable;
+    }
+
+    public void setNullable(boolean nullable) {
+        this.nullable = nullable;
+    }
+
+    public int getLength() {
+        return length;
+    }
+
+    public void setLength(int length) {
+        this.length = length;
+    }
+
+    public int getPrecision() {
+        return precision;
+    }
+
+    public void setPrecision(int precision) {
+        this.precision = precision;
+    }
+
+    public int getScale() {
+        return scale;
+    }
+
+    public void setScale(int scale) {
+        this.scale = scale;
+    }
+
+    public String getColumnDefinition() {
+        return columnDefinition;
+    }
+
+    public void setColumnDefinition(String columnDefinition) {
+        this.columnDefinition = columnDefinition != null ? columnDefinition : "";
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment != null ? comment : "";
+    }
+
+    public String getDefaultValue() {
+        return defaultValue;
+    }
+
+    public void setDefaultValue(String defaultValue) {
+        this.defaultValue = defaultValue != null ? defaultValue : "";
     }
 }

@@ -166,6 +166,9 @@ public class EntityMetadataManager {
         }
         metadata.setTableName(tableName);
         metadata.setSchema(schema);
+        if (tableInfo != null && tableInfo.getComment() != null) {
+            metadata.setComment(tableInfo.getComment());
+        }
 
         com.javaorm.core.sharding.JoSharding shardingAnn = clazz.getAnnotation(com.javaorm.core.sharding.JoSharding.class);
         if (shardingAnn != null) {
@@ -425,6 +428,27 @@ public class EntityMetadataManager {
             }
             if (colInfo.getConverter() != null) {
                 col.setConverter(colInfo.getConverter());
+            }
+            if (colInfo.getNullable() != null) {
+                col.setNullable(colInfo.getNullable());
+            }
+            if (colInfo.getLength() != null) {
+                col.setLength(colInfo.getLength());
+            }
+            if (colInfo.getPrecision() != null) {
+                col.setPrecision(colInfo.getPrecision());
+            }
+            if (colInfo.getScale() != null) {
+                col.setScale(colInfo.getScale());
+            }
+            if (colInfo.getColumnDefinition() != null) {
+                col.setColumnDefinition(colInfo.getColumnDefinition());
+            }
+            if (colInfo.getComment() != null) {
+                col.setComment(colInfo.getComment());
+            }
+            if (colInfo.getDefaultValue() != null) {
+                col.setDefaultValue(colInfo.getDefaultValue());
             }
         }
 

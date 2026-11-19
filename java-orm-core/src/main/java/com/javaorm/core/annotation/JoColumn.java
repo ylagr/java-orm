@@ -33,6 +33,36 @@ public @interface JoColumn {
     boolean nullable() default true;
 
     /**
+     * 字段长度（如字符串 VARCHAR 长度，默认 255）
+     */
+    int length() default 255;
+
+    /**
+     * 浮点/定点数精度（整数部分+小数部分总位数，默认 0）
+     */
+    int precision() default 0;
+
+    /**
+     * 定点数小数位精度（默认 0）
+     */
+    int scale() default 0;
+
+    /**
+     * 显式指定数据库列类型 DDL 定义（例如 "TEXT"、"VARCHAR(100) NOT NULL"），若非空则优先使用
+     */
+    String columnDefinition() default "";
+
+    /**
+     * 字段注释
+     */
+    String comment() default "";
+
+    /**
+     * 默认值表达式（如 "0"、"''"）
+     */
+    String defaultValue() default "";
+
+    /**
      * 是否忽略该字段（不参与 SQL 增删改查）
      */
     boolean ignore() default false;

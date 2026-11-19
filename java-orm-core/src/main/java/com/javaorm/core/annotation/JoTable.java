@@ -26,4 +26,9 @@ public @interface JoTable {
      * 模式或数据库名（可选）
      */
     String schema() default "";
+
+    /**
+     * 表注释（可选）
+     */
+    String comment() default "";
 }

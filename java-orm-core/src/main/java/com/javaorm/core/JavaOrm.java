@@ -40,6 +40,16 @@ public class JavaOrm {
             this.config.getDataSourceManager().setDefaultDataSource(dataSource);
         }
         this.dialect = dialect != null ? dialect : detectDialect(dataSource);
+        if (this.config.getCodeFirstMode() != null && this.config.getCodeFirstMode() != com.javaorm.core.codefirst.CodeFirstMode.NONE) {
+            codeFirst().syncAll();
+        }
+    }
+
+    /**
+     * 获取 Code-First 数据库架构同步引擎
+     */
+    public com.javaorm.core.codefirst.CodeFirst codeFirst() {
+        return new com.javaorm.core.codefirst.CodeFirst(dataSource, dialect, config);
     }
 
     /**

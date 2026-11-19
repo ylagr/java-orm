@@ -26,7 +26,7 @@ public class JoMetadataBridge implements MetadataBridge {
             if (ann instanceof JoTable) {
                 JoTable t = (JoTable) ann;
                 String name = !t.value().isEmpty() ? t.value() : t.name();
-                return new TableInfo(name, t.schema());
+                return new TableInfo(name, t.schema(), t.comment());
             }
             String annName = ann.annotationType().getName();
             if (annName.endsWith(".JoTable") || annName.endsWith(".Table")) {
@@ -35,7 +35,8 @@ public class JoMetadataBridge implements MetadataBridge {
                     name = getAnnotationString(ann, "name");
                 }
                 String schema = getAnnotationString(ann, "schema");
-                return new TableInfo(name, schema);
+                String comment = getAnnotationString(ann, "comment");
+                return new TableInfo(name, schema, comment);
             }
         }
         return null;
@@ -57,6 +58,13 @@ public class JoMetadataBridge implements MetadataBridge {
                 if (!colName.isEmpty()) info.setColumnName(colName);
                 if (c.primaryKey()) info.setPrimaryKey(true);
                 if (c.ignore()) info.setIgnored(true);
+                info.setNullable(c.nullable());
+                info.setLength(c.length());
+                info.setPrecision(c.precision());
+                info.setScale(c.scale());
+                if (!c.columnDefinition().isEmpty()) info.setColumnDefinition(c.columnDefinition());
+                if (!c.comment().isEmpty()) info.setComment(c.comment());
+                if (!c.defaultValue().isEmpty()) info.setDefaultValue(c.defaultValue());
             } else if (name.endsWith(".JoColumn") || name.endsWith(".Column")) {
                 if (info == null) info = new ColumnInfo();
                 String colName = getAnnotationString(ann, "value");
@@ -64,6 +72,18 @@ public class JoMetadataBridge implements MetadataBridge {
                     colName = getAnnotationString(ann, "name");
                 }
                 if (colName != null && !colName.isEmpty()) info.setColumnName(colName);
+                Boolean nullable = getAnnotationBoolean(ann, "nullable");
+                if (nullable != null) info.setNullable(nullable);
+                Integer length = getAnnotationInt(ann, "length");
+                if (length != null) info.setLength(length);
+                Integer precision = getAnnotationInt(ann, "precision");
+                if (precision != null) info.setPrecision(precision);
+                Integer scale = getAnnotationInt(ann, "scale");
+                if (scale != null) info.setScale(scale);
+                String def = getAnnotationString(ann, "columnDefinition");
+                if (def != null && !def.isEmpty()) info.setColumnDefinition(def);
+                String cmt = getAnnotationString(ann, "comment");
+                if (cmt != null && !cmt.isEmpty()) info.setComment(cmt);
             }
 
             // 2. @JoId / @Id
@@ -184,6 +204,28 @@ public class JoMetadataBridge implements MetadataBridge {
             Method m = ann.annotationType().getMethod(methodName);
             Object v = m.invoke(ann);
             return v != null ? v.toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Boolean getAnnotationBoolean(Annotation ann, String methodName) {
+        try {
+            Method m = ann.annotationType().getMethod(methodName);
+            Object v = m.invoke(ann);
+            if (v instanceof Boolean) return (Boolean) v;
+            return v != null ? Boolean.valueOf(v.toString()) : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Integer getAnnotationInt(Annotation ann, String methodName) {
+        try {
+            Method m = ann.annotationType().getMethod(methodName);
+            Object v = m.invoke(ann);
+            if (v instanceof Number) return ((Number) v).intValue();
+            return v != null ? Integer.valueOf(v.toString()) : null;
         } catch (Exception e) {
             return null;
         }
