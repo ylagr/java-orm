@@ -54,6 +54,50 @@
 
 ---
 
+## 💡 AI 时代的核心价值：相比 MyBatis-Plus 的维度对比
+
+在由大模型（LLM）与自主编程智能体（AI Coding Agent，如 Cursor、Devin、Antigravity、Copilot）主导的研发时代，ORM 框架的核心竞争力已经发生质的转变：**从过去“帮人类少敲几次键盘”，演变为“为 AI 提供强类型闭环、零幻觉惩罚、极低 Token 消耗、以及通过编译器反馈实现 100% 自我纠错（Self-Correction）的确定性契约”。**
+
+### 核心维度对比一览
+
+| 核心维度 | MyBatis / MyBatis-Plus | Java-ORM (现代无 APT 流式 ORM) | AI 时代的决定性差异 |
+| :--- | :--- | :--- | :--- |
+| **多表/联表类型安全** | 仅单表有简单 LambdaWrapper；多表/聚合**必须退化为手写 SQL 或 XML** | **全场景 100% 强类型方法感知**（`s.getTeacher().getAge()`） | AI 在手写 XML/SQL 时极易臆造字段或写错标签；Java-ORM 全链路受类型系统保护，**从根本杜绝字段幻觉** |
+| **AI 自动化纠错与自愈** | **极差**。XML 语法错误或字段拼错无法被 `javac` 拦截，CI/CD 盲目通过，运行时报错崩溃 | **极强（秒级闭环）**。全链路纯 Java 语法，AI 生成代码后仅需一次本地 `javac` 即可**捕获错误并在下一轮无缝自愈** | 降低人类排错心智负担，AI 无需连接数据库即可在本地完成编译纠错闭环 |
+| **Token 消耗与上下文窗口** | **臃肿冗长**。需同时生成/读取 Entity、Mapper 接口、Mapper XML、Service 继承树等 | **极致精简（直降 60%~80%）**。实体即全部元数据，所有业务内聚在一段 `orm.sql(...)` 中 | 节省庞大的 Prompt Token 成本，彻底消除长上下文导致的 AI 注意力漂移（Attention Loss） |
+| **代码生成器（APT）摩擦** | 竞品（如 EasyQuery / QueryDSL）依赖 APT 编译生成 `Q` 类，类未生成导致符号报错 | **彻底零 APT**。基于运行时动态代理与调用录制，实体即改即用，代码随写随测 | 避免 AI 在新增/修改实体字段时陷入“找不到生成类”、“IDE 缓存不一致”的编译死循环 |
+| **复杂 SQL（自连接/树形）心智** | 手写别名（`t1`, `t2`, `a`, `b`），AI 联表时常发生 `ON` 条件或 `WHERE` 逻辑颠倒 | `SqlEnv` 显式声明语义化变量（如 `parent`, `child`），由变量名天然驱动上下文 | 大模型底层注意力机制对有语义的表变量极其敏感，极大降低复杂 SQL 的逻辑颠倒率 |
+| **存量工程平滑接轨** | 切换框架通常需要推翻重写历史 XML、实体注解与插件体系，阻力巨大 | 提供 `MyBatisPlusAdapter` 一行代码无缝继承历史注解、MP 插件与事务 | **存量 100% 保持不动，增量 100% 享受纯 Java-ORM**，企业零成本、零风险让 AI 落地 |
+
+---
+
+### 为什么说 Java-ORM 是为 AI 智能体量身打造的？
+
+#### 1. 彻底斩断 AI 幻觉，建立“编译器自愈闭环”（Compiler Feedback Loop）
+在 AI 编程流中，最可怕的不是编译报错，而是**“编译顺利通过，但运行时 SQL 语法或字段错误”**。MyBatis-Plus 在处理复杂查询时依赖 XML 或手写动态 SQL，AI 极易在 `<if test="...">` 或多表字符串中编造出不存在的列名。
+在 Java-ORM 中，无论是单表、多表 JOIN、自连接、流式更新还是删除，**全链路皆为纯正合法 Java 代码**。一旦实体字段重命名或 AI 产生幻觉，Java 编译器会在毫秒级直接亮红拦截，AI Agent 借由编译器的精准报错信息（File, Line, Symbol Not Found），无需任何人工介入即可自主在下一轮修正代码。
+
+#### 2. 告别庞大样板文件，单段 Java 代码实现业务全内聚
+AI 面对 MyBatis-Plus 时，为了新增一个稍微复杂点的查询，不得不生成 `XxxMapper.java`，然后在 `resources/mapper/XxxMapper.xml` 中编写繁琐的 XML 声明。这不仅大幅占用了原本宝贵的上下文 Token，更容易在两处文件同步时出现失步。
+Java-ORM 提倡**“实体即元数据”**，AI 仅需一段高内聚的 Java 代码即可闭环所有数据操作：
+```java
+// AI 编写的代码极其聚焦，零多余文件，零 XML 模板：
+List<OrderVo> orders = orm.sql(e -> {
+    Order o = e.table(Order.class, "o");
+    User u = e.table(User.class, "u");
+    e.select(OrderVo.class, o.getOrderNo(), u.getName(), o.getAmount())
+     .from(o)
+     .leftJoin(u).on(o.getUserId(), u.getId())
+     .where().ge(o.getAmount(), 100);
+}).toList();
+```
+
+#### 3. 零 APT（Zero-APT）带来丝滑的即写即测体验
+许多主打类型安全的 ORM 依赖 APT（Annotation Processor）在编译期生成 `QUser.java` 冗余代码。但在 AI 自动化 Agent（如 Devin、Cursor Agent）的多轮交互中，AI 刚修改了实体类，生成的代理类往往还没生成或 IDE 索引尚未更新，导致 AI 反复遇到 `Cannot resolve symbol QUser` 的困境。
+Java-ORM 采用 ByteBuddy 运行时代理与调用录制，**从根本上不依赖任何编译期代码生成器**。实体改动即生效，无需额外编译等待，完美融入现代 Agentic 极速开发流水线。
+
+---
+
 ## 快速上手
 
 ### 1. 引入 Maven 依赖
