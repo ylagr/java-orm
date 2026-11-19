@@ -564,4 +564,34 @@ public class DdlBuilder {
         }
         return list;
     }
+
+    /**
+     * 生成创建索引的 DDL 语句（CREATE INDEX / CREATE UNIQUE INDEX）
+     */
+    public static String buildCreateIndex(Dialect dialect, EntityMetadata metadata, com.javaorm.core.metadata.IndexMetadata index) {
+        StringBuilder sb = new StringBuilder();
+        String tableName = dialect.quote(metadata.getTableName());
+
+        String indexName = index.getName();
+        if (indexName == null || indexName.trim().isEmpty()) {
+            String prefix = index.isUnique() ? "uniq_" : "idx_";
+            indexName = prefix + metadata.getTableName() + "_" + String.join("_", index.getColumns());
+        }
+        String quotedIndexName = dialect.quote(indexName);
+
+        sb.append("CREATE ");
+        if (index.isUnique()) {
+            sb.append("UNIQUE ");
+        }
+        sb.append("INDEX ").append(quotedIndexName).append(" ON ").append(tableName).append(" (");
+
+        List<String> quotedCols = new ArrayList<>();
+        for (String col : index.getColumns()) {
+            quotedCols.add(dialect.quote(col));
+        }
+        sb.append(String.join(", ", quotedCols));
+        sb.append(")");
+
+        return sb.toString();
+    }
 }

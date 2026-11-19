@@ -5,6 +5,7 @@ import com.javaorm.core.annotation.GenerationType;
 import com.javaorm.core.annotation.JoColumn;
 import com.javaorm.core.annotation.JoGeneratedValue;
 import com.javaorm.core.annotation.JoId;
+import com.javaorm.core.annotation.JoIndex;
 import com.javaorm.core.annotation.JoTable;
 import com.javaorm.core.codefirst.CodeFirstMode;
 import com.javaorm.core.config.OrmConfig;
@@ -238,10 +239,62 @@ public class CodeFirstTest {
             // 清理测试表
             stmt.execute("DROP TABLE IF EXISTS \"t_cf_order\"");
             stmt.execute("DROP TABLE IF EXISTS \"t_cf_user\"");
+            stmt.execute("DROP TABLE IF EXISTS \"t_cf_article\"");
 
             // 预先创建 t_cf_user 表，但故意缺少 email, age, nickname 字段
             stmt.execute("CREATE TABLE \"t_cf_user\" (\"id\" BIGINT PRIMARY KEY, \"username\" VARCHAR(50))");
             stmt.execute("INSERT INTO \"t_cf_user\" VALUES (1, 'alice')");
+        }
+    }
+
+    /**
+     * 演示包含类级别多列复合索引与字段级别唯一索引的实体模型
+     */
+    @JoTable(name = "t_cf_article")
+    @JoIndex(name = "idx_art_status_time", columns = {"status", "create_time"})
+    public static class IndexedArticleEntity {
+        @JoId
+        @JoGeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
+
+        @JoIndex(name = "uk_art_code", unique = true)
+        @JoColumn(length = 64, nullable = false)
+        private String articleCode;
+
+        private Integer status;
+
+        private LocalDateTime createTime;
+
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public String getArticleCode() {
+            return articleCode;
+        }
+
+        public void setArticleCode(String articleCode) {
+            this.articleCode = articleCode;
+        }
+
+        public Integer getStatus() {
+            return status;
+        }
+
+        public void setStatus(Integer status) {
+            this.status = status;
+        }
+
+        public LocalDateTime getCreateTime() {
+            return createTime;
+        }
+
+        public void setCreateTime(LocalDateTime createTime) {
+            this.createTime = createTime;
         }
     }
 
@@ -464,5 +517,97 @@ public class CodeFirstTest {
         UserEntityV2 alice = orm.select(UserEntityV2.class).where().eq(UserEntityV2::getId, 1L).first();
         Assert.assertNotNull(alice);
         Assert.assertEquals("a_very_long_username_that_exceeds_fifty_characters_0123456789_abcdefg", alice.getUsername());
+    }
+
+    /**
+     * 7. 测试 @JoIndex 索引元数据解析、DDL 自动生成及 Code-First 自动建索引与幂等性
+     */
+    @Test
+    public void testAutoCreateIndexes() throws Exception {
+        OrmConfig config = new OrmConfig()
+                .setCodeFirstMode(CodeFirstMode.UPDATE)
+                .setPrintSql(true);
+        JavaOrm orm = JavaOrm.create(dataSource, new H2Dialect(), config);
+
+        // 1. 生成 DDL 检查
+        List<String> ddls = orm.codeFirst().generateDdl(IndexedArticleEntity.class);
+        Assert.assertNotNull(ddls);
+        Assert.assertEquals("首次建表应生成 1 条建表 DDL + 2 条索引 DDL", 3, ddls.size());
+
+        boolean hasCreateTable = ddls.stream().anyMatch(sql -> sql.toUpperCase().contains("CREATE TABLE") && sql.toUpperCase().contains("T_CF_ARTICLE"));
+        Assert.assertTrue("应包含 CREATE TABLE", hasCreateTable);
+
+        boolean hasUniqueIndex = ddls.stream().anyMatch(sql -> sql.toUpperCase().contains("CREATE UNIQUE INDEX") && sql.contains("uk_art_code"));
+        Assert.assertTrue("应包含 CREATE UNIQUE INDEX uk_art_code", hasUniqueIndex);
+
+        boolean hasCompoundIndex = ddls.stream().anyMatch(sql -> sql.toUpperCase().contains("CREATE INDEX") && sql.contains("idx_art_status_time"));
+        Assert.assertTrue("应包含 CREATE INDEX idx_art_status_time", hasCompoundIndex);
+
+        // 2. 执行表结构与索引同步
+        orm.codeFirst().syncTable(IndexedArticleEntity.class);
+
+        // 3. 校验数据库中的物理索引
+        try (Connection conn = dataSource.getConnection()) {
+            java.util.Set<String> indexes = SchemaInspector.getExistingIndexes(conn, null, "t_cf_article");
+            Assert.assertTrue("数据库应包含唯一索引 uk_art_code", indexes.contains("uk_art_code"));
+            Assert.assertTrue("数据库应包含复合索引 idx_art_status_time", indexes.contains("idx_art_status_time"));
+        }
+
+        // 4. 再次执行 generateDdl，由于索引已在数据库中存在，应具备幂等性（生成 0 条 DDL）
+        List<String> secondDdls = orm.codeFirst().generateDdl(IndexedArticleEntity.class);
+        Assert.assertTrue("索引与表已存在时再次同步应生成 0 条 DDL（具备幂等性）", secondDdls.isEmpty());
+
+        // 5. 验证数据操作与唯一索引约束生效
+        IndexedArticleEntity a1 = new IndexedArticleEntity();
+        a1.setArticleCode("ART_001");
+        a1.setStatus(1);
+        a1.setCreateTime(LocalDateTime.now());
+        orm.insert(a1);
+
+        IndexedArticleEntity a2 = new IndexedArticleEntity();
+        a2.setArticleCode("ART_001"); // 重复 code，应当触发唯一约束冲突
+        a2.setStatus(1);
+        a2.setCreateTime(LocalDateTime.now());
+        boolean uniqueConflict = false;
+        try {
+            orm.insert(a2);
+        } catch (Exception e) {
+            uniqueConflict = true;
+        }
+        Assert.assertTrue("重复插入唯一索引字段值应当触发约束异常", uniqueConflict);
+    }
+
+    /**
+     * 8. 测试已有表在 UPDATE 模式下增量补齐缺失索引，且受 CodeFirstAlterMode.INDEX 控制
+     */
+    @Test
+    public void testExistingTableIndexAlterMode() throws Exception {
+        // 先手动创建无索引的 t_cf_article 表
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE TABLE \"t_cf_article\" (\"id\" BIGINT PRIMARY KEY, \"article_code\" VARCHAR(64), \"status\" INT, \"create_time\" TIMESTAMP)");
+        }
+
+        OrmConfig config = new OrmConfig()
+                .setCodeFirstMode(CodeFirstMode.UPDATE)
+                .codeFirstAlterMode(CodeFirstAlterMode.NONE); // 默认严格模式：禁止对已有表修改
+        JavaOrm orm = JavaOrm.create(dataSource, new H2Dialect(), config);
+
+        // NONE 模式下，即便缺失索引，也不生成
+        List<String> noneDdls = orm.codeFirst().generateDdl(IndexedArticleEntity.class);
+        Assert.assertTrue("NONE 模式下不应对已有表增量添加索引", noneDdls.isEmpty());
+
+        // 允许 INDEX 位掩码
+        config.codeFirstAlterMode(CodeFirstAlterMode.INDEX);
+        List<String> indexDdls = orm.codeFirst().generateDdl(IndexedArticleEntity.class);
+        Assert.assertEquals("开启 INDEX 模式后应对已有表补齐 2 个缺失索引", 2, indexDdls.size());
+
+        // 执行同步并校验
+        orm.codeFirst().syncTable(IndexedArticleEntity.class);
+        try (Connection conn = dataSource.getConnection()) {
+            java.util.Set<String> indexes = SchemaInspector.getExistingIndexes(conn, null, "t_cf_article");
+            Assert.assertTrue(indexes.contains("uk_art_code"));
+            Assert.assertTrue(indexes.contains("idx_art_status_time"));
+        }
     }
 }

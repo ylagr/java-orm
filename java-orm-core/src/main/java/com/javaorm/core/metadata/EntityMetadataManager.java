@@ -169,6 +169,9 @@ public class EntityMetadataManager {
         if (tableInfo != null && tableInfo.getComment() != null) {
             metadata.setComment(tableInfo.getComment());
         }
+        if (tableInfo != null && !tableInfo.getIndexes().isEmpty()) {
+            metadata.addIndexes(tableInfo.getIndexes());
+        }
 
         com.javaorm.core.sharding.JoSharding shardingAnn = clazz.getAnnotation(com.javaorm.core.sharding.JoSharding.class);
         if (shardingAnn != null) {
@@ -233,6 +236,26 @@ public class EntityMetadataManager {
             ColumnMetadata colMeta = parseColumn(clazz, field, getter, setter, nameConversion, config);
             if (colMeta != null && !colMeta.isIgnored()) {
                 metadata.addColumn(colMeta);
+
+                // 解析字段级 @JoIndex 注解
+                com.javaorm.core.annotation.JoIndex joIndex = field != null ? field.getAnnotation(com.javaorm.core.annotation.JoIndex.class) : null;
+                if (joIndex == null && getter != null) {
+                    joIndex = getter.getAnnotation(com.javaorm.core.annotation.JoIndex.class);
+                }
+                if (joIndex != null) {
+                    String idxName = joIndex.name().trim();
+                    String[] cols = joIndex.columns();
+                    List<String> colList = new ArrayList<>();
+                    if (cols.length == 0) {
+                        colList.add(colMeta.getColumnName());
+                    } else {
+                        Collections.addAll(colList, cols);
+                    }
+                    if (idxName.isEmpty()) {
+                        idxName = (joIndex.unique() ? "uniq_" : "idx_") + metadata.getTableName() + "_" + colMeta.getColumnName();
+                    }
+                    metadata.addIndex(new IndexMetadata(idxName, colList, joIndex.unique()));
+                }
             }
         }
  

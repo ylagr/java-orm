@@ -97,4 +97,36 @@ public class SchemaInspector {
 
         return columns;
     }
+
+    /**
+     * 获取指定表中已存在的所有索引名称（大小写不敏感 Set）
+     */
+    public static Set<String> getExistingIndexes(Connection conn, String schema, String tableName) throws SQLException {
+        Set<String> indexes = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        DatabaseMetaData meta = conn.getMetaData();
+        String catalog = null;
+        try {
+            catalog = conn.getCatalog();
+        } catch (Exception ignored) {
+        }
+
+        String[] candidates = new String[]{tableName, tableName.toUpperCase(), tableName.toLowerCase()};
+        for (String candidate : candidates) {
+            try (ResultSet rs = meta.getIndexInfo(catalog, schema, candidate, false, true)) {
+                boolean found = false;
+                while (rs.next()) {
+                    String indexName = rs.getString("INDEX_NAME");
+                    if (indexName != null) {
+                        indexes.add(indexName);
+                        found = true;
+                    }
+                }
+                if (found) {
+                    break;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return indexes;
+    }
 }

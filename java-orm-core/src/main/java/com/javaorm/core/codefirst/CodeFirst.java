@@ -130,6 +130,10 @@ public class CodeFirst {
                         ddlList.add(DdlBuilder.buildDropTable(dialect, tableName));
                     }
                     ddlList.add(DdlBuilder.buildCreateTable(dialect, meta));
+                    for (com.javaorm.core.metadata.IndexMetadata idx : meta.getIndexes()) {
+                        if (idx.getColumns().isEmpty()) continue;
+                        ddlList.add(DdlBuilder.buildCreateIndex(dialect, meta, idx));
+                    }
                     continue;
                 }
 
@@ -151,6 +155,25 @@ public class CodeFirst {
                             DdlBuilder.ColumnDiff diff = DdlBuilder.diffColumn(dialect, col, existing, alterModeMask);
                             if (diff.hasChange()) {
                                 ddlList.addAll(DdlBuilder.buildAlterColumn(dialect, meta, col, existing, diff));
+                            }
+                        }
+                    }
+                }
+
+                // 检测并生成缺失的索引语句（CREATE INDEX / CREATE UNIQUE INDEX）
+                if (!meta.getIndexes().isEmpty()) {
+                    boolean allowIndex = !tableExists || ((mode == CodeFirstMode.UPDATE || mode == CodeFirstMode.VALIDATE)
+                            && CodeFirstAlterMode.isEnabled(config.getCodeFirstAlterModeMask(), CodeFirstAlterMode.INDEX));
+                    if (allowIndex) {
+                        Set<String> existingIndexes = tableExists ? SchemaInspector.getExistingIndexes(conn, meta.getSchema(), tableName) : Collections.emptySet();
+                        for (com.javaorm.core.metadata.IndexMetadata idx : meta.getIndexes()) {
+                            if (idx.getColumns().isEmpty()) continue;
+                            String resolvedName = idx.getName();
+                            if (resolvedName == null || resolvedName.trim().isEmpty()) {
+                                resolvedName = (idx.isUnique() ? "uniq_" : "idx_") + meta.getTableName() + "_" + String.join("_", idx.getColumns());
+                            }
+                            if (!existingIndexes.contains(resolvedName)) {
+                                ddlList.add(DdlBuilder.buildCreateIndex(dialect, meta, idx));
                             }
                         }
                     }

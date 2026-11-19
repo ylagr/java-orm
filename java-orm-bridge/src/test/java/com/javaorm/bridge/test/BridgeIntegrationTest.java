@@ -1,11 +1,13 @@
 package com.javaorm.bridge.test;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.IEnum;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.core.exceptions.MybatisPlusException;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
@@ -14,6 +16,7 @@ import com.baomidou.mybatisplus.extension.plugins.inner.DynamicTableNameInnerInt
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.javaorm.bridge.mp.MyBatisPlusInterceptorBridge;
+import com.javaorm.bridge.mp.MyBatisPlusMetaObjectHandlerBridge;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
 import com.easy.query.core.annotation.Column;
@@ -208,6 +211,56 @@ public class BridgeIntegrationTest {
         public long getSize() { return size; }
     }
 
+    // 5. JPA 注解实体（带复合索引与唯一索引定义）
+    @javax.persistence.Entity
+    @javax.persistence.Table(name = "t_jpa_article", indexes = {
+            @javax.persistence.Index(name = "idx_jpa_author_status", columnList = "author_id, status DESC"),
+            @javax.persistence.Index(name = "uk_jpa_code", columnList = "article_code", unique = true)
+    })
+    public static class JpaArticle {
+        @javax.persistence.Id
+        private Long id;
+
+        private Long authorId;
+
+        private Integer status;
+
+        private String articleCode;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public Long getAuthorId() { return authorId; }
+        public void setAuthorId(Long authorId) { this.authorId = authorId; }
+        public Integer getStatus() { return status; }
+        public void setStatus(Integer status) { this.status = status; }
+        public String getArticleCode() { return articleCode; }
+        public void setArticleCode(String articleCode) { this.articleCode = articleCode; }
+    }
+
+    // 6. MyBatis-Plus 自动填充实体
+    @TableName("t_mp_auto_user")
+    public static class MpAutoUser {
+        @TableId(type = IdType.AUTO)
+        private Long id;
+
+        private String name;
+
+        @TableField(fill = FieldFill.INSERT)
+        private String createBy;
+
+        @TableField(fill = FieldFill.INSERT_UPDATE)
+        private String updateBy;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getCreateBy() { return createBy; }
+        public void setCreateBy(String createBy) { this.createBy = createBy; }
+        public String getUpdateBy() { return updateBy; }
+        public void setUpdateBy(String updateBy) { this.updateBy = updateBy; }
+    }
+
     @BeforeClass
     public static void setUp() throws Exception {
         JdbcDataSource ds = new JdbcDataSource();
@@ -229,6 +282,13 @@ public class BridgeIntegrationTest {
                     "user_status INT, " +
                     "user_grade INT, " +
                     "tenant_id INT DEFAULT 0)");
+
+            stmt.execute("DROP TABLE IF EXISTS t_mp_auto_user");
+            stmt.execute("CREATE TABLE t_mp_auto_user (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "name VARCHAR(50), " +
+                    "create_by VARCHAR(50), " +
+                    "update_by VARCHAR(50))");
 
             stmt.execute("DROP TABLE IF EXISTS t_mp_user_dyn");
             stmt.execute("CREATE TABLE t_mp_user_dyn (" +
@@ -622,5 +682,62 @@ public class BridgeIntegrationTest {
                 .eq(MpUser::getId, user.getId())
                 .firstOrNull();
         Assert.assertNull(afterDel); // 已逻辑删除，普通查询自动过滤
+    }
+
+    @Test
+    public void testJpaIndexMetadataExtraction() {
+        EntityMetadata meta = EntityMetadataManager.get(JpaArticle.class);
+        Assert.assertNotNull(meta);
+        Assert.assertEquals(2, meta.getIndexes().size());
+
+        com.javaorm.core.metadata.IndexMetadata idx1 = meta.getIndexes().stream()
+                .filter(i -> "idx_jpa_author_status".equals(i.getName()))
+                .findFirst()
+                .orElse(null);
+        Assert.assertNotNull(idx1);
+        Assert.assertFalse(idx1.isUnique());
+        Assert.assertEquals(Arrays.asList("author_id", "status"), idx1.getColumns());
+
+        com.javaorm.core.metadata.IndexMetadata idx2 = meta.getIndexes().stream()
+                .filter(i -> "uk_jpa_code".equals(i.getName()))
+                .findFirst()
+                .orElse(null);
+        Assert.assertNotNull(idx2);
+        Assert.assertTrue(idx2.isUnique());
+        Assert.assertEquals(Arrays.asList("article_code"), idx2.getColumns());
+    }
+
+    @Test
+    public void testMyBatisPlusMetaObjectHandlerBridge() {
+        MetaObjectHandler handler = new MetaObjectHandler() {
+            @Override
+            public void insertFill(org.apache.ibatis.reflection.MetaObject metaObject) {
+                this.strictInsertFill(metaObject, "createBy", String.class, "admin_insert");
+                this.strictInsertFill(metaObject, "updateBy", String.class, "admin_insert");
+            }
+
+            @Override
+            public void updateFill(org.apache.ibatis.reflection.MetaObject metaObject) {
+                this.setFieldValByName("updateBy", "admin_update", metaObject);
+            }
+        };
+
+        OrmConfig config = new OrmConfig()
+                .autoFillHandler(new MyBatisPlusMetaObjectHandlerBridge(handler));
+        JavaOrm fillOrm = JavaOrm.create(dataSource, config);
+
+        MpAutoUser user = new MpAutoUser();
+        user.setName("Jack");
+        fillOrm.insert(user);
+
+        Assert.assertNotNull(user.getId());
+        Assert.assertEquals("admin_insert", user.getCreateBy());
+        Assert.assertEquals("admin_insert", user.getUpdateBy());
+
+        // Update entity
+        user.setName("Jackson");
+        fillOrm.update(user);
+        Assert.assertEquals("admin_update", user.getUpdateBy());
+        Assert.assertEquals("admin_insert", user.getCreateBy());
     }
 }

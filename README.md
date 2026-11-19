@@ -22,16 +22,20 @@
   通过 `orm.sql(e -> { ... })` 开启强类型、显式受控的 SQL 环境。显式声明表变量与别名（如 `e.table(Student.class, "s")`），彻底终结多表联查别名冲突；原生支持同表自连接（Self Join）、复杂多表 JOIN、全量字段/聚合函数计算与任意 DTO 投影映射；内置流式条件 UPDATE 与 DELETE；线程级安全隔离，执行完毕自动清理上下文，零污染、零泄漏。
 - ⚡ **高性能批量操作引擎（Batch Engine，参考 EasyQuery）**：
   原生支持 `insertBatch`、`updateBatch`、`deleteBatch`、`deleteByIds`，支持 `batchSize(n)` 批量分块分批，支持多值 VALUES 批量构造与 JDBC `addBatch()` 双模式，自动识别并分发到对应物理分库分表节点，支持主键安全回填与批量乐观锁。
-- 🏗️ **智能 Code-First 结构同步引擎（参考 EasyQuery / JPA）**：
-  支持实体驱动数据库架构自进化。系统自动反射或包扫描实体元数据，智能比对目标数据库元数据，**自动生成并执行建表 DDL（CREATE TABLE）与增量列补齐（ALTER TABLE ... ADD COLUMN ...）**。提供 `CodeFirstMode` 细粒度控制（`NONE`, `VALIDATE`, `CREATE_ONLY`, `UPDATE`, `DROP_CREATE`），支持跨方言 DDL（MySQL, PostgreSQL, H2, SQLite, Oracle 等），严格遵循安全生产原则（默认绝不执行危险的 DROP COLUMN 操作）。
+- 🏗️ **智能 Code-First 结构同步与索引引擎（参考 EasyQuery / JPA）**：
+  支持实体驱动数据库架构自进化。系统自动反射或包扫描实体元数据，智能比对目标数据库元数据，**自动生成并执行建表 DDL（CREATE TABLE）、增量列补齐（ALTER TABLE ... ADD COLUMN ...）以及物理索引的自动创建（CREATE [UNIQUE] INDEX）**。提供 `CodeFirstMode` 细粒度控制（`NONE`, `VALIDATE`, `CREATE_ONLY`, `UPDATE`, `DROP_CREATE`），提供基于位运算的 `CodeFirstAlterMode` 已有表与索引安全保护（`INDEX`, `LENGTH_EXPAND`, `SAFE` 等），支持跨方言 DDL（MySQL, PostgreSQL, H2, SQLite, Oracle 等），严格遵循安全生产原则。
 - 🌉 **MyBatis-Plus 一站式完整适配器（MyBatisPlusAdapter）**：
-  在应用启动时（如 Spring Boot 配置类中）仅需配置一次 `MyBatisPlusAdapter.create(sqlSessionFactory)`，即可无缝继承 MyBatis-Plus 的所有能力（动态表名、多租户行级隔离、防全表更新删除 BlockAttack 插件、Spring 声明式事务、枚举转换、分页插件与注解），后续业务代码 **100% 仅使用纯粹的 JavaORM**，无需再写 Mapper XML 或 BaseMapper！
+  在应用启动时（如 Spring Boot 配置类中）仅需配置一次 `MyBatisPlusAdapter.create(sqlSessionFactory)`，即可无缝继承 MyBatis-Plus 的所有能力（自动挂载 `MetaObjectHandler` 插入/更新审计填充、动态表名、多租户行级隔离、防全表更新删除 BlockAttack 插件、Spring 声明式事务、枚举转换、分页插件与注解），后续业务代码 **100% 仅使用纯粹的 JavaORM**，无需再写 Mapper XML 或 BaseMapper！
 - 🛡️ **多级乐观锁机制（Optimistic Locking）**：
   原生支持 `@JoVersion`，通过桥接同时支持 MyBatis-Plus `@Version` 与 EasyQuery `@Version`。更新时自动带上 `WHERE version = ?` 并递增 `version + 1`，并发冲突自动抛出强类型 `OptimisticLockException`。
+- 📝 **通用元数据自动填充（AutoFillHandler & MetaObjectHandler 桥接）**：
+  提供原生的 `AutoFillHandler` 接口与 `@JoAutoFill`（支持 `INSERT`, `UPDATE`, `INSERT_UPDATE`），在插入与更新时自动触发租户、创建人、更新人、时间戳等审计字段填充；通过 SPI 深度桥接 MyBatis-Plus 的 `@TableField(fill = FieldFill.xxx)` 与 `MetaObjectHandler`。
 - 📄 **通用无侵入分页模式（Zero-Invasive Pagination）**：
   提供统一的 `toPage(pageNum, pageSize)` 入口，支持开箱即用 `PageResult`，支持函数式构造引用（如 `toPage(1, 10, MyCustomVoPage::new)`）零侵入返回业务自定义 Page 对象；通过 SPI 原生无缝适配 MyBatis-Plus 的 `IPage<T>` 实例传参并就地回写返回。
 - 🔍 **多框架注解桥接与智能去重合并（java-orm-bridge）**：
-  基于 SPI 动态加载外部元数据，核心模块零硬编码。引入桥接包后，自动支持 MyBatis-Plus（`@TableName`, `@TableId`, `@TableField`, `@Version`, `@TableLogic`）、EasyQuery（`@Table`, `@Column`, `@Version`, `@LogicDelete` 等）、JPA（`@Table`, `@Id`, `@Column`, `@Version`）等注解，多注解并存时智能去重合并为一个属性。
+  基于 SPI 动态加载外部元数据，核心模块零硬编码。引入桥接包后，自动支持 MyBatis-Plus（`@TableName`, `@TableId`, `@TableField`, `@Version`, `@TableLogic`）、EasyQuery（`@Table`, `@Column`, `@Version`, `@LogicDelete`, `@Index` 等）、JPA（`@Table`, `@Id`, `@Column`, `@Version`, `@Index`）等注解，多注解并存时智能去重合并为一个属性。
+- ⚡ **实体级与类级索引管理（@JoIndex / JPA @Index / EasyQuery @Index 桥接）**：
+  原生支持 `@JoIndex` / `@JoIndexes`，既可在类级别声明多列复合索引，也可在字段级别声明单列索引/唯一索引（`unique = true`）；通过桥接包原生兼容 JPA `@Table(indexes = { @Index(...) })` 与 EasyQuery `@Index` 注解，由 Code-First 引擎自动探测与按需建索引。
 - 🎯 **第三方枚举原生桥接（IEnum & @EnumValue）**：
   自动识别 MyBatis-Plus 的 `IEnum` 接口与 `@EnumValue` 注解，预热静态反射缓存，实现 O(1) 零反射耗时持久化与反序列化。
 - 🔍 **SQL 切面与执行拦截器（SqlInterceptor）**：
@@ -673,10 +677,11 @@ Java-ORM 内置智能的 Code-First 架构迁移同步引擎，支持自动识�
   - `NULLABLE` (8)：允许修改字段可空性约束（SET NOT NULL / DROP NOT NULL）。
   - `COMMENT` (16)：允许修改字段注释。
   - `DATA_TYPE` (32)：允许修改字段类型定义（如 VARCHAR -> TEXT）。
+  - `INDEX` (64)：允许为已有表自动创建/补齐缺失的物理索引（CREATE [UNIQUE] INDEX）。
 - **常用组合预设（Presets）**：
-  - `EXPAND_ONLY` / `SAFE`（推荐开发环境）：`LENGTH_EXPAND | DEFAULT_VALUE | COMMENT`，仅允许安全扩容与默认值更新，禁止缩减字段。
+  - `EXPAND_ONLY` / `SAFE`（推荐开发环境）：`LENGTH_EXPAND | DEFAULT_VALUE | COMMENT | INDEX`，仅允许安全扩容、默认值更新与补齐索引，禁止缩减字段。
   - `LENGTH`：`LENGTH_EXPAND | LENGTH_SHRINK`，允许所有长度变动。
-  - `ALL`：开放所有已有列属性变更。
+  - `ALL`：开放所有已有列属性变更与索引补齐。
 - **自定义按位或（|）组合**：
   ```java
   // 方式 1：使用预设组合
@@ -744,6 +749,108 @@ public class Order {
     @JoColumn(length = 128)
     private String email;
 }
+```
+
+#### 索引声明与自动创建（@JoIndex / JPA @Index / EasyQuery @Index）
+
+Java-ORM 提供统一强大的索引抽象，全面打通 Code-First 自动创建与已有表增量补齐：
+- **支持粒度**：可在实体类级别声明多列复合索引（`@JoIndex(name="...", columns={"...", "..."})` 或可重复 `@JoIndexes`）；也可在特定属性字段上声明单列索引或唯一索引（`@JoIndex(name="...", unique=true)`）。
+- **跨框架桥接**：引入 `java-orm-bridge` 模块后，自动桥接 JPA 的 `@Table(indexes = { @Index(name="...", columnList="col1, col2") })` 以及 EasyQuery 的 `@Index` 注解。
+- **Code-First 自动化**：在 `UPDATE` / `CREATE_ONLY` 模式下，系统通过 JDBC 深度探测物理数据库中的已有索引。若检测到实体中声明了索引但在物理表中缺失，将自动生成并执行 `CREATE [UNIQUE] INDEX ...`，具备高度幂等性与各主流方言语法通用性。
+
+```java
+// 1. 原生 JavaORM 索引定义
+@JoTable(name = "t_article")
+@JoIndex(name = "idx_art_status_pubtime", columns = {"status", "publish_time"})
+public class Article {
+    @JoId
+    private Long id;
+
+    // 字段级别唯一索引
+    @JoIndex(name = "uk_article_code", unique = true)
+    @JoColumn(length = 64, nullable = false)
+    private String articleCode;
+
+    private Integer status;
+
+    private LocalDateTime publishTime;
+}
+
+// 2. 无缝识别 JPA 索引注解定义
+@javax.persistence.Entity
+@javax.persistence.Table(name = "t_jpa_doc", indexes = {
+    @javax.persistence.Index(name = "idx_doc_cat_status", columnList = "catalog_id, status DESC"),
+    @javax.persistence.Index(name = "uk_doc_sn", columnList = "sn", unique = true)
+})
+public class JpaDocument {
+    @javax.persistence.Id
+    private Long id;
+    private Long catalogId;
+    private Integer status;
+    private String sn;
+}
+```
+
+#### 实体审计字段自动填充（AutoFillHandler & MyBatis-Plus MetaObjectHandler 桥接）
+
+在企业级研发中，`create_time`, `create_by`, `update_time`, `update_by`, `tenant_id` 等审计字段通常希望在入库与更新时由系统自动注入：
+- **原生体系**：通过在实体属性上标注 `@JoAutoFill(FillTime.INSERT)` 或 `@JoAutoFill(FillTime.INSERT_UPDATE)`，并在全局注册 `AutoFillHandler` 实现类。
+- **MyBatis-Plus 无缝继承**：若项目中已存在基于 MyBatis-Plus 的 `MetaObjectHandler` 填充配置，或者实体标注了 `@TableField(fill = FieldFill.INSERT)` / `@TableField(fill = FieldFill.INSERT_UPDATE)`：
+  - 使用 `MyBatisPlusAdapter.create(sqlSessionFactory)` 或 `JavaOrmMyBatisSupport.from(session)` 时，JavaORM 将**自动检测并挂载 MP 的 MetaObjectHandler**；
+  - 亦可显式直接设置：`config.setAutoFillHandler(new MyBatisPlusMetaObjectHandlerBridge(myMpHandler))`；
+  - 在执行 `orm.insert(entity)`、`orm.update(entity)` 或流式 `orm.sql(e -> e.update(...))` 时，自动触发对应的 `insertFill` 与 `updateFill` 回调！
+
+```java
+// 1. 实体类使用 MyBatis-Plus 填充注解
+@TableName("t_sys_user")
+public class SysUser {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private String username;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
+
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updateTime;
+
+    @TableField(fill = FieldFill.INSERT)
+    private String createBy;
+
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private String updateBy;
+}
+
+// 2. 存量 MyBatis-Plus MetaObjectHandler 直接无缝接入
+MetaObjectHandler mpHandler = new MetaObjectHandler() {
+    @Override
+    public void insertFill(MetaObject metaObject) {
+        this.strictInsertFill(metaObject, "createTime", LocalDateTime.class, LocalDateTime.now());
+        this.strictInsertFill(metaObject, "createBy", String.class, SecurityUtils.getCurrentUser());
+        this.strictInsertFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
+        this.strictInsertFill(metaObject, "updateBy", String.class, SecurityUtils.getCurrentUser());
+    }
+
+    @Override
+    public void updateFill(MetaObject metaObject) {
+        this.setFieldValByName("updateTime", LocalDateTime.now(), metaObject);
+        this.setFieldValByName("updateBy", SecurityUtils.getCurrentUser(), metaObject);
+    }
+};
+
+// 3. 注册到 JavaORM 配置中
+OrmConfig config = new OrmConfig()
+    .autoFillHandler(new MyBatisPlusMetaObjectHandlerBridge(mpHandler));
+JavaOrm orm = JavaOrm.create(dataSource, config);
+
+// 执行插入：createTime, createBy, updateTime, updateBy 自动赋值入库
+SysUser user = new SysUser();
+user.setUsername("developer");
+orm.insert(user);
+
+// 执行更新：updateTime, updateBy 自动更新注入
+user.setUsername("developer_updated");
+orm.update(user);
 ```
 
 ---

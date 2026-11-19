@@ -98,6 +98,16 @@ public class MyBatisPlusBridge implements MetadataBridge {
             if (!colName.isEmpty()) {
                 info.setColumnName(colName);
             }
+            if (tableField.fill() != null && tableField.fill() != com.baomidou.mybatisplus.annotation.FieldFill.DEFAULT) {
+                info.setAutoFill(true);
+                if (tableField.fill() == com.baomidou.mybatisplus.annotation.FieldFill.INSERT) {
+                    info.setAutoFillType(com.javaorm.core.annotation.AutoFillType.INSERT);
+                } else if (tableField.fill() == com.baomidou.mybatisplus.annotation.FieldFill.UPDATE) {
+                    info.setAutoFillType(com.javaorm.core.annotation.AutoFillType.UPDATE);
+                } else if (tableField.fill() == com.baomidou.mybatisplus.annotation.FieldFill.INSERT_UPDATE) {
+                    info.setAutoFillType(com.javaorm.core.annotation.AutoFillType.INSERT_UPDATE);
+                }
+            }
         }
 
         if (version != null) {

@@ -22,11 +22,13 @@ public class JoMetadataBridge implements MetadataBridge {
     @Override
     public TableInfo resolveTable(Class<?> entityClass) {
         if (entityClass == null) return null;
+        TableInfo tableInfo = null;
         for (Annotation ann : entityClass.getAnnotations()) {
             if (ann instanceof JoTable) {
                 JoTable t = (JoTable) ann;
                 String name = !t.value().isEmpty() ? t.value() : t.name();
-                return new TableInfo(name, t.schema(), t.comment());
+                tableInfo = new TableInfo(name, t.schema(), t.comment());
+                break;
             }
             String annName = ann.annotationType().getName();
             if (annName.endsWith(".JoTable") || annName.endsWith(".Table")) {
@@ -36,10 +38,76 @@ public class JoMetadataBridge implements MetadataBridge {
                 }
                 String schema = getAnnotationString(ann, "schema");
                 String comment = getAnnotationString(ann, "comment");
-                return new TableInfo(name, schema, comment);
+                tableInfo = new TableInfo(name, schema, comment);
+                break;
             }
         }
+        if (tableInfo == null) {
+            tableInfo = new TableInfo();
+        }
+
+        // 解析类级别 @JoIndex 与 @JoIndexes
+        for (com.javaorm.core.annotation.JoIndex idx : entityClass.getAnnotationsByType(com.javaorm.core.annotation.JoIndex.class)) {
+            tableInfo.addIndex(new com.javaorm.core.metadata.IndexMetadata(idx.name(), java.util.Arrays.asList(idx.columns()), idx.unique()));
+        }
+
+        // 解析第三方/通用 @Index 与 @Indexes 注解（如 EasyQuery、MyBatis 衍生或自定义 @Index）
+        for (Annotation ann : entityClass.getAnnotations()) {
+            String sName = ann.annotationType().getSimpleName();
+            if ("Index".equals(sName) && !(ann instanceof com.javaorm.core.annotation.JoIndex)) {
+                com.javaorm.core.metadata.IndexMetadata im = parseGenericIndex(ann);
+                if (im != null) tableInfo.addIndex(im);
+            } else if ("Indexes".equals(sName) && !(ann instanceof com.javaorm.core.annotation.JoIndexes)) {
+                try {
+                    Method valM = ann.annotationType().getMethod("value");
+                    Object arr = valM.invoke(ann);
+                    if (arr instanceof Annotation[]) {
+                        for (Annotation sub : (Annotation[]) arr) {
+                            com.javaorm.core.metadata.IndexMetadata im = parseGenericIndex(sub);
+                            if (im != null) tableInfo.addIndex(im);
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+
+        return (tableInfo.getTableName() != null || !tableInfo.getIndexes().isEmpty()) ? tableInfo : null;
+    }
+
+    private com.javaorm.core.metadata.IndexMetadata parseGenericIndex(Annotation ann) {
+        try {
+            String name = getAnnotationString(ann, "name");
+            Boolean unique = getAnnotationBoolean(ann, "unique");
+            boolean isUnique = unique != null && unique;
+
+            java.util.List<String> cols = new java.util.ArrayList<>();
+            Object colObj = getAnnotationObject(ann, "columns");
+            if (colObj == null) colObj = getAnnotationObject(ann, "columnNames");
+            if (colObj == null) colObj = getAnnotationObject(ann, "columnList");
+            if (colObj instanceof String[]) {
+                java.util.Collections.addAll(cols, (String[]) colObj);
+            } else if (colObj instanceof String) {
+                for (String part : ((String) colObj).split(",")) {
+                    String c = part.trim().split("\\s+")[0].trim();
+                    if (!c.isEmpty()) cols.add(c);
+                }
+            }
+            if (!cols.isEmpty() || (name != null && !name.isEmpty())) {
+                return new com.javaorm.core.metadata.IndexMetadata(name, cols, isUnique);
+            }
+        } catch (Throwable ignored) {
+        }
         return null;
+    }
+
+    private static Object getAnnotationObject(Annotation ann, String methodName) {
+        try {
+            Method m = ann.annotationType().getMethod(methodName);
+            return m.invoke(ann);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Override

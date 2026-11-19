@@ -365,6 +365,9 @@ public class UpdateBuilder<T> {
 
     public UpdateBuilder<T> setColumns(T entity, boolean selective) {
         if (entity == null) return this;
+        if (env != null && env.getConfig() != null && env.getConfig().getAutoFillHandler() != null && metadata != null) {
+            env.getConfig().getAutoFillHandler().updateFill(entity, metadata);
+        }
         for (ColumnMetadata col : metadata.getColumns()) {
             if (col.isPrimaryKey() || col.isIgnored()) {
                 continue;
@@ -405,6 +408,11 @@ public class UpdateBuilder<T> {
         @SuppressWarnings("unchecked")
         Class<E> clazz = (Class<E>) entity.getClass();
         EntityMetadata meta = EntityMetadataManager.get(clazz, env.getConfig());
+
+        // 自动触发 AutoFillHandler.updateFill
+        if (env.getConfig() != null && env.getConfig().getAutoFillHandler() != null) {
+            env.getConfig().getAutoFillHandler().updateFill(entity, meta);
+        }
 
         if (meta.getIdColumn() == null) {
             throw new IllegalStateException("Entity " + clazz.getName() + " does not have a primary key for update");

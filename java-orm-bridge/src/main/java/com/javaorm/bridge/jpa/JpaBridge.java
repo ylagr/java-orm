@@ -49,6 +49,27 @@ public class JpaBridge implements MetadataBridge {
             info.setSchema(schema);
         }
 
+        // 解析 JPA @Index 索引配置
+        try {
+            javax.persistence.Index[] jpaIndexes = table.indexes();
+            if (jpaIndexes != null) {
+                for (javax.persistence.Index idx : jpaIndexes) {
+                    String idxName = idx.name().trim();
+                    boolean unique = idx.unique();
+                    String colList = idx.columnList().trim();
+                    java.util.List<String> cols = new java.util.ArrayList<>();
+                    for (String part : colList.split(",")) {
+                        String col = part.trim().split("\\s+")[0].trim();
+                        if (!col.isEmpty()) {
+                            cols.add(col);
+                        }
+                    }
+                    info.addIndex(new com.javaorm.core.metadata.IndexMetadata(idxName, cols, unique));
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+
         return info;
     }
 

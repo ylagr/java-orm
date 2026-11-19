@@ -48,8 +48,18 @@ public class JavaOrmMyBatisSupport {
         OrmConfig config = new OrmConfig();
         config.setSqlExecutor(new MyBatisSqlExecutor(sqlSessionFactory));
         autoRegisterInterceptors(config, configuration);
+        autoRegisterMetaObjectHandler(config, configuration);
 
         return JavaOrm.create(dataSource, config);
+    }
+
+    public static void autoRegisterMetaObjectHandler(OrmConfig config, Configuration configuration) {
+        if (config == null || configuration == null) return;
+        try {
+            com.baomidou.mybatisplus.core.toolkit.GlobalConfigUtils.getMetaObjectHandler(configuration)
+                    .ifPresent(handler -> config.setAutoFillHandler(new com.javaorm.bridge.mp.MyBatisPlusMetaObjectHandlerBridge(handler)));
+        } catch (Throwable ignored) {
+        }
     }
 
     public static void autoRegisterInterceptors(OrmConfig config, Configuration configuration) {

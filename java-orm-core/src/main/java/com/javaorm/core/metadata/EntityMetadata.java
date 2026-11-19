@@ -1,7 +1,9 @@
 package com.javaorm.core.metadata;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public class EntityMetadata {
@@ -242,5 +244,23 @@ public class EntityMetadata {
 
     public void setAllowFullShardingScan(boolean allowFullShardingScan) {
         this.allowFullShardingScan = allowFullShardingScan;
+    }
+
+    private final List<IndexMetadata> indexes = new ArrayList<>();
+
+    public List<IndexMetadata> getIndexes() {
+        return indexes;
+    }
+
+    public void addIndex(IndexMetadata index) {
+        if (index != null) {
+            this.indexes.add(index);
+        }
+    }
+
+    public void addIndexes(Collection<IndexMetadata> indexList) {
+        if (indexList != null) {
+            this.indexes.addAll(indexList);
+        }
     }
 }

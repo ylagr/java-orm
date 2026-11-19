@@ -150,6 +150,21 @@ public class OrmConfig {
         return this;
     }
 
+    private com.javaorm.core.handler.AutoFillHandler autoFillHandler = null;
+
+    public com.javaorm.core.handler.AutoFillHandler getAutoFillHandler() {
+        return autoFillHandler;
+    }
+
+    public OrmConfig setAutoFillHandler(com.javaorm.core.handler.AutoFillHandler autoFillHandler) {
+        this.autoFillHandler = autoFillHandler;
+        return this;
+    }
+
+    public OrmConfig autoFillHandler(com.javaorm.core.handler.AutoFillHandler autoFillHandler) {
+        return setAutoFillHandler(autoFillHandler);
+    }
+
     private com.javaorm.core.codefirst.CodeFirstMode codeFirstMode = com.javaorm.core.codefirst.CodeFirstMode.NONE;
     private final java.util.Set<String> codeFirstPackageNames = new java.util.LinkedHashSet<>();
     private final java.util.Set<Class<?>> codeFirstEntities = new java.util.LinkedHashSet<>();

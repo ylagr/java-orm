@@ -88,6 +88,8 @@ public class MyBatisPlusAdapter {
         config.setSqlExecutor(new MyBatisSqlExecutor(sqlSessionFactory));
         // 自动探测并注册所有 MP 拦截器插件
         JavaOrmMyBatisSupport.autoRegisterInterceptors(config, sqlSessionFactory.getConfiguration());
+        // 自动桥接 MP MetaObjectHandler 自动填充处理器
+        JavaOrmMyBatisSupport.autoRegisterMetaObjectHandler(config, sqlSessionFactory.getConfiguration());
     }
 
     /**

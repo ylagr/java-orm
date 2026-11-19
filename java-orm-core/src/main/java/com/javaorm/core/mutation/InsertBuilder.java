@@ -129,6 +129,10 @@ public class InsertBuilder<T> {
         Class<T> entityClass = (Class<T>) entity.getClass();
         EntityMetadata metadata = EntityMetadataManager.get(entityClass, getConfig());
 
+        if (getConfig() != null && getConfig().getAutoFillHandler() != null) {
+            getConfig().getAutoFillHandler().insertFill(entity, metadata);
+        }
+
         InsertStatement stmt = new InsertStatement(entityClass, metadata.getTableName());
         if (this.shardingRouter != null) {
             stmt.setShardingRouter(this.shardingRouter);

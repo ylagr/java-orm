@@ -45,4 +45,22 @@ public class TableInfo {
     public void setComment(String comment) {
         this.comment = comment;
     }
+
+    private final java.util.List<com.javaorm.core.metadata.IndexMetadata> indexes = new java.util.ArrayList<>();
+
+    public java.util.List<com.javaorm.core.metadata.IndexMetadata> getIndexes() {
+        return indexes;
+    }
+
+    public void addIndex(com.javaorm.core.metadata.IndexMetadata index) {
+        if (index != null) {
+            this.indexes.add(index);
+        }
+    }
+
+    public void addIndexes(java.util.Collection<com.javaorm.core.metadata.IndexMetadata> indexList) {
+        if (indexList != null) {
+            this.indexes.addAll(indexList);
+        }
+    }
 }
