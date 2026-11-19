@@ -314,6 +314,50 @@ public class SqlExecution<T> implements Query<T> {
         throw new IllegalStateException("Cannot call count() on an UPDATE or DELETE operation.");
     }
 
+    @SuppressWarnings("unchecked")
+    public com.javaorm.core.pagination.PageResult<T> toPage(long pageNum, long pageSize) {
+        if (operation instanceof SelectBuilder<?>) {
+            return (com.javaorm.core.pagination.PageResult<T>) ((SelectBuilder<T>) operation).toPage(pageNum, pageSize);
+        }
+        if (operation instanceof SqlSelectStream<?>) {
+            return ((SqlSelectStream<T>) operation).toPage(pageNum, pageSize);
+        }
+        throw new IllegalStateException("Cannot call toPage() on a non-query operation.");
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <P> P toPage(long pageNum, long pageSize, com.javaorm.core.pagination.PageFactory<T, P> pageFactory) {
+        if (operation instanceof SelectBuilder<?>) {
+            return (P) ((SelectBuilder) operation).toPage(pageNum, pageSize, pageFactory);
+        }
+        if (operation instanceof SqlSelectStream<?>) {
+            return (P) ((SqlSelectStream) operation).toPage(pageNum, pageSize, pageFactory);
+        }
+        throw new IllegalStateException("Cannot call toPage() on a non-query operation.");
+    }
+
+    @SuppressWarnings("unchecked")
+    public <P> P toPage(P page) {
+        if (operation instanceof SelectBuilder<?>) {
+            return (P) ((SelectBuilder) operation).toPage(page);
+        }
+        if (operation instanceof SqlSelectStream<?>) {
+            return (P) ((SqlSelectStream) operation).toPage(page);
+        }
+        throw new IllegalStateException("Cannot call toPage() on a non-query operation.");
+    }
+
+    @SuppressWarnings("unchecked")
+    public <P> P toPage(P page, com.javaorm.core.pagination.PageAdapter<P> adapter) {
+        if (operation instanceof SelectBuilder<?>) {
+            return (P) ((SelectBuilder) operation).toPage(page, adapter);
+        }
+        if (operation instanceof SqlSelectStream<?>) {
+            return (P) ((SqlSelectStream) operation).toPage(page, adapter);
+        }
+        throw new IllegalStateException("Cannot call toPage() on a non-query operation.");
+    }
+
     /**
      * 获取生成的 SQL 语句
      */

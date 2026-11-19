@@ -405,6 +405,30 @@ public class SqlSelectStream<T> implements Query<T> {
         return this;
     }
 
+    @SuppressWarnings("unchecked")
+    public com.javaorm.core.pagination.PageResult<T> toPage(long pageNum, long pageSize) {
+        ensureQuery();
+        return (com.javaorm.core.pagination.PageResult<T>) query.toPage(pageNum, pageSize);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <P> P toPage(long pageNum, long pageSize, com.javaorm.core.pagination.PageFactory<T, P> pageFactory) {
+        ensureQuery();
+        return (P) ((SelectBuilder) query).toPage(pageNum, pageSize, pageFactory);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <P> P toPage(P page) {
+        ensureQuery();
+        return (P) query.toPage(page);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <P> P toPage(P page, com.javaorm.core.pagination.PageAdapter<P> adapter) {
+        ensureQuery();
+        return (P) query.toPage(page, adapter);
+    }
+
     public SqlSelectStream<T> printSql() {
         return printSql(true);
     }

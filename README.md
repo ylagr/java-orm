@@ -13,37 +13,44 @@
 
 ## 核心特性一览
 
-- ⚡ **高性能批量操作引擎（Batch Engine）**：参考 EasyQuery，原生支持 `insertBatch`、`updateBatch`、`deleteBatch`、`deleteByIds`，支持 `batchSize(n)` 批量分块切分，支持多值 VALUES 批量构造与 JDBC `addBatch()` 双模式，自动识别并分发到对应物理分库分表节点，支持主键安全回填与批量乐观锁。
-- 🛡️ **多级乐观锁机制（Optimistic Locking）**：内置 `@JoVersion`，更新自动带上 `WHERE version = ?` 并递增 `version + 1`，并发冲突自动抛出强类型 `OptimisticLockException`。
-- 🌉 **多框架无缝桥接模块（java-orm-bridge）**：
-  - **注解支持列表动态获取与去重合并**：基于 SPI 动态加载外部元数据，核心模块零硬编码。引入桥接包后，同时支持 **MyBatis-Plus**（`@TableName`, `@TableId`, `@TableField`, `@Version`, `@TableLogic`）、**EasyQuery**（`@Table`, `@Column`, `@Version`, `@LogicDelete` 等）、**JPA**（`@Table`, `@Id`, `@Column`, `@Version`）等注解，多注解并存时按优先级智能去重合并为一个属性。
-  - **MyBatis 深度执行器集成**：提供 `MyBatisSqlExecutor` 与 `JavaOrmMyBatisSupport`，Java-ORM 的流式 DSL 直接运行在 MyBatis 的 `SqlSession` / Spring 事务管理上下文中！
-  - **MyBatis-Plus 原生插件体系全兼容（MyBatisPlusInterceptorBridge）**：全面适配 MyBatis-Plus 的 `InnerInterceptor` 生态，支持多租户（`TenantLineInnerInterceptor`）、动态表名（`DynamicTableNameInnerInterceptor`）、防全表更新删除（`BlockAttackInnerInterceptor`）等；支持从 `SqlSession` 自动继承现有 MP 插件！
-- 📄 **通用无侵入分页模式（Zero-Invasive Pagination）**：提供统一的 `toPage(pageNum, pageSize)` 入口，支持函数式工厂引用（如 `toPage(1, 10, MyCustomVoPage::new)`）零侵入返回业务自定义 Page 对象；通过 SPI 原生无缝适配 MyBatis-Plus 的 `IPage<T>` 实例传参并就地回写返回。
-- 🔍 **SQL 切面与执行拦截器（SqlInterceptor）**：支持对所有查询与增删改操作进行 `beforeQuery`、`beforeUpdate`、`afterExecution` 环绕切面监控、SQL 动态改写与慢查询耗时统计，并提供 `MyBatisSqlInterceptorBridge` 无缝桥接 MyBatis 插件生态。
-- 🎯 **第三方枚举原生桥接（IEnum & @EnumValue）**：自动识别 MyBatis-Plus 的 `IEnum` 接口与 `@EnumValue` 注解，预热静态反射缓存，实现 O(1) 零反射耗时持久化与反序列化。
-- 🚀 **零 APT 编译依赖**：无需在 `pom.xml` 中配置任何 annotation processor，无须生成 `QUser` 或 `UserProxy` 冗余代码，代码随写随测，实体即改即用。
-- 🔍 **多级字段感知与 IDE 原生重构**：直接写 `s -> s.getTeacher().getAge()` 或 `Student::getAge`，IDE 原生自动补全字段，重命名时全局安全重构。
-- 🌊 **扁平流畅的 SQL 条件流**：支持 `where().eq([condition, ]column, value)`，自带布尔判断参数，无需繁复的 `if` 拼接。
-- 🔗 **智能导航与多表自动 JOIN**：在条件或排序列中点号调用外键关联实体属性，框架自动基于外键关系生成对应的 `LEFT JOIN`。
-- 📦 **高性能 Split/Batch IN 装配（Include）**：一对一/多对一/一对多关系通过 `.include()` 显式批量加载（IN 查询），从根源杜绝 SQL 笛卡尔积膨胀与分页失效问题。
-- 🔄 **值转换器体系（ValueConverter）**：统一单层转换架构，支持属性级 `@JoColumn(converter = ...)` 以及全局自动匹配 `AutoValueConverter`。
-- 🎯 **高性能枚举支持（@JoEnumValue & JoEnum）**：
-  - 实体/枚举属性标注 `@JoEnumValue` 即可自动完成 Code/Name 双向映射。
-  - 支持实现 `JoEnum` 接口。
-  - 内置零反射快速查找缓存，O(1) 时间复杂度完成装配。
-- 🔒 **字段级敏感数据加密（@JoEncrypt）**：内置标准 AES-CBC/Base64 加密策略基类，落库自动加密，入库/查询反序列化自动解密。
+- 🌟 **SqlEnv 声明式全功能环境模式（首推核心模式）**：
+  通过 `orm.sql(e -> { ... })` 开启强类型、显式受控的 SQL 环境。显式声明表变量与别名（如 `e.table(Student.class, "s")`），彻底终结多表联查别名冲突；原生支持同表自连接（Self Join）、复杂多表 JOIN、全量字段/聚合函数计算与任意 DTO 投影映射；内置流式条件 UPDATE 与 DELETE；线程级安全隔离，执行完毕自动清理上下文，零污染、零泄漏。
+- ⚡ **高性能批量操作引擎（Batch Engine，参考 EasyQuery）**：
+  原生支持 `insertBatch`、`updateBatch`、`deleteBatch`、`deleteByIds`，支持 `batchSize(n)` 批量分块分批，支持多值 VALUES 批量构造与 JDBC `addBatch()` 双模式，自动识别并分发到对应物理分库分表节点，支持主键安全回填与批量乐观锁。
+- 🌉 **MyBatis-Plus 一站式完整适配器（MyBatisPlusAdapter）**：
+  在应用启动时（如 Spring Boot 配置类中）仅需配置一次 `MyBatisPlusAdapter.create(sqlSessionFactory)`，即可无缝继承 MyBatis-Plus 的所有能力（动态表名、多租户行级隔离、防全表更新删除 BlockAttack 插件、Spring 声明式事务、枚举转换、分页插件与注解），后续业务代码 **100% 仅使用纯粹的 JavaORM**，无需再写 Mapper XML 或 BaseMapper！
+- 🛡️ **多级乐观锁机制（Optimistic Locking）**：
+  原生支持 `@JoVersion`，通过桥接同时支持 MyBatis-Plus `@Version` 与 EasyQuery `@Version`。更新时自动带上 `WHERE version = ?` 并递增 `version + 1`，并发冲突自动抛出强类型 `OptimisticLockException`。
+- 📄 **通用无侵入分页模式（Zero-Invasive Pagination）**：
+  提供统一的 `toPage(pageNum, pageSize)` 入口，支持开箱即用 `PageResult`，支持函数式构造引用（如 `toPage(1, 10, MyCustomVoPage::new)`）零侵入返回业务自定义 Page 对象；通过 SPI 原生无缝适配 MyBatis-Plus 的 `IPage<T>` 实例传参并就地回写返回。
+- 🔍 **多框架注解桥接与智能去重合并（java-orm-bridge）**：
+  基于 SPI 动态加载外部元数据，核心模块零硬编码。引入桥接包后，自动支持 MyBatis-Plus（`@TableName`, `@TableId`, `@TableField`, `@Version`, `@TableLogic`）、EasyQuery（`@Table`, `@Column`, `@Version`, `@LogicDelete` 等）、JPA（`@Table`, `@Id`, `@Column`, `@Version`）等注解，多注解并存时智能去重合并为一个属性。
+- 🎯 **第三方枚举原生桥接（IEnum & @EnumValue）**：
+  自动识别 MyBatis-Plus 的 `IEnum` 接口与 `@EnumValue` 注解，预热静态反射缓存，实现 O(1) 零反射耗时持久化与反序列化。
+- 🔍 **SQL 切面与执行拦截器（SqlInterceptor）**：
+  支持对所有查询与增删改操作进行 `beforeQuery`、`beforeUpdate`、`afterExecution` 环绕切面监控、SQL 动态改写与慢查询耗时统计，并提供 `MyBatisPlusInterceptorBridge` 无缝桥接 MP 插件生态。
+- 🚀 **零 APT 编译依赖**：
+  无需在 `pom.xml` 中配置任何 annotation processor，无须生成 `QUser` 或 `UserProxy` 冗余代码，代码随写随测，实体即改即用。
+- 🔍 **多级字段感知与 IDE 原生重构**：
+  直接写 `s.getTeacher().getAge()` 或 `Student::getAge`，IDE 原生自动补全字段，重命名时全局安全重构。
+- 🌊 **扁平流畅的 SQL 条件流**：
+  支持 `where().eq([condition, ]column, value)`，自带布尔判断参数，无需繁复的 `if` 拼接。
+- 🔗 **智能导航与多表自动 JOIN**：
+  在条件或排序列中点号调用外键关联实体属性，框架自动基于外键关系生成对应的 `LEFT JOIN`。
+- 📦 **高性能 Split/Batch IN 装配（Include）**：
+  一对一/多对一/一对多关系通过 `.include()` 显式批量加载（IN 查询），从根源杜绝 SQL 笛卡尔积膨胀与分页失效问题。
+- 🔄 **值转换器体系（ValueConverter）**：
+  统一单层转换架构，支持属性级 `@JoColumn(converter = ...)` 以及全局自动匹配 `AutoValueConverter`。
+- 🔒 **字段级敏感数据加密（@JoEncrypt）**：
+  内置标准 AES-CBC/Base64 加密策略基类，落库自动加密，入库/查询反序列化自动解密。
 - 📄 **开箱即用 JSON 字段（@JoJson）**：
-  - 零配置自动通过 SPI 探测 classpath 上的 JSON 库（Jackson、Fastjson2、Gson）。
-  - 保留并解析 `java.lang.reflect.Type` 完整泛型，彻底解决 `List<MyVo>` 反序列化泛型擦除难题。
-- 🧩 **DDD 扁平值对象（ValueObject）**：实体中通过 `@JoEmbedded` 嵌入值对象，数据库单表平铺展开存储，支持多层嵌套 VO 与 DDD 优雅 null 回填策略。
+  零配置自动通过 SPI 探测 classpath 上的 JSON 库（Jackson、Fastjson2、Gson），保留并解析完整泛型，解决 `List<MyVo>` 反序列化泛型擦除难题。
+- 🧩 **DDD 扁平值对象（ValueObject）**：
+  实体中通过 `@JoEmbedded` 嵌入值对象，数据库单表平铺展开存储，支持多层嵌套 VO 与优雅 null 回填策略。
 - 🌐 **分库分表与多数据源（Unified Sharding）**：
-  - 单一类注解 `@JoSharding` 统辖分库与分表（支持静态从库、动态分库、动态分表、全表扫描防护 `allowFullScan`）。
-  - 单一字段注解 `@JoShardingKey` 驱动库表路由；未标注时**自动回退 `@JoId`** 缺省作为分片键。
-  - 多数据源管理器 `DataSourceManager` 与线程级切库上下文 `DataSourceContext`。
-  - 笛卡尔积执行引擎：支持单库单表直接下推与多库多表广播/内存归并聚合。
-- 🔌 **底层执行器解耦（SqlExecutor SPI）**：分片在 `SqlExecutor` 之前执行，底层无缝解耦并可插拔替换为原生 JDBC、MyBatis、Spring 等执行引擎。
-- ☕ **向下兼容 Java 8**：基线面向 Java 8，无缝向上兼容运行于 Java 11 / 17 / 21 / 25。
+  单一类注解 `@JoSharding` 统辖分库与分表，单一字段注解 `@JoShardingKey` 驱动路由（未标注时自动回退 `@JoId` 主键）；支持单库单表下推与笛卡尔积广播聚合。
+- ☕ **向下兼容 Java 8**：
+  基线面向 Java 8，无缝向上兼容运行于 Java 11 / 17 / 21 / 25。
 
 ---
 
@@ -52,18 +59,27 @@
 ### 1. 引入 Maven 依赖
 
 ```xml
+<!-- 核心模块 -->
 <dependency>
     <groupId>com.javaorm</groupId>
     <artifactId>java-orm-core</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+
+<!-- 桥接模块（可选：如需桥接 MyBatis-Plus / EasyQuery / JPA 注解与插件生态时引入） -->
+<dependency>
+    <groupId>com.javaorm</groupId>
+    <artifactId>java-orm-bridge</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
 ```
 
 ### 2. 实体定义
 
+实体为纯净 POJO，既支持 Java-ORM 原生注解，也可**直接复用现有 MyBatis-Plus 注解**：
+
 ```java
 import com.javaorm.core.annotation.*;
-import com.javaorm.core.sharding.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -103,28 +119,168 @@ public class Student {
 
 ### 3. 初始化客户端
 
+#### 方式 A：原生 JDBC 数据源模式
 ```java
-DataSource dataSource = ...; // 任何 JDBC DataSource (HikariCP / Druid / SQLite 等)
+DataSource dataSource = ...; // HikariCP / Druid / SQLite 等
 JavaOrm orm = JavaOrm.create(dataSource);
+```
+
+#### 方式 B：MyBatis-Plus 一站式适配器模式（推荐在 Spring Boot + MP 项目中使用）
+```java
+// 在 Spring Boot 配置类中配置一次 Adapter，后续业务代码 100% 纯用 JavaOrm：
+@Configuration
+public class OrmConfiguration {
+    @Bean
+    public JavaOrm javaOrm(SqlSessionFactory sqlSessionFactory) {
+        return MyBatisPlusAdapter.create(sqlSessionFactory);
+    }
+}
 ```
 
 ---
 
-## 常用操作代码示例
+## 核心推荐模式：SqlEnv 声明式环境（主推）
 
-### 1. 基础单表查询
+> **为什么首推 `SqlEnv`？**
+> 1. **显式受控别名**：通过 `e.table(Class, "alias")` 显式获得强类型代理，彻底杜绝多表联查与复杂 SQL 下的别名冲突。
+> 2. **原生同表自连接（Self Join）**：同一个实体多次声明不同别名，完美解决树形上下级、层级汇报等经典痛点。
+> 3. **全语句流式闭环**：单表/多表查询、DTO 映射、批量流式更新、流式删除均使用统一的声明式心智模型。
+> 4. **零上下文泄漏**：线程级安全，执行完毕后在 `finally` 中严格清理录制上下文。
+
+### 1. 基础单表查询与通用分页
 
 ```java
-List<Student> list = orm.select(Student.class)
-    .where()
-        .ge(Student::getAge, 18)
-        .like(Student::getStudentName, "张%")
-    .orderBy(Student::getAge).desc()
-    .page(1, 10)
-    .toList();
+// 1.1 查询列表
+List<Student> list = orm.sql(e -> {
+    Student s = e.table(Student.class);
+    e.select(s)
+     .where()
+         .ge(s.getAge(), 18)
+         .like(s.getStudentName(), "张%")
+     .orderBy(s.getId()).desc();
+}).toList();
+
+// 1.2 通用无侵入分页（返回开箱即用的 PageResult）
+Page<Student> page = orm.sql(e -> {
+    Student s = e.table(Student.class);
+    e.select(s)
+     .where().ge(s.getAge(), 18);
+}).toPage(1, 10);
+
+// 1.3 辅助终端操作
+long count = orm.sql(e -> {
+    Student s = e.table(Student.class);
+    e.select(s).where().ge(s.getAge(), 18);
+}).count();
+
+Student first = orm.sql(e -> {
+    Student s = e.table(Student.class);
+    e.select(s).where().eq(s.getId(), 1L);
+}).firstOrNull();
 ```
 
-### 2. 动态条件过滤（三参数布尔开关）
+### 2. 多表关联查询（LEFT JOIN / INNER JOIN）与字段投影
+
+```java
+List<Map<String, Object>> rows = orm.sql(e -> {
+    Student s = e.table(Student.class, "s");
+    Teacher t = e.table(Teacher.class, "t");
+
+    e.select(s.getStudentName(), t.getTeacherName())
+     .from(s)
+     .leftJoin(t).on(s.getTeacherId(), t.getId())
+     .where()
+         .ge(s.getAge(), 20)
+         .like(t.getTeacherName(), "王%");
+}).listMaps();
+```
+
+### 3. 经典同表自连接（Self Join 树形层级结构）
+
+当查询部门上下级、员工直属领导、无限级分类等自连接结构时，`SqlEnv` 展现出无与伦比的优雅与直观：
+
+```java
+@JoTable(name = "t_department")
+public class Department {
+    @JoId private Long id;
+    private Long parentId;
+    private String name;
+    // ...
+}
+
+// 查询 "研发部" 及其所有直接子部门：
+List<Map<String, Object>> departments = orm.sql(e -> {
+    Department parent = e.table(Department.class, "d_parent");
+    Department child  = e.table(Department.class, "d_child");
+
+    e.select(parent.getName(), child.getName())
+     .from(parent)
+     .leftJoin(child).on(child.getParentId(), parent.getId())
+     .where()
+         .eq(parent.getName(), "研发部")
+     .orderBy(child.getId()).asc();
+}).listMaps();
+```
+
+### 4. DTO / VO 聚合映射
+
+无需在实体中增加无关冗余字段，直接强类型映射到任意业务 DTO：
+
+```java
+public class StudentDto {
+    private Long id;
+    private String studentName;
+    private String teacherName;
+    // Getter / Setter ...
+}
+
+List<StudentDto> dtoList = orm.sql(e -> {
+    Student s = e.table(Student.class, "s");
+    Teacher t = e.table(Teacher.class, "t");
+
+    e.select(StudentDto.class, s.getId(), s.getStudentName(), t.getTeacherName())
+     .from(s)
+     .leftJoin(t).on(s.getTeacherId(), t.getId())
+     .where().ge(s.getAge(), 18);
+}).toList();
+```
+
+### 5. 流式条件 UPDATE 与动态 SET 赋值
+
+```java
+Integer newAge = null;
+String newName = "张小明";
+
+// 支持布尔条件开闭（三参数重载：满足条件才拼入 SET）
+int updatedRows = orm.sql(e -> {
+    Student s = e.table(Student.class);
+    e.update(s)
+     .set(newAge != null, s.getAge(), newAge)
+     .set(newName != null, s.getStudentName(), newName)
+     .where()
+         .eq(s.getId(), 1L);
+}).exec();
+```
+
+### 6. 流式条件 DELETE
+
+```java
+// 若实体标注了 @JoLogicDelete，自动重写为逻辑删除 UPDATE；否则物理删除
+int deletedRows = orm.sql(e -> {
+    Student s = e.table(Student.class);
+    e.delete(s)
+     .where()
+         .lt(s.getAge(), 10);
+}).exec();
+```
+
+---
+
+## 快捷单表操作模式（Quick Single-Table Mode）
+
+针对最常见的简单单表 CRUD，Java-ORM 也保留了极简的单表流式操作作为语法糖：
+
+### 1. 单表查询与动态条件
 
 ```java
 String searchName = "张";
@@ -134,10 +290,11 @@ List<Student> list = orm.select(Student.class)
     .where()
         .like(searchName != null, Student::getStudentName, searchName + "%")
         .ge(minAge != null, Student::getAge, minAge)
+    .orderBy(Student::getAge).desc()
     .toList();
 ```
 
-### 3. 级联导航字段过滤（自动隐式 LEFT JOIN）
+### 2. 级联导航字段过滤（自动隐式 LEFT JOIN）
 
 直接点出两层实体关系，框架自动根据外键生成 `LEFT JOIN t_teacher t1 ON t0.teacher_id = t1.id`：
 
@@ -148,10 +305,10 @@ List<Student> students = orm.select(Student.class)
     .toList();
 ```
 
-### 4. 关联数据装配（Include 模式，避免笛卡尔积）
+### 3. 关联数据批量装配（Include 模式，避免笛卡尔积）
 
 ```java
-// 多对一：查出学生，并装配每个学生的指导老师对象
+// 多对一：查出学生，并批量装配每个学生的指导老师对象
 List<Student> students = orm.select(Student.class)
     .include(Student::getTeacher)
     .where()
@@ -164,7 +321,7 @@ List<Teacher> teachers = orm.select(Teacher.class)
     .toList();
 ```
 
-### 5. 增删改（CUD 操作）
+### 4. 实体级增删改（CUD 操作）
 
 ```java
 // 实体级插入（自增主键自动回填）
@@ -179,40 +336,185 @@ orm.update(s);
 
 // 实体级删除（标有 @JoLogicDelete 则自动执行 UPDATE is_deleted = 1）
 orm.delete(s);
-
-// 纯 SQL 批量流式条件更新（支持直接代理属性、自增/自减计算与表达式）
-orm.update(Student.class)
-    .set(Student::getAge, increment(1))   // 原地自增 age = age + 1
-    .set(Student::getStudentName, "新名字")
-    .where()
-        .eq(Student::getStudentName, "王大锤")
-    .execute();
-
-// 纯 SQL 条件删除（有 @JoLogicDelete 自动转逻辑删除）
-orm.delete(Student.class)
-    .where()
-        .lt(Student::getAge, 10)
-    .execute();
 ```
 
 ---
 
-## 高级特性
+## 企业级高级特性
 
-### 1. 枚举与转换器（@JoEnumValue / ValueConverter）
+### 1. MyBatis-Plus 一站式完整适配器（MyBatisPlusAdapter）
+
+在基于 Spring Boot + MyBatis-Plus 的企业项目中，通常希望**利用 Java-ORM 强大的流式 DSL 和无 APT 感知能力，同时复用已有 MP 的配置与插件**。
+
+`MyBatisPlusAdapter` 提供了**一站式门面**：
 
 ```java
-public enum Gender implements JoEnum<Integer> {
+// 步骤 1：在配置类中定义统一 JavaOrm Bean（仅需这一行！）
+@Configuration
+public class OrmConfiguration {
+    @Bean
+    public JavaOrm javaOrm(SqlSessionFactory sqlSessionFactory) {
+        return MyBatisPlusAdapter.create(sqlSessionFactory);
+    }
+}
+
+// 步骤 2：在业务 Service 中 100% 纯粹使用 JavaOrm，无需定义任何 BaseMapper！
+@Service
+public class UserService {
+    @Autowired
+    private JavaOrm orm;
+
+    public Page<User> queryUsers(int page, int size) {
+        // 自动生效 MP 实体注解、多租户行级隔离、动态表名、枚举转换、防全表更新以及 Spring @Transactional 事务！
+        return orm.sql(e -> {
+            User u = e.table(User.class);
+            e.select(u).where().gt(u.getAge(), 18);
+        }).toPage(page, size);
+    }
+
+    @Transactional
+    public void updateUser(Long userId, String newName) {
+        orm.sql(e -> {
+            User u = e.table(User.class);
+            e.update(u).set(u.getName(), newName).where().eq(u.getId(), userId);
+        }).exec();
+    }
+}
+```
+
+### 2. 批量操作引擎与乐观锁（参考 EasyQuery）
+
+```java
+@JoTable(name = "t_product")
+public class Product {
+    @JoId private Long id;
+    private String name;
+    private Double price;
+
+    @JoVersion // 乐观锁版本号（同时兼容 MP 的 @Version 与 EasyQuery 的 @Version）
+    private Integer version;
+}
+
+// 1. 批量插入（自动按 batchSize 分批分块，支持多库多分表自动分组分发，主键安全回填）
+List<Product> products = ...;
+orm.insertBatch(products)
+    .batchSize(500)
+    .execute();
+
+// 2. 批量更新（自动递增版本号 version = version + 1，并发冲突校验）
+for (Product p : products) {
+    p.setPrice(p.getPrice() * 1.1);
+}
+orm.updateBatch(products)
+    .batchSize(200)
+    .execute(); // 若版本号不匹配，自动抛出强类型 OptimisticLockException
+
+// 3. 批量删除与根据 ID 列表批量删除
+orm.deleteBatch(products).execute();
+orm.deleteByIds(Product.class, Arrays.asList(1L, 2L, 3L)).batchSize(100).execute();
+```
+
+### 3. 多框架注解桥接与智能去重合并（java-orm-bridge）
+
+引入 `java-orm-bridge` 模块后，实体类可直接使用已有框架的注解，Java-ORM 通过 SPI 自动提取并按优先级智能去重合并：
+
+```java
+// 实体完全复用 MyBatis-Plus / EasyQuery 注解，无需改造为 @Jo 注解！
+@TableName("t_mp_user")
+public class User {
+    @TableId(value = "user_id", type = IdType.AUTO)
+    private Long id;
+
+    @TableField("user_name")
+    private String name;
+
+    @com.baomidou.mybatisplus.annotation.Version // 兼容 MyBatis-Plus 乐观锁
+    private Integer version;
+
+    @TableLogic(value = "0", delval = "1") // 兼容逻辑删除
+    private Integer deleted;
+}
+```
+
+### 4. 通用无侵入分页（Zero-Invasive Pagination）
+
+Java-ORM 采用统一的入口模式，不强制绑定任何第三方分页实现类：
+
+```java
+// 模式 1：开箱即用内置 PageResult（完全兼容 Page<T> 标准契约与 records / list 访问）
+Page<User> page = orm.sql(e -> {
+    User u = e.table(User.class);
+    e.select(u).where().gt(u.getAge(), 18);
+}).toPage(1, 10);
+
+// 模式 2：零侵入返回业务自定义 VO / DTO 分页类（通过构造引用 (page, size, total, list) -> CustomPage）
+public class MyVoPage<T> {
+    public MyVoPage(long current, long size, long total, List<T> data) { ... }
+}
+
+MyVoPage<User> voPage = orm.sql(e -> {
+    User u = e.table(User.class);
+    e.select(u).where().gt(u.getAge(), 18);
+}).toPage(1, 10, MyVoPage::new); // 零框架依赖，直接强类型返回！
+
+// 模式 3：无缝对接 MyBatis-Plus 的 IPage 实例（就地回写，零侵入）
+IPage<User> mpPage = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, 10);
+IPage<User> result = orm.sql(e -> {
+    User u = e.table(User.class);
+    e.select(u).where().gt(u.getAge(), 18);
+}).toPage(mpPage); // 框架通过 SPI 自动适配 IPage，回填 total/records 后返回
+```
+
+### 5. SQL 切面与拦截器（SqlInterceptor & MP 插件桥接）
+
+支持对所有操作进行 `beforeQuery`、`beforeUpdate`、`afterExecution` 环绕切面监控，并无缝适配 MyBatis-Plus 原生插件：
+
+```java
+// 1. 创建 MyBatis-Plus 原生插件（可组合任意 InnerInterceptor）
+MybatisPlusInterceptor mpInterceptor = new MybatisPlusInterceptor();
+
+// 1.1 动态表名插件
+DynamicTableNameInnerInterceptor dynamicTableInterceptor = new DynamicTableNameInnerInterceptor();
+dynamicTableInterceptor.setTableNameHandler((sql, tableName) -> "t_user".equals(tableName) ? "t_user_2026" : tableName);
+mpInterceptor.addInnerInterceptor(dynamicTableInterceptor);
+
+// 1.2 多租户行级隔离插件
+mpInterceptor.addInnerInterceptor(new TenantLineInnerInterceptor(new TenantLineHandler() {
+    @Override
+    public Expression getTenantId() { return new LongValue(1001L); }
+    @Override
+    public String getTenantIdColumn() { return "tenant_id"; }
+    @Override
+    public boolean ignoreTable(String tableName) { return false; }
+}));
+
+// 1.3 防全表更新/删除攻击插件
+mpInterceptor.addInnerInterceptor(new BlockAttackInnerInterceptor());
+
+// 方式 A：独立使用 Java-ORM 时直接挂载
+OrmConfig config = new OrmConfig();
+config.addInterceptor(new MyBatisPlusInterceptorBridge(mpInterceptor));
+JavaOrm orm = JavaOrm.create(dataSource, config);
+
+// 方式 B：通过 MyBatisPlusAdapter 自动继承（零额外配置！）
+JavaOrm orm = MyBatisPlusAdapter.create(sqlSessionFactory);
+```
+
+### 6. 枚举与转换器（@JoEnumValue / IEnum / @EnumValue）
+
+```java
+// 支持实现 MyBatis-Plus 的 IEnum，或者标注 @JoEnumValue / @EnumValue
+public enum Gender implements IEnum<Integer> {
     MALE(1, "男"),
     FEMALE(2, "女");
 
-    @JoEnumValue // 标明数据库存储该字段的值
-    private final int code;
+    private final int value;
     private final String desc;
 
+    Gender(int value, String desc) { this.value = value; this.desc = desc; }
+
     @Override
-    public Integer getValue() { return code; }
-    // ...
+    public Integer getValue() { return value; }
 }
 
 @JoTable(name = "t_user")
@@ -222,7 +524,7 @@ public class User {
 }
 ```
 
-### 2. JSON 字段自动映射（@JoJson）
+### 7. JSON 字段自动映射（@JoJson）
 
 ```java
 @JoTable(name = "t_user")
@@ -234,7 +536,7 @@ public class User {
 }
 ```
 
-### 3. 字段敏感加密（@JoEncrypt）
+### 8. 字段敏感加密（@JoEncrypt）
 
 ```java
 @JoTable(name = "t_user")
@@ -246,7 +548,7 @@ public class User {
 }
 ```
 
-### 4. DDD 扁平值对象（ValueObject）
+### 9. DDD 扁平值对象（ValueObject）
 
 ```java
 @JoEmbeddable
@@ -265,7 +567,7 @@ public class User {
 }
 ```
 
-### 5. 分库分表与多数据源（Unified Sharding）
+### 10. 分库分表与多数据源（Unified Sharding）
 
 ```java
 // 既分库又分表：按 tradeId % 2 路由数据源(ds_0/ds_1)，按 tradeId % 4 路由物理表(t_trade_0..3)
@@ -283,180 +585,15 @@ public class Trade {
 }
 
 // 统一 Fluent 查询：根据 tradeId 自动定位物理库和物理表
-Trade trade = orm.select(Trade.class)
-    .where().eq(Trade::getTradeId, 200L)
-    .firstOrNull();
+Trade trade = orm.sql(e -> {
+    Trade t = e.table(Trade.class);
+    e.select(t).where().eq(t.getTradeId(), 200L);
+}).firstOrNull();
 
 // 线程级动态切库
 orm.useDataSource("ds_slave", () -> {
     return orm.select(Report.class).toList();
 });
-```
-
-### 6. 批量操作引擎与乐观锁（参考 EasyQuery）
-
-```java
-@JoTable(name = "t_product")
-public class Product {
-    @JoId private Long id;
-    private String name;
-    private Double price;
-
-    @JoVersion // 乐观锁版本号
-    private Integer version;
-}
-
-// 1. 批量插入（支持自动按 batchSize 分批分块，支持多库多分表自动分组分发）
-List<Product> products = ...;
-orm.insertBatch(products)
-    .batchSize(500)
-    .execute();
-
-// 2. 批量更新（自动递增版本号，并发冲突校验）
-for (Product p : products) {
-    p.setPrice(p.getPrice() * 1.1);
-}
-orm.updateBatch(products)
-    .batchSize(200)
-    .execute(); // 若版本号不匹配，自动抛出 OptimisticLockException
-
-// 3. 批量删除与根据 ID 列表批量删除
-orm.deleteBatch(products).execute();
-orm.deleteByIds(Product.class, Arrays.asList(1L, 2L, 3L)).batchSize(100).execute();
-```
-
-### 7. 多框架注解桥接与 MyBatis 深度集成（java-orm-bridge）
-
-引入 `java-orm-bridge` 模块后，实体类可直接使用现有框架的注解，Java-ORM 通过 SPI 自动探测、动态提取并智能去重合并：
-
-```java
-// 实体完全复用 MyBatis-Plus / EasyQuery 注解，无需改造为 @Jo 注解！
-@TableName("t_mp_user")
-public class User {
-    @TableId(value = "user_id", type = IdType.AUTO)
-    private Long id;
-
-    @TableField("user_name")
-    private String name;
-
-    @com.baomidou.mybatisplus.annotation.Version // 支持 MyBatis-Plus / EasyQuery 乐观锁
-    private Integer version;
-
-    @TableLogic(value = "0", delval = "1") // 支持逻辑删除
-    private Integer deleted;
-}
-
-// 统一复用 MyBatis 的事务与连接池：
-try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
-    JavaOrm mybatisOrm = JavaOrmMyBatisSupport.from(sqlSession);
-
-    // 完全在 MyBatis 事务环境下执行流式 Java-ORM DSL！
-    mybatisOrm.insert(user);
-    List<User> list = mybatisOrm.select(User.class)
-        .where()
-        .gt(User::getAge, 18)
-        .list();
-}
-```
-
-### 8. 通用无侵入分页（Zero-Invasive Pagination）
-
-Java-ORM 采用统一的入口模式，不强制绑定任何分页实现类：
-
-```java
-// 模式 1：开箱即用内置 PageResult（完全兼容 Page<T> 标准契约与 records / list 访问）
-Page<User> page = orm.select(User.class)
-    .where().gt(User::getAge, 18)
-    .toPage(1, 10);
-
-// 模式 2：零侵入返回业务自定义 VO / DTO 分页类（通过构造引用 (page, size, total, list) -> CustomPage）
-public class MyVoPage<T> {
-    public MyVoPage(long current, long size, long total, List<T> data) { ... }
-}
-
-MyVoPage<User> voPage = orm.select(User.class)
-    .where().gt(User::getAge, 18)
-    .toPage(1, 10, MyVoPage::new); // 零框架依赖，直接强类型返回！
-
-// 模式 3：无缝对接 MyBatis-Plus 的 IPage 实例（就地回写，零侵入）
-IPage<User> mpPage = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, 10);
-IPage<User> result = orm.select(User.class)
-    .where().gt(User::getAge, 18)
-    .toPage(mpPage); // 框架通过 SPI 自动适配 IPage，回填 total/records 后返回
-```
-
-### 9. SQL 切面与拦截器（SqlInterceptor）
-
-支持对查询、新增、修改、删除等所有 SQL 操作进行统一切面拦截与耗时监控：
-
-```java
-OrmConfig config = new OrmConfig();
-config.addInterceptor(new SqlInterceptor() {
-    @Override
-    public SqlAndParams beforeQuery(SqlAndParams sqlAndParams, EntityMetadata metadata, Dialect dialect) {
-        // 动态改写查询 SQL 或追加租户参数
-        return sqlAndParams;
-    }
-
-    @Override
-    public SqlAndParams beforeUpdate(SqlAndParams sqlAndParams, EntityMetadata metadata, Dialect dialect) {
-        // 动态改写新增/修改/删除 SQL
-        return sqlAndParams;
-    }
-
-    @Override
-    public void afterExecution(String sql, List<Object> params, long elapsedMillis, Throwable throwable) {
-        // 统计慢 SQL、输出耗时日志或接入链路追踪
-        if (elapsedMillis > 1000) {
-            System.err.println("Slow SQL: " + sql + ", cost: " + elapsedMillis + "ms");
-        }
-    }
-});
-
-JavaOrm orm = JavaOrm.create(dataSource, config);
-```
-
-### 10. MyBatis-Plus 原生插件生态适配（MyBatisPlusInterceptorBridge）
-
-Java-ORM 深度兼容 MyBatis-Plus 原生的 `InnerInterceptor` 插件生态：
-
-```java
-// 1. 创建 MyBatis-Plus 原生插件（可组合任意 InnerInterceptor）
-MybatisPlusInterceptor mpInterceptor = new MybatisPlusInterceptor();
-
-// 1.1 动态表名插件（根据规则动态改写物理表名）
-DynamicTableNameInnerInterceptor dynamicTableInterceptor = new DynamicTableNameInnerInterceptor();
-dynamicTableInterceptor.setTableNameHandler((sql, tableName) -> {
-    return "t_user".equals(tableName) ? "t_user_2026" : tableName;
-});
-mpInterceptor.addInnerInterceptor(dynamicTableInterceptor);
-
-// 1.2 多租户行级隔离插件（自动向 SELECT/UPDATE/DELETE 注入租户条件，向 INSERT 注入租户列）
-mpInterceptor.addInnerInterceptor(new TenantLineInnerInterceptor(new TenantLineHandler() {
-    @Override
-    public Expression getTenantId() { return new LongValue(1001L); }
-    @Override
-    public String getTenantIdColumn() { return "tenant_id"; }
-    @Override
-    public boolean ignoreTable(String tableName) { return false; }
-}));
-
-// 1.3 防全表更新/删除攻击插件（阻止无 WHERE 条件的危险更新与删除）
-mpInterceptor.addInnerInterceptor(new BlockAttackInnerInterceptor());
-
-// 方式 A：独立使用 Java-ORM 时直接挂载
-OrmConfig config = new OrmConfig();
-config.addInterceptor(new MyBatisPlusInterceptorBridge(mpInterceptor));
-JavaOrm orm = JavaOrm.create(dataSource, config);
-
-// 方式 B：在 MyBatis / MyBatis-Plus 环境下自动继承（零额外配置！）
-try (SqlSession session = sqlSessionFactory.openSession()) {
-    // 自动探测并继承 MyBatis Configuration 中已配置的所有 MP 拦截器插件！
-    JavaOrm mybatisOrm = JavaOrmMyBatisSupport.from(session);
-    
-    // 全表更新无 WHERE 条件时，将自动被 BlockAttackInnerInterceptor 拦截并抛出异常
-    mybatisOrm.update(User.class).set(User::getAge, 18).execute();
-}
 ```
 
 ---
