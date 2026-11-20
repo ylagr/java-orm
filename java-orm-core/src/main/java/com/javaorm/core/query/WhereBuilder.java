@@ -3118,17 +3118,16 @@ public class WhereBuilder<T> implements Query<T> {
         if (sqlAndParamsSupplier != null && (targetDialect == null || (env != null && targetDialect == env.getDialect()))) {
             return sqlAndParamsSupplier.get();
         }
+        if (statement instanceof UpdateStatement && targetDialect != null) {
+            return targetDialect.buildUpdate((UpdateStatement) statement);
+        } else if (statement instanceof DeleteStatement && targetDialect != null) {
+            return targetDialect.buildDelete((DeleteStatement) statement);
+        }
         if (rootQuery != null) {
             return targetDialect != null ? rootQuery.toSqlAndParams(targetDialect) : rootQuery.toSqlAndParams();
         }
-        if (statement != null && targetDialect != null) {
-            if (statement instanceof SelectStatement) {
-                return targetDialect.buildSelect((SelectStatement) statement);
-            } else if (statement instanceof UpdateStatement) {
-                return targetDialect.buildUpdate((UpdateStatement) statement);
-            } else if (statement instanceof DeleteStatement) {
-                return targetDialect.buildDelete((DeleteStatement) statement);
-            }
+        if (statement instanceof SelectStatement && targetDialect != null) {
+            return targetDialect.buildSelect((SelectStatement) statement);
         }
         if (sqlAndParamsSupplier != null) {
             return sqlAndParamsSupplier.get();

@@ -540,6 +540,8 @@ public abstract class AbstractSqlMatrixTest {
             return ((com.javaorm.core.mutation.InsertBuilder<?>) query).toSqlAndParams(dialect);
         } else if (query instanceof com.javaorm.core.mutation.UpsertBuilder) {
             return ((com.javaorm.core.mutation.UpsertBuilder<?>) query).toSqlAndParams(dialect);
+        } else if (query instanceof com.javaorm.core.mutation.UpdateBuilder) {
+            return ((com.javaorm.core.mutation.UpdateBuilder<?>) query).toSqlAndParams(dialect);
         }
         throw new UnsupportedOperationException("Unsupported query type for toSqlAndParams: " + query.getClass());
     }

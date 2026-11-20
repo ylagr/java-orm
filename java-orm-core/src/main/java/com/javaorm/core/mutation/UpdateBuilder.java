@@ -175,6 +175,10 @@ public class UpdateBuilder<T> {
         return getDialect().buildUpdate(statement);
     }
 
+    public SqlAndParams toSqlAndParams(Dialect customDialect) {
+        return (customDialect != null ? customDialect : getDialect()).buildUpdate(statement);
+    }
+
     public String toSql() {
         return toSqlAndParams().getSql();
     }

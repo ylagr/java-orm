@@ -158,5 +158,5 @@
 | **Phase 6** | 子查询与集合操作 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
 | **Phase 7** | 窗口函数, CASE WHEN, CTE, 悲观锁 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
 | **Phase 8** | INSERT, 批量与 Upsert | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
-| **Phase 9** | UPDATE, 增量更新与脏检查 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
+| **Phase 9** | UPDATE, 增量更新与脏检查 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
 | **Phase 10**| DELETE, 逻辑删除与防全表删除 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
