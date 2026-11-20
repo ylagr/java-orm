@@ -21,7 +21,18 @@
      1. 生成的最终 SQL 字符串（大小写、反引号/双引号标识符、关键字、占位符语法）**100% 全等**。
      2. 提取并绑定的 `List<Object>` 参数列表（类型、值、顺序）**100% 全等**。
 
-4. **双层覆盖推进顺序**：
+4. **严禁隐式 `SELECT *`，全列显式展开（Explicit Column Expansion）**：
+   - 生产级 ORM 规范：当调用 `orm.select(Entity.class)` 时，严禁生成 `SELECT *` 或 `t0.*`，必须依据实体元数据将全部物理列逐一显式展开（带表别名前缀与当前方言转义符），避免新增列引发意外、覆盖索引失效及大字段滥带。
+
+5. **SQL 矩阵断言 + 真实查询实体数据双重校验闭环（Dual Assertion Closure）**：
+   - 单测不能仅停留在 AST 生成 SQL 字符串的比对；
+   - 每一个单测场景在断言 5 大方言 SQL 与参数 100% 精确匹配后，必须在测试数据源上**真实执行该查询**；
+   - 对真实查询返回的实体集合、Map 映射、聚合计算值进行**强类型全字段深度断言**（校验条数、每个字段值正确填充、类型转换、去重生效等），确保 AST 生成、JDBC 执行、PreparedStatement 绑定与 EntityHydrator 装配全链路 100% 正确。
+
+6. **纯 CodeFirst 方式初始化测试种子数据**：
+   - 严禁手写 `INSERT INTO ...` 原生 SQL，所有测试基准数据必须通过 `orm.insertBatch(...)` 实体批处理进行初始化。
+
+7. **双层覆盖推进顺序**：
    - **第一阶段（优先推进）**：**SQL 计算与渲染覆盖（SQL AST / Segment Tree / Dialect Generator）**，要求达到 100% 的分支覆盖，确保任意复杂查询在所有方言下生成的 SQL 绝对正确。
    - **第二阶段（功能稳定后）**：**框架执行生命周期代码覆盖（Connection、Transaction、Interceptor、Hydrator、Cache、Reflection）**。
 
@@ -131,8 +142,8 @@
 | 阶段 | 模块内容 | 方言覆盖数 | 100%全文本断言 | CodeFirst建表 | 完成状态 |
 | :--- | :--- | :---: | :---: | :---: | :---: |
 | **Phase 1** | SELECT 投影与基础查询 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
-| **Phase 2** | WHERE 条件分支与操作符 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
-| **Phase 3** | JOIN 多表连接与关联查询 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
+| **Phase 2** | WHERE 条件分支与操作符 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
+| **Phase 3** | JOIN 多表连接与关联查询 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 进行中 |
 | **Phase 4** | GROUP BY, HAVING 与聚合 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
 | **Phase 5** | ORDER BY, LIMIT 与分页 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
 | **Phase 6** | 子查询与集合操作 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |

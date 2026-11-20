@@ -17,6 +17,7 @@ public enum BuiltinSqlOperator implements SqlOperator {
     IS_NULL("IS NULL"),
     IS_NOT_NULL("IS NOT NULL"),
     BETWEEN("BETWEEN"),
+    NOT_BETWEEN("NOT BETWEEN"),
     IS_EMPTY("IS EMPTY"),
     IS_NOT_EMPTY("IS NOT EMPTY"),
     IS_BLANK("IS BLANK"),

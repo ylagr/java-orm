@@ -2400,6 +2400,96 @@ public class WhereBuilder<T> implements Query<T> {
         return executeFlatCondition(condition, propertyOrColumn, SqlOperator.BETWEEN, min, max);
     }
 
+    // --- notBetween ---
+    public <R> WhereBuilder<T> notBetween(R propOrExpr, R min, R max) {
+        return notBetween(true, propOrExpr, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(boolean condition, R propOrExpr, R min, R max) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_BETWEEN, min, max);
+    }
+
+    public <R extends Number> WhereBuilder<T> notBetween(R propOrExpr, Number min, Number max, Object... dummy) {
+        return notBetween(true, propOrExpr, min, max);
+    }
+
+    public <R extends Number> WhereBuilder<T> notBetween(boolean condition, R propOrExpr, Number min, Number max, Object... dummy) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_BETWEEN, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(R propOrExpr, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
+        return notBetween(true, propOrExpr, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(boolean condition, R propOrExpr, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
+        return executeFlatCondition(condition, propOrExpr, SqlOperator.NOT_BETWEEN, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(SqlExpression<R> expr, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
+        return notBetween(true, expr, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(boolean condition, SqlExpression<R> expr, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
+        return executeFlatCondition(condition, expr, SqlOperator.NOT_BETWEEN, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(SqlExpression<R> expr, R min, R max) {
+        return notBetween(true, expr, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(boolean condition, SqlExpression<R> expr, R min, R max) {
+        return executeFlatCondition(condition, expr, SqlOperator.NOT_BETWEEN, min, max);
+    }
+
+    public <R extends Number> WhereBuilder<T> notBetween(SqlExpression<R> expr, Number min, Number max, Object... dummy) {
+        return notBetween(true, expr, min, max);
+    }
+
+    public <R extends Number> WhereBuilder<T> notBetween(boolean condition, SqlExpression<R> expr, Number min, Number max, Object... dummy) {
+        return executeFlatCondition(condition, expr, SqlOperator.NOT_BETWEEN, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(Function<T, R> getter, R min, R max) {
+        return notBetween(true, getter, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(boolean condition, Function<T, R> getter, R min, R max) {
+        return executeFlatCondition(condition, getter, SqlOperator.NOT_BETWEEN, min, max);
+    }
+
+    public <R extends Number> WhereBuilder<T> notBetween(Function<T, R> getter, Number min, Number max, Object... dummy) {
+        return notBetween(true, getter, min, max);
+    }
+
+    public <R extends Number> WhereBuilder<T> notBetween(boolean condition, Function<T, R> getter, Number min, Number max, Object... dummy) {
+        return executeFlatCondition(condition, getter, SqlOperator.NOT_BETWEEN, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(Function<T, R> getter, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
+        return notBetween(true, getter, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(boolean condition, Function<T, R> getter, SqlExpression<? extends R> min, SqlExpression<? extends R> max) {
+        return executeFlatCondition(condition, getter, SqlOperator.NOT_BETWEEN, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(String propertyOrColumn, R min, R max) {
+        return notBetween(true, propertyOrColumn, min, max);
+    }
+
+    public <R> WhereBuilder<T> notBetween(boolean condition, String propertyOrColumn, R min, R max) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_BETWEEN, min, max);
+    }
+
+    public WhereBuilder<T> notBetween(String propertyOrColumn, SqlExpression<?> min, SqlExpression<?> max) {
+        return notBetween(true, propertyOrColumn, min, max);
+    }
+
+    public WhereBuilder<T> notBetween(boolean condition, String propertyOrColumn, SqlExpression<?> min, SqlExpression<?> max) {
+        return executeFlatCondition(condition, propertyOrColumn, SqlOperator.NOT_BETWEEN, min, max);
+    }
+
+
     // --- isEmpty / isNotEmpty / isBlank / isNotBlank ---
     public WhereBuilder<T> isEmpty(Object propOrExpr) {
         return isEmpty(true, propOrExpr);

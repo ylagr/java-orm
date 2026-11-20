@@ -709,7 +709,7 @@ public abstract class AbstractDialect implements Dialect {
         if (isOp(op, SqlOperator.IS_NULL, SqlOperator.IS_NOT_NULL)) {
             return;
         }
-        if (isOp(op, SqlOperator.BETWEEN)) {
+        if (isOp(op, SqlOperator.BETWEEN, SqlOperator.NOT_BETWEEN)) {
             sql.append(" ? AND ?");
             if (values != null && values.length >= 2) {
                 params.add(values[0]);

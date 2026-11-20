@@ -1,0 +1,269 @@
+package com.javaorm.core.sqlmatrix;
+
+import org.junit.Assert;
+import org.junit.Test;
+
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import static com.javaorm.core.SQL.$;
+
+/**
+ * Phase 2: WHERE 条件分支与操作符全覆盖测试矩阵
+ * 1. 严格全文本精确断言 5 大数据库方言 (MySQL, PostgreSQL, Oracle, SQLite, H2) 生成的 SQL 字符串与参数；
+ * 2. 真实执行 JDBC 查询，严格校验查询返回的实体数据（条数、字段值过滤精准性）。
+ */
+public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
+
+    private static final String ALL_COLS_MYSQL = "SELECT t0.`id`, t0.`username`, t0.`email`, t0.`age`, t0.`status`, t0.`score`, t0.`create_time`, t0.`is_deleted` FROM `matrix_user` t0";
+    private static final String ALL_COLS_DOUBLE_QUOTE = "SELECT t0.\"id\", t0.\"username\", t0.\"email\", t0.\"age\", t0.\"status\", t0.\"score\", t0.\"create_time\", t0.\"is_deleted\" FROM \"matrix_user\" t0";
+
+    /**
+     * 2.1 基础比较操作符：eq, ne, gt, ge, lt, le
+     */
+    @Test
+    public void testBasicComparisonOperators() {
+        MatrixUser u = $(MatrixUser.class);
+
+        // 1. eq (=)
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where().eq(u.getUsername(), "alice"),
+                ALL_COLS_MYSQL + " WHERE t0.`username` = ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" = ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" = ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" = ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" = ?",
+                "alice"
+        );
+        List<MatrixUser> eqList = orm.select(MatrixUser.class).where().eq(u.getUsername(), "alice").list();
+        Assert.assertEquals(1, eqList.size());
+        Assert.assertEquals("alice", eqList.get(0).getUsername());
+
+        // 2. ne (<>)
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where().ne(u.getStatus(), 1),
+                ALL_COLS_MYSQL + " WHERE t0.`status` <> ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"status\" <> ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"status\" <> ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"status\" <> ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"status\" <> ?",
+                1
+        );
+        List<MatrixUser> neList = orm.select(MatrixUser.class).where().ne(u.getStatus(), 1).list();
+        Assert.assertEquals(1, neList.size());
+        Assert.assertEquals("charlie", neList.get(0).getUsername());
+
+        // 3. gt (>), ge (>=), lt (<), le (<=)
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where().gt(u.getAge(), 20).le(u.getAge(), 30),
+                ALL_COLS_MYSQL + " WHERE t0.`age` > ? AND t0.`age` <= ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" > ? AND t0.\"age\" <= ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" > ? AND t0.\"age\" <= ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" > ? AND t0.\"age\" <= ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" > ? AND t0.\"age\" <= ?",
+                20, 30
+        );
+        List<MatrixUser> rangeUsers = orm.select(MatrixUser.class).where().gt(u.getAge(), 20).le(u.getAge(), 30).list();
+        // bob(25), charlie(30)
+        Assert.assertEquals(2, rangeUsers.size());
+    }
+
+    /**
+     * 2.2 空值检查：isNull, isNotNull
+     */
+    @Test
+    public void testNullChecks() {
+        MatrixUser u = $(MatrixUser.class);
+
+        // isNull
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where().isNull(u.getEmail()),
+                ALL_COLS_MYSQL + " WHERE t0.`email` IS NULL",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"email\" IS NULL",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"email\" IS NULL",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"email\" IS NULL",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"email\" IS NULL"
+        );
+        List<MatrixUser> nullList = orm.select(MatrixUser.class).where().isNull(u.getEmail()).list();
+        Assert.assertEquals(0, nullList.size()); // 种子数据均有 email
+
+        // isNotNull
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where().isNotNull(u.getEmail()),
+                ALL_COLS_MYSQL + " WHERE t0.`email` IS NOT NULL",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"email\" IS NOT NULL",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"email\" IS NOT NULL",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"email\" IS NOT NULL",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"email\" IS NOT NULL"
+        );
+        List<MatrixUser> notNullList = orm.select(MatrixUser.class).where().isNotNull(u.getEmail()).list();
+        Assert.assertEquals(4, notNullList.size());
+    }
+
+    /**
+     * 2.3 集合运算：in, notIn 与空集合防御分支
+     */
+    @Test
+    public void testInAndNotInOperators() {
+        MatrixUser u = $(MatrixUser.class);
+
+        // in(Collection)
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where().in(u.getUsername(), Arrays.asList("alice", "bob")),
+                ALL_COLS_MYSQL + " WHERE t0.`username` IN (?, ?)",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" IN (?, ?)",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" IN (?, ?)",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" IN (?, ?)",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" IN (?, ?)",
+                "alice", "bob"
+        );
+        List<MatrixUser> inList = orm.select(MatrixUser.class).where().in(u.getUsername(), Arrays.asList("alice", "bob")).list();
+        Assert.assertEquals(2, inList.size());
+
+        // notIn(Collection)
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where().notIn(u.getUsername(), Arrays.asList("alice", "bob")),
+                ALL_COLS_MYSQL + " WHERE t0.`username` NOT IN (?, ?)",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" NOT IN (?, ?)",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" NOT IN (?, ?)",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" NOT IN (?, ?)",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" NOT IN (?, ?)",
+                "alice", "bob"
+        );
+        List<MatrixUser> notInList = orm.select(MatrixUser.class).where().notIn(u.getUsername(), Arrays.asList("alice", "bob")).list();
+        Assert.assertEquals(2, notInList.size()); // charlie, david
+    }
+
+    /**
+     * 2.4 范围检查：between, notBetween
+     */
+    @Test
+    public void testBetweenAndNotBetween() {
+        MatrixUser u = $(MatrixUser.class);
+
+        // between
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where().between(u.getAge(), 20, 25),
+                ALL_COLS_MYSQL + " WHERE t0.`age` BETWEEN ? AND ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" BETWEEN ? AND ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" BETWEEN ? AND ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" BETWEEN ? AND ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" BETWEEN ? AND ?",
+                20, 25
+        );
+        List<MatrixUser> betweenList = orm.select(MatrixUser.class).where().between(u.getAge(), 20, 25).list();
+        // alice(20), bob(25), david(20)
+        Assert.assertEquals(3, betweenList.size());
+
+        // notBetween
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where().notBetween(u.getAge(), 20, 25),
+                ALL_COLS_MYSQL + " WHERE t0.`age` NOT BETWEEN ? AND ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" NOT BETWEEN ? AND ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" NOT BETWEEN ? AND ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" NOT BETWEEN ? AND ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" NOT BETWEEN ? AND ?",
+                20, 25
+        );
+        List<MatrixUser> notBetweenList = orm.select(MatrixUser.class).where().notBetween(u.getAge(), 20, 25).list();
+        // charlie(30)
+        Assert.assertEquals(1, notBetweenList.size());
+        Assert.assertEquals("charlie", notBetweenList.get(0).getUsername());
+    }
+
+    /**
+     * 2.5 模糊匹配与正则：like, notLike, likeLeft, likeRight
+     */
+    @Test
+    public void testLikeAndPatternMatching() {
+        MatrixUser u = $(MatrixUser.class);
+
+        // like
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where().like(u.getUsername(), "%li%"),
+                ALL_COLS_MYSQL + " WHERE t0.`username` LIKE ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" LIKE ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" LIKE ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" LIKE ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" LIKE ?",
+                "%li%"
+        );
+        List<MatrixUser> likeList = orm.select(MatrixUser.class).where().like(u.getUsername(), "%li%").list();
+        // alice, charlie
+        Assert.assertEquals(2, likeList.size());
+
+        // notLike
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where().notLike(u.getUsername(), "%li%"),
+                ALL_COLS_MYSQL + " WHERE t0.`username` NOT LIKE ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" NOT LIKE ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" NOT LIKE ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" NOT LIKE ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"username\" NOT LIKE ?",
+                "%li%"
+        );
+        List<MatrixUser> notLikeList = orm.select(MatrixUser.class).where().notLike(u.getUsername(), "%li%").list();
+        // bob, david
+        Assert.assertEquals(2, notLikeList.size());
+    }
+
+    /**
+     * 2.6 复杂嵌套与逻辑分支：and(w -> ...), or(w -> ...)
+     */
+    @Test
+    public void testNestedLogicalGrouping() {
+        MatrixUser u = $(MatrixUser.class);
+
+        // WHERE (status = 1 AND (age = 25 OR score >= 90.00))
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where()
+                        .eq(u.getStatus(), 1)
+                        .and(w -> w.eq(u.getAge(), 25).or(w2 -> w2.ge(u.getScore(), new BigDecimal("90.00")))),
+                ALL_COLS_MYSQL + " WHERE t0.`status` = ? AND (t0.`age` = ? OR (t0.`score` >= ?))",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"status\" = ? AND (t0.\"age\" = ? OR (t0.\"score\" >= ?))",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"status\" = ? AND (t0.\"age\" = ? OR (t0.\"score\" >= ?))",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"status\" = ? AND (t0.\"age\" = ? OR (t0.\"score\" >= ?))",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"status\" = ? AND (t0.\"age\" = ? OR (t0.\"score\" >= ?))",
+                1, 25, new BigDecimal("90.00")
+        );
+
+        List<MatrixUser> nestedUsers = orm.select(MatrixUser.class).where()
+                .eq(u.getStatus(), 1)
+                .and(w -> w.eq(u.getAge(), 25).or(w2 -> w2.ge(u.getScore(), new BigDecimal("90.00"))))
+                .list();
+        // alice (status=1, score=95.50), bob (status=1, age=25)
+        Assert.assertEquals(2, nestedUsers.size());
+    }
+
+    /**
+     * 2.7 动态条件过滤 (Condition Control)
+     * condition == false 时自动剔除条件，绝不拼接无意义的 AND 1=1
+     */
+    @Test
+    public void testDynamicConditionControl() {
+        MatrixUser u = $(MatrixUser.class);
+        String nameFilter = null;
+        Integer ageFilter = 25;
+
+        assertMatrixSql(
+                () -> orm.select(MatrixUser.class).where()
+                        .eq(nameFilter != null, u.getUsername(), nameFilter)
+                        .eq(ageFilter != null, u.getAge(), ageFilter),
+                ALL_COLS_MYSQL + " WHERE t0.`age` = ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" = ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" = ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" = ?",
+                ALL_COLS_DOUBLE_QUOTE + " WHERE t0.\"age\" = ?",
+                25
+        );
+
+        List<MatrixUser> result = orm.select(MatrixUser.class).where()
+                .eq(nameFilter != null, u.getUsername(), nameFilter)
+                .eq(ageFilter != null, u.getAge(), ageFilter)
+                .list();
+        Assert.assertEquals(1, result.size());
+        Assert.assertEquals("bob", result.get(0).getUsername());
+    }
+}

@@ -32,6 +32,7 @@ public interface SqlOperator {
     SqlOperator IS_NULL = BuiltinSqlOperator.IS_NULL;
     SqlOperator IS_NOT_NULL = BuiltinSqlOperator.IS_NOT_NULL;
     SqlOperator BETWEEN = BuiltinSqlOperator.BETWEEN;
+    SqlOperator NOT_BETWEEN = BuiltinSqlOperator.NOT_BETWEEN;
     SqlOperator IS_EMPTY = BuiltinSqlOperator.IS_EMPTY;
     SqlOperator IS_NOT_EMPTY = BuiltinSqlOperator.IS_NOT_EMPTY;
     SqlOperator IS_BLANK = BuiltinSqlOperator.IS_BLANK;
