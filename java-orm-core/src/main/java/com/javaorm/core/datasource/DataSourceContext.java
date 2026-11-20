@@ -9,9 +9,41 @@ import java.util.function.Supplier;
 public class DataSourceContext {
 
     private static final ThreadLocal<String> CURRENT_DS = new ThreadLocal<>();
+    private static final java.util.List<DynamicDataSourceProvider> PROVIDERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    static {
+        try {
+            java.util.ServiceLoader<DynamicDataSourceProvider> loader = java.util.ServiceLoader.load(DynamicDataSourceProvider.class);
+            for (DynamicDataSourceProvider p : loader) {
+                PROVIDERS.add(p);
+            }
+            PROVIDERS.sort(java.util.Comparator.comparingInt(DynamicDataSourceProvider::getOrder));
+        } catch (Throwable ignored) {
+        }
+    }
+
+    public static void registerProvider(DynamicDataSourceProvider provider) {
+        if (provider != null && !PROVIDERS.contains(provider)) {
+            PROVIDERS.add(provider);
+            PROVIDERS.sort(java.util.Comparator.comparingInt(DynamicDataSourceProvider::getOrder));
+        }
+    }
 
     public static String getDataSource() {
-        return CURRENT_DS.get();
+        String ds = CURRENT_DS.get();
+        if (ds != null && !ds.trim().isEmpty()) {
+            return ds;
+        }
+        for (DynamicDataSourceProvider provider : PROVIDERS) {
+            try {
+                String externalDs = provider.getCurrentDataSource();
+                if (externalDs != null && !externalDs.trim().isEmpty()) {
+                    return externalDs.trim();
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
     }
 
     public static void setDataSource(String dataSourceName) {

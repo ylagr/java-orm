@@ -121,4 +121,45 @@ public interface Query<T> {
      * 设置是否开启实体变脏追踪
      */
     Query<T> tracking(boolean enable);
+
+    /**
+     * 读写分离：显式强制路由到 Master 主库
+     */
+    default Query<T> useMaster() {
+        if (getStatement() != null) {
+            getStatement().setRouteRole(com.javaorm.core.datasource.RouteRole.MASTER);
+        }
+        return this;
+    }
+
+    /**
+     * 读写分离：显式强制路由到 Slave 从库（按权重/轮询负载均衡）
+     */
+    default Query<T> useSlave() {
+        if (getStatement() != null) {
+            getStatement().setRouteRole(com.javaorm.core.datasource.RouteRole.SLAVE);
+        }
+        return this;
+    }
+
+    /**
+     * 读写分离：显式强制路由到指定命名从库
+     */
+    default Query<T> useSlave(String slaveName) {
+        if (getStatement() != null) {
+            getStatement().setRouteRole(com.javaorm.core.datasource.RouteRole.SLAVE);
+            getStatement().setTargetDataSource(slaveName);
+        }
+        return this;
+    }
+
+    /**
+     * 显式指定查询的目标物理数据源名称（支持分库与动态多数据源）
+     */
+    default Query<T> useDataSource(String dataSourceName) {
+        if (getStatement() != null) {
+            getStatement().setTargetDataSource(dataSourceName);
+        }
+        return this;
+    }
 }

@@ -3183,4 +3183,28 @@ public class WhereBuilder<T> implements Query<T> {
         }
         return this;
     }
+
+    @Override
+    public WhereBuilder<T> useMaster() {
+        Query.super.useMaster();
+        return this;
+    }
+
+    @Override
+    public WhereBuilder<T> useSlave() {
+        Query.super.useSlave();
+        return this;
+    }
+
+    @Override
+    public WhereBuilder<T> useSlave(String slaveName) {
+        Query.super.useSlave(slaveName);
+        return this;
+    }
+
+    @Override
+    public WhereBuilder<T> useDataSource(String dataSourceName) {
+        Query.super.useDataSource(dataSourceName);
+        return this;
+    }
 }

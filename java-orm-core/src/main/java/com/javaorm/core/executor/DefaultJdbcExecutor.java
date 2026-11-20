@@ -32,7 +32,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
         Connection effectiveConn = conn;
         try {
             if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
+                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, false);
                 closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
             }
             List<R> result = EntityHydrator.queryList(effectiveConn, statement, metadata, dialect, config);
@@ -56,7 +56,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
         Connection effectiveConn = conn;
         try {
             if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
+                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, false);
                 closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
             }
             return EntityHydrator.queryDtoList(effectiveConn, statement, dtoClass, dialect, config);
@@ -76,7 +76,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
         Connection effectiveConn = conn;
         try {
             if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
+                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, false);
                 closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
             }
             return EntityHydrator.queryMaps(effectiveConn, statement, dialect, config);
@@ -96,7 +96,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
         Connection effectiveConn = conn;
         try {
             if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
+                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, false);
                 closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
             }
             return EntityHydrator.queryScalar(effectiveConn, statement, targetType, dialect, config);
@@ -116,7 +116,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
         Connection effectiveConn = conn;
         try {
             if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
+                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, false);
                 closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
             }
             return EntityHydrator.queryScalarList(effectiveConn, statement, targetType, dialect, config);
@@ -142,7 +142,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
         Throwable err = null;
         try {
             if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
+                effectiveConn = ConnectionUtils.getConnection(dataSource, config, null, true);
                 closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
             }
             try (PreparedStatement ps = effectiveConn.prepareStatement(effective.getSql())) {
@@ -152,7 +152,9 @@ public class DefaultJdbcExecutor implements SqlExecutor {
                         ps.setObject(i + 1, params.get(i));
                     }
                 }
-                return ps.executeUpdate();
+                int affected = ps.executeUpdate();
+                com.javaorm.core.datasource.ReadWriteContext.recordWrite();
+                return affected;
             }
         } catch (Exception e) {
             err = e;
@@ -180,7 +182,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
         Connection effectiveConn = conn;
         try {
             if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
+                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, false);
                 closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
             }
 
@@ -271,7 +273,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
         SqlAndParams effective = null;
         try {
             if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
+                effectiveConn = ConnectionUtils.getConnection(dataSource, config, null, true);
                 closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
             }
             SqlAndParams sqlAndParams = dialect.buildInsert(statement);
@@ -288,6 +290,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
                     }
                 }
                 int affected = ps.executeUpdate();
+                com.javaorm.core.datasource.ReadWriteContext.recordWrite();
                 if (returnKeys && entity != null && metadata != null && metadata.getIdColumn() != null) {
                     try (java.sql.ResultSet rs = ps.getGeneratedKeys()) {
                         if (rs != null && rs.next()) {
@@ -321,7 +324,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
         SqlAndParams effective = null;
         try {
             if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
+                effectiveConn = ConnectionUtils.getConnection(dataSource, config, null, true);
                 closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
             }
             SqlAndParams sqlAndParams = dialect.buildUpsert(statement);
@@ -338,6 +341,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
                     }
                 }
                 int affected = ps.executeUpdate();
+                com.javaorm.core.datasource.ReadWriteContext.recordWrite();
                 if (returnKeys && entity != null && metadata != null && metadata.getIdColumn() != null) {
                     try (java.sql.ResultSet rs = ps.getGeneratedKeys()) {
                         if (rs != null && rs.next()) {
@@ -370,7 +374,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
         Throwable err = null;
         try {
             if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config);
+                effectiveConn = ConnectionUtils.getConnection(dataSource, config, null, true);
                 closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
             }
             try (PreparedStatement ps = effectiveConn.prepareStatement(sql)) {
@@ -384,7 +388,9 @@ public class DefaultJdbcExecutor implements SqlExecutor {
                         ps.addBatch();
                     }
                 }
-                return ps.executeBatch();
+                int[] affected = ps.executeBatch();
+                com.javaorm.core.datasource.ReadWriteContext.recordWrite();
+                return affected;
             }
         } catch (Exception e) {
             err = e;

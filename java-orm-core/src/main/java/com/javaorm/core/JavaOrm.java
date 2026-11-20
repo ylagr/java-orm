@@ -781,6 +781,61 @@ public class JavaOrm {
         return java.util.Collections.emptySet();
     }
 
+    /**
+     * 获取读写分离管理器
+     */
+    public com.javaorm.core.datasource.MasterSlaveManager getMasterSlaveManager() {
+        return this.config.getMasterSlaveManager();
+    }
+
+    /**
+     * 配置读写分离主从路由器（链式调用）
+     */
+    public JavaOrm masterSlave(Consumer<com.javaorm.core.datasource.MasterSlaveManager> consumer) {
+        if (this.config.getMasterSlaveManager() == null) {
+            this.config.setMasterSlaveManager(new com.javaorm.core.datasource.MasterSlaveManager(this.dataSource));
+        }
+        if (consumer != null) {
+            consumer.accept(this.config.getMasterSlaveManager());
+        }
+        return this;
+    }
+
+    /**
+     * 读写分离配置别名（readWrite）
+     */
+    public JavaOrm readWrite(Consumer<com.javaorm.core.datasource.MasterSlaveManager> consumer) {
+        return masterSlave(consumer);
+    }
+
+    /**
+     * 在强制使用 Master 主库的上下文中执行操作（带返回值）
+     */
+    public <R> R useMaster(java.util.function.Supplier<R> action) {
+        return com.javaorm.core.datasource.ReadWriteContext.useMaster(action);
+    }
+
+    /**
+     * 在强制使用 Master 主库的上下文中执行操作（无返回值）
+     */
+    public void useMaster(Runnable action) {
+        com.javaorm.core.datasource.ReadWriteContext.useMaster(action);
+    }
+
+    /**
+     * 在强制使用 Slave 从库的上下文中执行操作（带返回值）
+     */
+    public <R> R useSlave(java.util.function.Supplier<R> action) {
+        return com.javaorm.core.datasource.ReadWriteContext.useSlave(action);
+    }
+
+    /**
+     * 在强制使用 Slave 从库的上下文中执行操作（无返回值）
+     */
+    public void useSlave(Runnable action) {
+        com.javaorm.core.datasource.ReadWriteContext.useSlave(action);
+    }
+
     private static Dialect detectDialect(DataSource dataSource) {
         try (Connection conn = dataSource.getConnection()) {
             String prodName = conn.getMetaData().getDatabaseProductName();

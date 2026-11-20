@@ -1710,4 +1710,28 @@ public class SelectBuilder<T> implements Query<T> {
         }
         return this;
     }
+
+    @Override
+    public SelectBuilder<T> useMaster() {
+        Query.super.useMaster();
+        return this;
+    }
+
+    @Override
+    public SelectBuilder<T> useSlave() {
+        Query.super.useSlave();
+        return this;
+    }
+
+    @Override
+    public SelectBuilder<T> useSlave(String slaveName) {
+        Query.super.useSlave(slaveName);
+        return this;
+    }
+
+    @Override
+    public SelectBuilder<T> useDataSource(String dataSourceName) {
+        Query.super.useDataSource(dataSourceName);
+        return this;
+    }
 }

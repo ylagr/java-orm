@@ -30,6 +30,10 @@
   原生支持 `@JoVersion`，通过桥接同时支持 MyBatis-Plus `@Version` 与 EasyQuery `@Version`。更新时自动带上 `WHERE version = ?` 并递增 `version + 1`，并发冲突自动抛出强类型 `OptimisticLockException`。
 - 🎯 **实体快照与变脏检测（Dirty Checking / 差异增量更新）**：
   基于纯物理内存地址（`IdentityWeakKey`）与 `ReferenceQueue` 实现的高性能非侵入式变更追踪。查询时通过 `.tracking()` 或全局 `autoTrack(true)` 拍摄初始状态快照；更新时智能比对真实变脏字段，**仅将发生实质变更的列加入 UPDATE SET 子句**；未变脏时**直接跳过网络 I/O 与 SQL 执行**（避免无效数据库交互与假性版本号递增）；与 `@JoVersion` 乐观锁无缝协同；内存随 GC 自动回收，彻底根绝内存泄露与实体重写 `equals/hashCode` 导致的状态冲突。
+- 🔄 **轻量级读写分离路由器（MasterSlaveRouter & 抗主从延迟）**：
+  一主多从极简配置，内置平滑加权轮询（Weighted Round-Robin）负载均衡与容灾软降级；事务环境读操作 100% 自动锁定 Master 主库；**独创写后粘性时间窗口（Pin Master After Write）**，彻底消除“刚写完立刻查”的主从同步复制延迟痛点；支持流式 API（`.useMaster()` / `.useSlave()`）微观精准控制。
+- ⚡ **Baomidou dynamic-datasource 动态多数据源无感桥接（@DS 深度感知）**：
+  引入 `java-orm-bridge` 后，自动无感感知 Spring 环境下通过 `@DS("slave_1")` 或 `DynamicDataSourceContextHolder` 切换的数据源名称，无缝调度物理数据源，让现有 MyBatis-Plus 动态多数据源生态零成本迁移。
 - 📝 **通用元数据自动填充（AutoFillHandler & MetaObjectHandler 桥接）**：
   提供原生的 `AutoFillHandler` 接口与 `@JoAutoFill`（支持 `INSERT`, `UPDATE`, `INSERT_UPDATE`），在插入与更新时自动触发租户、创建人、更新人、时间戳等审计字段填充；通过 SPI 深度桥接 MyBatis-Plus 的 `@TableField(fill = FieldFill.xxx)` 与 `MetaObjectHandler`。
 - 📄 **通用无侵入分页模式（Zero-Invasive Pagination）**：
@@ -1063,6 +1067,94 @@ orm.getConfig().setAutoTrack(true);
 orm.attach(user);   // 手动拍摄当前状态为快照
 orm.detach(user);   // 显式脱管，后续 update 恢复为普通全量/非空更新
 ```
+
+---
+
+### 15. 轻量级读写分离路由器（MasterSlaveRouter & 抗主从延迟）
+
+在中大型企业架构中，面对“读多写少”的业务场景，主从只读分离（1 主多从 / 阿里云 RDS 读写分离 / Aurora）是降低主库压力的标准架构。
+传统读写分离通常面临四大痛点：
+1. **庞大中间件（ShardingSphere / MyCat）**：几十兆依赖包、启动缓慢、复杂 SQL 改写偶发兼容性 Bug；
+2. **Spring AOP 注解（`@Slave`）**：只能在方法维度切数据源，方法内部先写后查无法切，且无法感知事务上下文导致跨数据源事务错乱；
+3. **主从同步复制延迟（Replication Lag）**：用户刚提交“保存”，前端立刻调用“查询详情”，从库尚未同步完成导致查出空数据或旧数据；
+4. **单次查询无法精准指定**：核心结算必须查主库、批量报表必须查特定从库时难以灵活控制。
+
+Java-ORM 提供了**轻量级、开箱即用、无第三方依赖的读写分离路由器**：
+
+#### 核心设计与创新：
+- **默认智能分流**：INSERT / UPDATE / DELETE / UPSERT 100% 自动路由到 Master 主库；SELECT 查询 100% 自动负载均衡路由到 Slaves 从库；
+- **事务强一致性自动锁定**：检测到处于事务环境（Spring 声明式事务 `@Transactional` 或本框架原生事务），**所有读查询 100% 自动锁定 Master 主库**，杜绝脏读与事务错乱；
+- **独创写后粘性时间窗口（Pin Master After Write）**：支持配置例如 `pinMasterAfterWriteMillis(500)`。当前线程刚执行过写操作后，500ms 窗口期内紧随其后的读查询**自动智能锁定主库**，彻底消除“刚保存立刻查”的主从延迟 Bug！500ms 窗口过期后平滑恢复走从库；
+- **平滑加权轮询（Weighted Round-Robin）**：基于 Nginx 算法思想，按权重均匀分发从库读流量，杜绝流量倾斜；
+- **从库故障与无从库自动软降级**：所有从库不可用或移除非空从库时，自动安全回退 Master，确保业务不宕机；
+- **全流式自由控制**：单条查询可通过 `.useMaster()`、`.useSlave()` 或 `.useSlave("slave_2")` 精准下发。
+
+#### 使用示例：
+```java
+// 1. 极简配置一主多从（支持权重与写后防延迟粘性窗口）
+orm.readWrite(rw -> rw
+    .setMaster("master", masterDataSource)
+    .addSlave("slave_1", slave1DataSource, 1) // 权重 1
+    .addSlave("slave_2", slave2DataSource, 2) // 权重 2
+    .setPinMasterAfterWriteMillis(500)         // 关键：写后 500ms 内读操作自动锁定主库，抗复制延迟！
+);
+
+// 2. 日常开发完全零侵入：
+// 写操作 -> 自动走 Master 主库
+orm.insert(order);
+
+// 读操作 -> 自动按权重轮询打在 slave_1 或 slave_2
+List<Order> list = orm.select(Order.class).toList();
+
+// 3. 刚写完立刻读：因处于 500ms 粘性窗口期内，自动查 Master 主库，查到最新数据！
+orm.update(order);
+Order latest = orm.select(Order.class).where().eq(Order::getId, order.getId()).first(); // 自动查 Master!
+
+// 4. 流式显式指定路由：
+// 核心资金对账，强制读 Master 主库：
+Account acc = orm.select(Account.class).where().eq(Account::getId, 1001L).useMaster().first();
+
+// 导出大报表，显式分流到指定的专用从库 slave_2：
+List<OrderReportVo> reports = orm.select(Order.class).useSlave("slave_2").toList();
+
+// 5. 线程级上下文控制：
+orm.useMaster(() -> {
+    // 该代码块内的所有查询强制路由到主库
+    return doCriticalBusiness();
+});
+```
+
+---
+
+### 16. Baomidou dynamic-datasource 动态多数据源桥接（@DS 原生支持）
+
+如果您的项目（如 Spring Boot）已经引入并使用了广受欢迎的 **`dynamic-datasource-spring-boot-starter`（@DS 注解）**，Java-ORM 通过 `java-orm-bridge` 提供了 **100% 零硬编码、SPI 动态探测的原生桥接**：
+
+1. **自动感知 `@DS` 注解与栈式切换**：
+   框架内部运行时自动探测 `DynamicDataSourceContextHolder.peek()`，当 Spring Service/Mapper 方法标注了 `@DS("slave_1")`、`@DS("tenant_db")` 或代码中手动 `push("xxx")` 时，JavaORM 的查询与更新会**自动捕获并无缝路由到对应的目标物理库**；
+2. **多数据源统一管理**：
+   支持在 `orm.registerDataSource("tenant_db", tenantDataSource)` 注册数据源，或者与现有 Spring 多数据源配置无缝联动；
+3. **零硬编码解耦**：
+   核心包 `java-orm-core` 零依赖，通过 SPI `DynamicDataSourceProvider` 扩展机制实现，未引入该 starter 时绝不会报 `ClassNotFoundException`。
+
+#### 使用示例：
+```java
+// Spring 业务层代码中直接沿用您熟悉的 @DS 注解：
+@Service
+@DS("tenant_east") // 自动切到华东租户库
+public class TenantOrderService {
+
+    @Autowired
+    private JavaOrm orm;
+
+    public List<Order> getOrders() {
+        // JavaORM 自动感知当前处于 @DS("tenant_east") 上下文中，
+        // 底层自动向 tenant_east 物理数据源获取连接并执行查询！
+        return orm.select(Order.class).where().ge(Order::getAmount, 100).toList();
+    }
+}
+```
+
 
 
 ---

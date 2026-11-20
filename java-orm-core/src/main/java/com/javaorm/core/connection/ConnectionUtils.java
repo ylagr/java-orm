@@ -11,11 +11,22 @@ import java.sql.Connection;
 public class ConnectionUtils {
 
     public static Connection getConnection(DataSource dataSource, OrmConfig config) throws Exception {
+        return getConnection(dataSource, config, null, false);
+    }
+
+    public static Connection getConnection(DataSource dataSource, OrmConfig config, com.javaorm.core.ast.SelectStatement statement, boolean isWrite) throws Exception {
         Connection txConn = TransactionContext.getConnection();
         if (txConn != null && !txConn.isClosed()) {
             return txConn;
         }
         DataSource effectiveDs = dataSource;
+
+        // 1. 优先检查读写分离路由 (MasterSlaveManager)
+        if (config != null && config.getMasterSlaveManager() != null && config.getMasterSlaveManager().isEnabled()) {
+            effectiveDs = config.getMasterSlaveManager().route(isWrite, statement);
+        }
+
+        // 2. 检查当前线程显式指定的数据源或外部动态数据源 (@DS / DynamicDataSourceContextHolder)
         if (config != null && config.getDataSourceManager() != null) {
             String currentDsName = com.javaorm.core.datasource.DataSourceContext.getDataSource();
             if (currentDsName != null && !currentDsName.isEmpty()) {

@@ -22,6 +22,7 @@ public class SelectStatement implements Statement {
     private boolean distinct;
     private LockMode lockMode = LockMode.NONE;
     private boolean tracking = false;
+    private com.javaorm.core.datasource.RouteRole routeRole = com.javaorm.core.datasource.RouteRole.AUTO;
     private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
     private com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter;
     private String targetDataSource;
@@ -227,6 +228,7 @@ public class SelectStatement implements Statement {
         copy.distinct = this.distinct;
         copy.lockMode = this.lockMode;
         copy.tracking = this.tracking;
+        copy.routeRole = this.routeRole;
         copy.shardingRouter = this.shardingRouter;
         copy.dataSourceRouter = this.dataSourceRouter;
         copy.targetDataSource = this.targetDataSource;
@@ -248,5 +250,13 @@ public class SelectStatement implements Statement {
 
     public void setTracking(boolean tracking) {
         this.tracking = tracking;
+    }
+
+    public com.javaorm.core.datasource.RouteRole getRouteRole() {
+        return routeRole;
+    }
+
+    public void setRouteRole(com.javaorm.core.datasource.RouteRole routeRole) {
+        this.routeRole = routeRole != null ? routeRole : com.javaorm.core.datasource.RouteRole.AUTO;
     }
 }

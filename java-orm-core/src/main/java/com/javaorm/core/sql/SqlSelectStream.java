@@ -604,4 +604,32 @@ public class SqlSelectStream<T> implements Query<T> {
         this.query.tracking(enable);
         return this;
     }
+
+    @Override
+    public SqlSelectStream<T> useMaster() {
+        ensureQuery();
+        this.query.useMaster();
+        return this;
+    }
+
+    @Override
+    public SqlSelectStream<T> useSlave() {
+        ensureQuery();
+        this.query.useSlave();
+        return this;
+    }
+
+    @Override
+    public SqlSelectStream<T> useSlave(String slaveName) {
+        ensureQuery();
+        this.query.useSlave(slaveName);
+        return this;
+    }
+
+    @Override
+    public SqlSelectStream<T> useDataSource(String dataSourceName) {
+        ensureQuery();
+        this.query.useDataSource(dataSourceName);
+        return this;
+    }
 }

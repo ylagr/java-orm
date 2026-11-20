@@ -456,6 +456,15 @@ public class ShardingHandler {
     }
 
     private static DataSource resolveDataSource(String dsName, OrmConfig config, DataSource defaultDs) {
+        if (config != null && config.getMasterSlaveManager() != null && config.getMasterSlaveManager().isEnabled()) {
+            if ("master".equalsIgnoreCase(dsName) || config.getMasterSlaveManager().getMasterName().equalsIgnoreCase(dsName)) {
+                return config.getMasterSlaveManager().getMasterDataSource();
+            }
+            com.javaorm.core.datasource.SlaveDataSource slave = config.getMasterSlaveManager().getSlave(dsName);
+            if (slave != null) {
+                return slave.getDataSource();
+            }
+        }
         if (dsName == null || dsName.isEmpty() || "default".equalsIgnoreCase(dsName)) {
             if (config != null && config.getDataSourceManager() != null) {
                 String currentDs = DataSourceContext.getDataSource();
@@ -467,7 +476,7 @@ public class ShardingHandler {
             }
             return defaultDs;
         }
-        if (config != null && config.getDataSourceManager() != null) {
+        if (config != null && config.getDataSourceManager() != null && config.getDataSourceManager().hasDataSource(dsName)) {
             return config.getDataSourceManager().getDataSource(dsName);
         }
         return defaultDs;

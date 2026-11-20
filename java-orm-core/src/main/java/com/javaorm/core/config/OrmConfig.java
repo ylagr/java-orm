@@ -290,4 +290,22 @@ public class OrmConfig {
     public OrmConfig trackManager(com.javaorm.core.track.TrackManager trackManager) {
         return setTrackManager(trackManager);
     }
+
+    private com.javaorm.core.datasource.MasterSlaveManager masterSlaveManager;
+
+    public com.javaorm.core.datasource.MasterSlaveManager getMasterSlaveManager() {
+        if (masterSlaveManager == null) {
+            masterSlaveManager = new com.javaorm.core.datasource.MasterSlaveManager();
+        }
+        return masterSlaveManager;
+    }
+
+    public OrmConfig setMasterSlaveManager(com.javaorm.core.datasource.MasterSlaveManager masterSlaveManager) {
+        this.masterSlaveManager = masterSlaveManager;
+        return this;
+    }
+
+    public OrmConfig masterSlaveManager(com.javaorm.core.datasource.MasterSlaveManager masterSlaveManager) {
+        return setMasterSlaveManager(masterSlaveManager);
+    }
 }
