@@ -10,8 +10,16 @@
     </parent>
 
     <artifactId>java-orm-bridge</artifactId>
+    <packaging>pom</packaging>
     <name>java-orm-bridge</name>
-    <description>Bridge adapter for third-party ORMs (MyBatis, MyBatis-Plus, EasyQuery, JPA) annotations and execution</description>
+    <description>Bridge adapter parent for third-party ORMs (MyBatis, MyBatis-Plus, JPA, EasyQuery)</description>
+
+    <modules>
+        <module>bridge-mybatis</module>
+        <module>bridge-mybatis-plus</module>
+        <module>bridge-jpa</module>
+        <module>bridge-easyquery</module>
+    </modules>
 
     <properties>
         <mybatis.version>3.5.15</mybatis.version>
@@ -20,79 +28,48 @@
         <jpa.version>2.2</jpa.version>
     </properties>
 
-    <dependencies>
-        <dependency>
-            <groupId>com.javaorm</groupId>
-            <artifactId>java-orm-core</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <!-- MyBatis 核心 (provided/optional) -->
-        <dependency>
-            <groupId>org.mybatis</groupId>
-            <artifactId>mybatis</artifactId>
-            <version>${mybatis.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- MyBatis-Plus 注解 (provided/optional) -->
-        <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-annotation</artifactId>
-            <version>${mybatis-plus.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- MyBatis-Plus 核心契约 (IPage, IEnum 等) (provided/optional) -->
-        <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-core</artifactId>
-            <version>${mybatis-plus.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- MyBatis-Plus 扩展 (Page 实现类, InnerInterceptor 等插件) (provided/optional) -->
-        <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-extension</artifactId>
-            <version>${mybatis-plus.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- EasyQuery 核心 (provided/optional) -->
-        <dependency>
-            <groupId>com.easy-query</groupId>
-            <artifactId>sql-core</artifactId>
-            <version>${easy-query.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- JPA 注解 (provided/optional) -->
-        <dependency>
-            <groupId>javax.persistence</groupId>
-            <artifactId>javax.persistence-api</artifactId>
-            <version>${jpa.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- 测试依赖 -->
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <version>${h2.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>${logback.version}</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.javaorm</groupId>
+                <artifactId>java-orm-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.javaorm</groupId>
+                <artifactId>bridge-mybatis</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mybatis</groupId>
+                <artifactId>mybatis</artifactId>
+                <version>${mybatis.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-annotation</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-core</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-extension</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.easy-query</groupId>
+                <artifactId>sql-core</artifactId>
+                <version>${easy-query.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>javax.persistence</groupId>
+                <artifactId>javax.persistence-api</artifactId>
+                <version>${jpa.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 </project>
