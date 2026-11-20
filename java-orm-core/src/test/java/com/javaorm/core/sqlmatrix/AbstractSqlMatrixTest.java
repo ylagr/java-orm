@@ -146,6 +146,74 @@ public abstract class AbstractSqlMatrixTest {
         // 100% 通过 CodeFirst 纯实体建表！
         orm.codeFirst().syncTable(MatrixUser.class);
         orm.codeFirst().syncTable(MatrixOrder.class);
+
+        // 100% 通过 CodeFirst 方式初始化测试种子数据（绝不手写原生 INSERT SQL）
+        initSeedData();
+    }
+
+    private static void initSeedData() {
+        LocalDateTime now = LocalDateTime.now();
+
+        MatrixUser u1 = new MatrixUser();
+        u1.setUsername("alice");
+        u1.setEmail("alice@example.com");
+        u1.setAge(20);
+        u1.setStatus(1);
+        u1.setScore(new BigDecimal("95.50"));
+        u1.setCreateTime(now);
+        u1.setIsDeleted(0);
+
+        MatrixUser u2 = new MatrixUser();
+        u2.setUsername("bob");
+        u2.setEmail("bob@example.com");
+        u2.setAge(25);
+        u2.setStatus(1);
+        u2.setScore(new BigDecimal("88.00"));
+        u2.setCreateTime(now);
+        u2.setIsDeleted(0);
+
+        MatrixUser u3 = new MatrixUser();
+        u3.setUsername("charlie");
+        u3.setEmail("charlie@example.com");
+        u3.setAge(30);
+        u3.setStatus(0);
+        u3.setScore(new BigDecimal("72.50"));
+        u3.setCreateTime(now);
+        u3.setIsDeleted(0);
+
+        MatrixUser u4 = new MatrixUser();
+        u4.setUsername("david");
+        u4.setEmail("david@example.com");
+        u4.setAge(20);
+        u4.setStatus(1);
+        u4.setScore(new BigDecimal("60.00"));
+        u4.setCreateTime(now);
+        u4.setIsDeleted(0);
+
+        orm.insertBatch(Arrays.asList(u1, u2, u3, u4)).execute();
+
+        MatrixOrder o1 = new MatrixOrder();
+        o1.setUserId(u1.getId());
+        o1.setOrderNo("ORD-001");
+        o1.setAmount(new BigDecimal("199.90"));
+        o1.setStatus(1);
+        o1.setCreateTime(now);
+
+        MatrixOrder o2 = new MatrixOrder();
+        o2.setUserId(u1.getId());
+        o2.setOrderNo("ORD-002");
+        o2.setAmount(new BigDecimal("299.00"));
+        o2.setStatus(2);
+        o2.setCreateTime(now);
+
+        MatrixOrder o3 = new MatrixOrder();
+        o3.setUserId(u2.getId());
+        o3.setOrderNo("ORD-003");
+        o3.setAmount(new BigDecimal("99.00"));
+        o3.setStatus(1);
+        o3.setCreateTime(now);
+
+        orm.insertBatch(Arrays.asList(o1, o2, o3)).execute();
     }
 
     /**
