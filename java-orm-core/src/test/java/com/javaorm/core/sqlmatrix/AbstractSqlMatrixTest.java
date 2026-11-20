@@ -5,6 +5,7 @@ import com.javaorm.core.annotation.GenerationType;
 import com.javaorm.core.annotation.JoColumn;
 import com.javaorm.core.annotation.JoGeneratedValue;
 import com.javaorm.core.annotation.JoId;
+import com.javaorm.core.annotation.JoLogicDelete;
 import com.javaorm.core.annotation.JoTable;
 import com.javaorm.core.codefirst.CodeFirstMode;
 import com.javaorm.core.config.OrmConfig;
@@ -186,6 +187,27 @@ public abstract class AbstractSqlMatrixTest {
         public void setParentId(Long parentId) { this.parentId = parentId; }
     }
 
+    // 测试实体 5：逻辑删除表
+    @JoTable
+    public static class MatrixSoftDelete {
+        @JoId
+        @JoGeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
+
+        @JoColumn(length = 64)
+        private String title;
+
+        @JoLogicDelete(normalValue = "0", deletedValue = "1")
+        private Integer isDeleted;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getTitle() { return title; }
+        public void setTitle(String title) { this.title = title; }
+        public Integer getIsDeleted() { return isDeleted; }
+        public void setIsDeleted(Integer isDeleted) { this.isDeleted = isDeleted; }
+    }
+
     @BeforeClass
     public static void initMatrixEnvironment() throws Exception {
         // 1. MySQL 隔离环境 (MODE=MySQL)
@@ -230,14 +252,17 @@ public abstract class AbstractSqlMatrixTest {
     private static void setupEnvironment(JavaOrm targetOrm) {
         try (java.sql.Connection conn = targetOrm.getDataSource().getConnection();
              java.sql.Statement stmt = conn.createStatement()) {
+            stmt.execute("DROP TABLE IF EXISTS matrix_soft_delete");
             stmt.execute("DROP TABLE IF EXISTS matrix_order_item");
             stmt.execute("DROP TABLE IF EXISTS matrix_order");
             stmt.execute("DROP TABLE IF EXISTS matrix_category");
             stmt.execute("DROP TABLE IF EXISTS matrix_user");
+            stmt.execute("DROP TABLE IF EXISTS \"MATRIX_SOFT_DELETE\"");
             stmt.execute("DROP TABLE IF EXISTS \"MATRIX_ORDER_ITEM\"");
             stmt.execute("DROP TABLE IF EXISTS \"MATRIX_ORDER\"");
             stmt.execute("DROP TABLE IF EXISTS \"MATRIX_CATEGORY\"");
             stmt.execute("DROP TABLE IF EXISTS \"MATRIX_USER\"");
+            stmt.execute("DROP TABLE IF EXISTS \"matrix_soft_delete\"");
             stmt.execute("DROP TABLE IF EXISTS \"matrix_order_item\"");
             stmt.execute("DROP TABLE IF EXISTS \"matrix_order\"");
             stmt.execute("DROP TABLE IF EXISTS \"matrix_category\"");
@@ -248,6 +273,7 @@ public abstract class AbstractSqlMatrixTest {
         targetOrm.codeFirst().syncTable(MatrixOrder.class);
         targetOrm.codeFirst().syncTable(MatrixOrderItem.class);
         targetOrm.codeFirst().syncTable(MatrixCategory.class);
+        targetOrm.codeFirst().syncTable(MatrixSoftDelete.class);
 
         initSeedData(targetOrm);
     }
@@ -374,6 +400,17 @@ public abstract class AbstractSqlMatrixTest {
         targetOrm.insert(c2);
         targetOrm.insert(c3);
         targetOrm.insert(c4);
+
+        MatrixSoftDelete s1 = new MatrixSoftDelete();
+        s1.setTitle("Document 1");
+        s1.setIsDeleted(0);
+
+        MatrixSoftDelete s2 = new MatrixSoftDelete();
+        s2.setTitle("Document 2");
+        s2.setIsDeleted(0);
+
+        targetOrm.insert(s1);
+        targetOrm.insert(s2);
     }
 
     /**
@@ -542,6 +579,8 @@ public abstract class AbstractSqlMatrixTest {
             return ((com.javaorm.core.mutation.UpsertBuilder<?>) query).toSqlAndParams(dialect);
         } else if (query instanceof com.javaorm.core.mutation.UpdateBuilder) {
             return ((com.javaorm.core.mutation.UpdateBuilder<?>) query).toSqlAndParams(dialect);
+        } else if (query instanceof com.javaorm.core.mutation.DeleteBuilder) {
+            return ((com.javaorm.core.mutation.DeleteBuilder<?>) query).toSqlAndParams(dialect);
         }
         throw new UnsupportedOperationException("Unsupported query type for toSqlAndParams: " + query.getClass());
     }

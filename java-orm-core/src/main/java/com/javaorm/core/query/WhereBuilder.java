@@ -124,6 +124,13 @@ public class WhereBuilder<T> implements Query<T> {
         });
     }
 
+    private java.util.function.Function<com.javaorm.core.dialect.Dialect, com.javaorm.core.dialect.SqlAndParams> sqlAndParamsDialectFunction;
+
+    public WhereBuilder<T> setSqlAndParamsDialectFunction(java.util.function.Function<com.javaorm.core.dialect.Dialect, com.javaorm.core.dialect.SqlAndParams> fn) {
+        this.sqlAndParamsDialectFunction = fn;
+        return this;
+    }
+
     public SqlEnv getEnv() {
         return env;
     }
@@ -3114,6 +3121,9 @@ public class WhereBuilder<T> implements Query<T> {
     public com.javaorm.core.dialect.SqlAndParams toSqlAndParams(com.javaorm.core.dialect.Dialect targetDialect) {
         if (targetDialect == null && env != null) {
             targetDialect = env.getDialect();
+        }
+        if (sqlAndParamsDialectFunction != null && targetDialect != null) {
+            return sqlAndParamsDialectFunction.apply(targetDialect);
         }
         if (sqlAndParamsSupplier != null && (targetDialect == null || (env != null && targetDialect == env.getDialect()))) {
             return sqlAndParamsSupplier.get();

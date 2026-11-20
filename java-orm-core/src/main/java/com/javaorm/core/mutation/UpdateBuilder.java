@@ -286,7 +286,7 @@ public class UpdateBuilder<T> {
         return new WhereBuilder<>(env, statement, entityClass, null, statement::addWhereCondition, queryHelper, null, this::execute, this::toSqlAndParams, val -> {
             if (val == null) this.printSql();
             else this.printSql(val);
-        });
+        }).setSqlAndParamsDialectFunction(this::toSqlAndParams);
     }
 
     public UpdateBuilder<T> where(Consumer<WhereBuilder<T>> consumer) {

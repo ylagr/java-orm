@@ -170,6 +170,10 @@ public class DeleteBuilder<T> {
         return buildSqlAndParams(env.getDialect());
     }
 
+    public SqlAndParams toSqlAndParams(Dialect customDialect) {
+        return buildSqlAndParams(customDialect);
+    }
+
     public SqlAndParams buildSqlAndParams(Dialect targetDialect) {
         Dialect effDialect = targetDialect != null ? targetDialect : env.getDialect();
         ColumnMetadata tc = metadata.hasTenant() ? metadata.getTenantColumn() : null;
@@ -226,7 +230,7 @@ public class DeleteBuilder<T> {
         return new WhereBuilder<>(env, statement, entityClass, null, statement::addWhereCondition, queryHelper, null, this::execute, this::toSqlAndParams, val -> {
             if (val == null) this.printSql();
             else this.printSql(val);
-        });
+        }).setSqlAndParamsDialectFunction(this::toSqlAndParams);
     }
 
     public DeleteBuilder<T> where(Consumer<WhereBuilder<T>> consumer) {
