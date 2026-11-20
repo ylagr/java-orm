@@ -18,6 +18,8 @@ import com.javaorm.core.dialect.SQLiteDialect;
 import com.javaorm.core.query.Query;
 import com.javaorm.core.query.SelectBuilder;
 import com.javaorm.core.query.WhereBuilder;
+import com.javaorm.core.sql.SqlJoinClause;
+import com.javaorm.core.sql.SqlSelectStream;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -123,6 +125,55 @@ public abstract class AbstractSqlMatrixTest {
         public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
     }
 
+    // 测试实体 3：订单明细项表
+    @JoTable(name = "matrix_order_item")
+    public static class MatrixOrderItem {
+        @JoId
+        @JoGeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
+
+        private Long orderId;
+
+        @JoColumn(length = 64, nullable = false)
+        private String prodName;
+
+        @JoColumn(precision = 10, scale = 2)
+        private BigDecimal price;
+
+        private Integer quantity;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public Long getOrderId() { return orderId; }
+        public void setOrderId(Long orderId) { this.orderId = orderId; }
+        public String getProdName() { return prodName; }
+        public void setProdName(String prodName) { this.prodName = prodName; }
+        public BigDecimal getPrice() { return price; }
+        public void setPrice(BigDecimal price) { this.price = price; }
+        public Integer getQuantity() { return quantity; }
+        public void setQuantity(Integer quantity) { this.quantity = quantity; }
+    }
+
+    // 测试实体 4：分类表（用于自连接与笛卡尔积测试）
+    @JoTable(name = "matrix_category")
+    public static class MatrixCategory {
+        @JoId
+        @JoGeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
+
+        @JoColumn(length = 64, nullable = false)
+        private String name;
+
+        private Long parentId;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public Long getParentId() { return parentId; }
+        public void setParentId(Long parentId) { this.parentId = parentId; }
+    }
+
     @BeforeClass
     public static void initMatrixEnvironment() throws Exception {
         JdbcDataSource ds = new JdbcDataSource();
@@ -141,11 +192,15 @@ public abstract class AbstractSqlMatrixTest {
              Statement stmt = conn.createStatement()) {
             stmt.execute("DROP TABLE IF EXISTS matrix_user");
             stmt.execute("DROP TABLE IF EXISTS matrix_order");
+            stmt.execute("DROP TABLE IF EXISTS matrix_order_item");
+            stmt.execute("DROP TABLE IF EXISTS matrix_category");
         }
 
         // 100% 通过 CodeFirst 纯实体建表！
         orm.codeFirst().syncTable(MatrixUser.class);
         orm.codeFirst().syncTable(MatrixOrder.class);
+        orm.codeFirst().syncTable(MatrixOrderItem.class);
+        orm.codeFirst().syncTable(MatrixCategory.class);
 
         // 100% 通过 CodeFirst 方式初始化测试种子数据（绝不手写原生 INSERT SQL）
         initSeedData();
@@ -213,7 +268,55 @@ public abstract class AbstractSqlMatrixTest {
         o3.setStatus(1);
         o3.setCreateTime(now);
 
-        orm.insertBatch(Arrays.asList(o1, o2, o3)).execute();
+        // o4 的 userId 为 999（无对应用户，专门用于验证 RIGHT JOIN 与 FULL JOIN）
+        MatrixOrder o4 = new MatrixOrder();
+        o4.setUserId(999L);
+        o4.setOrderNo("ORD-999");
+        o4.setAmount(new BigDecimal("50.00"));
+        o4.setStatus(1);
+        o4.setCreateTime(now);
+
+        orm.insertBatch(Arrays.asList(o1, o2, o3, o4)).execute();
+
+        // 订单明细
+        MatrixOrderItem item1 = new MatrixOrderItem();
+        item1.setOrderId(o1.getId());
+        item1.setProdName("Mechanical Keyboard");
+        item1.setPrice(new BigDecimal("99.90"));
+        item1.setQuantity(1);
+
+        MatrixOrderItem item2 = new MatrixOrderItem();
+        item2.setOrderId(o1.getId());
+        item2.setProdName("Wireless Mouse");
+        item2.setPrice(new BigDecimal("100.00"));
+        item2.setQuantity(1);
+
+        MatrixOrderItem item3 = new MatrixOrderItem();
+        item3.setOrderId(o2.getId());
+        item3.setProdName("4K Monitor");
+        item3.setPrice(new BigDecimal("299.00"));
+        item3.setQuantity(1);
+
+        orm.insertBatch(Arrays.asList(item1, item2, item3)).execute();
+
+        // 分类（用于自连接）
+        MatrixCategory c1 = new MatrixCategory();
+        c1.setName("Electronics");
+        c1.setParentId(null);
+
+        MatrixCategory c2 = new MatrixCategory();
+        c2.setName("Computer");
+        c2.setParentId(1L);
+
+        MatrixCategory c3 = new MatrixCategory();
+        c3.setName("Phone");
+        c3.setParentId(1L);
+
+        MatrixCategory c4 = new MatrixCategory();
+        c4.setName("Laptop");
+        c4.setParentId(2L);
+
+        orm.insertBatch(Arrays.asList(c1, c2, c3, c4)).execute();
     }
 
     /**
@@ -259,6 +362,12 @@ public abstract class AbstractSqlMatrixTest {
             return ((SelectBuilder<?>) query).toSqlAndParams(dialect);
         } else if (query instanceof WhereBuilder) {
             return ((WhereBuilder<?>) query).toSqlAndParams(dialect);
+        } else if (query instanceof SqlSelectStream) {
+            return ((SqlSelectStream<?>) query).toSqlAndParams(dialect);
+        } else if (query instanceof SqlJoinClause) {
+            return ((SqlJoinClause<?>) query).toSqlAndParams(dialect);
+        } else if (query instanceof com.javaorm.core.sql.SqlExecution) {
+            return ((com.javaorm.core.sql.SqlExecution<?>) query).toSqlAndParams(dialect);
         }
         throw new UnsupportedOperationException("Unsupported query type for toSqlAndParams: " + query.getClass());
     }

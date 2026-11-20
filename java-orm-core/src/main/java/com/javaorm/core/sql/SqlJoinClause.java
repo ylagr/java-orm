@@ -107,6 +107,22 @@ public class SqlJoinClause<T> implements Query<T> {
         return selectStream.rightjoin(targetTable);
     }
 
+    public SqlJoinClause<T> fullJoin(Object targetTable) {
+        return selectStream.fullJoin(targetTable);
+    }
+
+    public SqlJoinClause<T> fulljoin(Object targetTable) {
+        return selectStream.fulljoin(targetTable);
+    }
+
+    public SqlSelectStream<T> crossJoin(Object targetTable) {
+        return selectStream.crossJoin(targetTable);
+    }
+
+    public SqlSelectStream<T> crossjoin(Object targetTable) {
+        return selectStream.crossjoin(targetTable);
+    }
+
     public WhereBuilder<T> where() {
         return selectStream.where();
     }
@@ -186,6 +202,10 @@ public class SqlJoinClause<T> implements Query<T> {
     @Override
     public SqlAndParams toSqlAndParams() {
         return selectStream.toSqlAndParams();
+    }
+
+    public SqlAndParams toSqlAndParams(com.javaorm.core.dialect.Dialect dialect) {
+        return selectStream.toSqlAndParams(dialect);
     }
 
     @Override

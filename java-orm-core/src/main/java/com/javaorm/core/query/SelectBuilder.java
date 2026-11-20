@@ -803,6 +803,41 @@ public class SelectBuilder<T> implements Query<T> {
         return rightJoin(entityClass).on(onConsumer);
     }
 
+    public <TJoin> JoinBuilder<T, TJoin> fullJoin(Class<TJoin> entityClass) {
+        EntityMetadata meta = EntityMetadataManager.get(entityClass, getConfig());
+        String joinAlias = obtainJoinAlias(entityClass);
+        return new JoinBuilder<>(this, TableJoin.JoinType.FULL_JOIN, meta.getTableName(), entityClass, joinAlias, null);
+    }
+
+    public <TJoin> SelectBuilder<T> fullJoin(Class<TJoin> entityClass, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
+        return fullJoin(entityClass).on(onConsumer);
+    }
+
+    public <TJoin> JoinBuilder<T, TJoin> fullJoin(Cte<TJoin> cte) {
+        String joinAlias = obtainJoinAlias(cte != null ? cte.getEntityClass() : null);
+        return new JoinBuilder<>(this, TableJoin.JoinType.FULL_JOIN, cte.getName(), cte.getEntityClass(), joinAlias, cte);
+    }
+
+    public <TJoin> SelectBuilder<T> fullJoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
+        return fullJoin(cte).on(onConsumer);
+    }
+
+    public <TJoin> SelectBuilder<T> crossJoin(Class<TJoin> entityClass) {
+        EntityMetadata meta = EntityMetadataManager.get(entityClass, getConfig());
+        String joinAlias = obtainJoinAlias(entityClass);
+        TableJoin join = new TableJoin(TableJoin.JoinType.CROSS_JOIN, meta.getTableName(), joinAlias);
+        getStatement().addJoin(join);
+        return this;
+    }
+
+    public <TJoin> SelectBuilder<T> crossJoin(Cte<TJoin> cte) {
+        String joinAlias = obtainJoinAlias(cte != null ? cte.getEntityClass() : null);
+        TableJoin join = new TableJoin(TableJoin.JoinType.CROSS_JOIN, cte.getName(), joinAlias);
+        getStatement().addJoin(join);
+        ensureCteAdded(cte);
+        return this;
+    }
+
     /**
      * 声明显式装配关联对象（避免笛卡尔积，采用 Split IN 查询，支持各级独立筛选与多层级嵌套）
      */

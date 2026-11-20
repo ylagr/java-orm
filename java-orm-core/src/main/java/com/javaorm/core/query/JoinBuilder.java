@@ -45,7 +45,7 @@ public class JoinBuilder<TRoot, TJoin> {
         TableJoin join = new TableJoin(joinType, tableName, joinAlias);
         rootQuery.getStatement().addJoin(join);
 
-        if (cte == null && rootQuery.getConfig() != null && joinClass != null) {
+        if (cte == null && rootQuery.getConfig() != null && joinClass != null && joinType != TableJoin.JoinType.CROSS_JOIN) {
             com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(joinClass, rootQuery.getConfig());
             if (meta != null) {
                 if (meta.hasLogicDelete()) {

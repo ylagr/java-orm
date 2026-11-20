@@ -2856,8 +2856,8 @@ public class WhereBuilder<T> implements Query<T> {
     @SuppressWarnings("unchecked")
     public <R> OrderByBuilder<WhereBuilder<T>> orderBy(Function<T, R> propertyGetter) {
         PropertyPath path = recordPath(propertyGetter);
-        String alias = path.hasRelations() ? rootQuery.resolveJoinAlias(path) : scopeAlias;
-        String colName = rootQuery.resolveColumnName(path);
+        String alias = rootQuery != null ? rootQuery.resolveTableAlias(path) : (path.getExplicitAlias() != null ? path.getExplicitAlias() : (path.hasRelations() ? rootQuery.resolveJoinAlias(path) : scopeAlias));
+        String colName = rootQuery != null ? rootQuery.resolveColumnName(path) : path.getTerminalProperty();
         return new OrderByBuilder<>(this, rootQuery.getStatement(), alias, colName);
     }
 
@@ -2873,16 +2873,16 @@ public class WhereBuilder<T> implements Query<T> {
             }
             throw new IllegalStateException("No proxy property accessed before calling orderBy(...)");
         }
-        String alias = path.hasRelations() ? rootQuery.resolveJoinAlias(path) : scopeAlias;
-        String colName = rootQuery.resolveColumnName(path);
+        String alias = rootQuery != null ? rootQuery.resolveTableAlias(path) : (path.getExplicitAlias() != null ? path.getExplicitAlias() : (path.hasRelations() ? rootQuery.resolveJoinAlias(path) : scopeAlias));
+        String colName = rootQuery != null ? rootQuery.resolveColumnName(path) : path.getTerminalProperty();
         return new OrderByBuilder<>(this, rootQuery.getStatement(), alias, colName);
     }
 
     public OrderByBuilder<WhereBuilder<T>> orderBy(String propertyOrColumn) {
         PropertyPath path = RecordingContext.finish();
         if (path != null) {
-            String alias = path.hasRelations() ? rootQuery.resolveJoinAlias(path) : scopeAlias;
-            String colName = rootQuery.resolveColumnName(path);
+            String alias = rootQuery != null ? rootQuery.resolveTableAlias(path) : (path.getExplicitAlias() != null ? path.getExplicitAlias() : (path.hasRelations() ? rootQuery.resolveJoinAlias(path) : scopeAlias));
+            String colName = rootQuery != null ? rootQuery.resolveColumnName(path) : path.getTerminalProperty();
             return new OrderByBuilder<>(this, rootQuery.getStatement(), alias, colName);
         }
         if (propertyOrColumn == null) {

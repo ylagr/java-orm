@@ -290,6 +290,62 @@ public class SqlSelectStream<T> implements Query<T> {
         return rightJoin(targetTable);
     }
 
+    public <E> SqlJoinClause<T> fullJoin(Class<E> entityClass) {
+        return createJoin(TableJoin.JoinType.FULL_JOIN, env.resolveTable(entityClass));
+    }
+
+    public <E> SqlJoinClause<T> fullJoin(Cte<E> cte) {
+        return createJoin(TableJoin.JoinType.FULL_JOIN, env.resolveTable(cte));
+    }
+
+    public <P> SqlJoinClause<T> fullJoin(P targetTable) {
+        return createJoin(TableJoin.JoinType.FULL_JOIN, (Object) targetTable);
+    }
+
+    public <E> SqlJoinClause<T> fulljoin(Class<E> entityClass) {
+        return fullJoin(entityClass);
+    }
+
+    public <E> SqlJoinClause<T> fulljoin(Cte<E> cte) {
+        return fullJoin(cte);
+    }
+
+    public <P> SqlJoinClause<T> fulljoin(P targetTable) {
+        return fullJoin(targetTable);
+    }
+
+    public <E> SqlSelectStream<T> crossJoin(Class<E> entityClass) {
+        ensureQuery();
+        query.crossJoin(entityClass);
+        return this;
+    }
+
+    public <E> SqlSelectStream<T> crossJoin(Cte<E> cte) {
+        ensureQuery();
+        query.crossJoin(cte);
+        return this;
+    }
+
+    public <P> SqlSelectStream<T> crossJoin(P targetTable) {
+        ensureQuery();
+        SqlTableInfo<P> info = env.resolveTableByProxy(targetTable);
+        TableJoin join = new TableJoin(TableJoin.JoinType.CROSS_JOIN, info.getTableName(), info.getAlias());
+        query.getStatement().addJoin(join);
+        return this;
+    }
+
+    public <E> SqlSelectStream<T> crossjoin(Class<E> entityClass) {
+        return crossJoin(entityClass);
+    }
+
+    public <E> SqlSelectStream<T> crossjoin(Cte<E> cte) {
+        return crossJoin(cte);
+    }
+
+    public <P> SqlSelectStream<T> crossjoin(P targetTable) {
+        return crossJoin(targetTable);
+    }
+
     private SqlJoinClause<T> createJoin(TableJoin.JoinType joinType, SqlTableInfo<?> targetInfo) {
         ensureQuery();
         TableJoin join;
@@ -569,6 +625,11 @@ public class SqlSelectStream<T> implements Query<T> {
     public SqlAndParams toSqlAndParams() {
         ensureQuery();
         return query.toSqlAndParams();
+    }
+
+    public SqlAndParams toSqlAndParams(com.javaorm.core.dialect.Dialect dialect) {
+        ensureQuery();
+        return query.toSqlAndParams(dialect);
     }
 
     @Override

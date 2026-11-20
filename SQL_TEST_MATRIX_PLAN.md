@@ -143,8 +143,8 @@
 | :--- | :--- | :---: | :---: | :---: | :---: |
 | **Phase 1** | SELECT 投影与基础查询 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
 | **Phase 2** | WHERE 条件分支与操作符 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
-| **Phase 3** | JOIN 多表连接与关联查询 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 进行中 |
-| **Phase 4** | GROUP BY, HAVING 与聚合 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
+| **Phase 3** | JOIN 多表连接与关联查询 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
+| **Phase 4** | GROUP BY, HAVING 与聚合 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 进行中 |
 | **Phase 5** | ORDER BY, LIMIT 与分页 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
 | **Phase 6** | 子查询与集合操作 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
 | **Phase 7** | 窗口函数, CASE WHEN, CTE, 悲观锁 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |

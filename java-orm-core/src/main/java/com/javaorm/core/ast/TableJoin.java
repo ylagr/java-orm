@@ -7,7 +7,9 @@ public class TableJoin {
     public enum JoinType {
         LEFT_JOIN("LEFT JOIN"),
         INNER_JOIN("INNER JOIN"),
-        RIGHT_JOIN("RIGHT JOIN");
+        RIGHT_JOIN("RIGHT JOIN"),
+        FULL_JOIN("FULL JOIN"),
+        CROSS_JOIN("CROSS JOIN");
 
         private final String sql;
 

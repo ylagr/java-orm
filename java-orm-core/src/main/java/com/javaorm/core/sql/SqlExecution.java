@@ -395,6 +395,28 @@ public class SqlExecution<T> implements Query<T> {
         throw new IllegalStateException("No valid SQL operation configured in SqlEnv.");
     }
 
+    public SqlAndParams toSqlAndParams(com.javaorm.core.dialect.Dialect dialect) {
+        if (operation instanceof SqlSelectStream<?>) {
+            return ((SqlSelectStream<?>) operation).toSqlAndParams(dialect);
+        }
+        if (operation instanceof SelectBuilder<?>) {
+            return ((SelectBuilder<?>) operation).toSqlAndParams(dialect);
+        }
+        if (operation instanceof SqlJoinClause<?>) {
+            return ((SqlJoinClause<?>) operation).toSqlAndParams(dialect);
+        }
+        if (operation instanceof Query<?>) {
+            Query<?> q = (Query<?>) operation;
+            if (q instanceof SelectBuilder<?>) {
+                return ((SelectBuilder<?>) q).toSqlAndParams(dialect);
+            }
+            if (q instanceof SqlSelectStream<?>) {
+                return ((SqlSelectStream<?>) q).toSqlAndParams(dialect);
+            }
+        }
+        throw new IllegalStateException("Operation does not support toSqlAndParams with Dialect: " + operation);
+    }
+
     @Override
     public String toString() {
         return toSql();
