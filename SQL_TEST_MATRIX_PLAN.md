@@ -34,7 +34,7 @@
 | **MySQL (8.0+)** | `` `name` `` | `LIMIT ?, ?` | `?` | `CONCAT(a, b)` / `IFNULL(a, b)` |
 | **PostgreSQL (12+)**| `"name"` | `LIMIT ? OFFSET ?` | `?` | `(a \|\| b)` / `COALESCE(a, b)` |
 | **Oracle (11g/12c+)**| `"NAME"` | `OFFSET ? ROWS FETCH NEXT ? ROWS ONLY` | `?` | `(a \|\| b)` / `NVL(a, b)` |
-| **SQLite (3+)** | `` `name` `` | `LIMIT ? OFFSET ?` | `?` | `(a \|\| b)` / `IFNULL(a, b)` |
+| **SQLite (3+)** | `"name"` | `LIMIT ? OFFSET ?` | `?` | `(a \|\| b)` / `IFNULL(a, b)` |
 | **H2 (2.x)** | `"name"` | `LIMIT ? OFFSET ?` | `?` | `CONCAT(a, b)` / `IFNULL(a, b)` |
 
 ---
@@ -130,7 +130,7 @@
 
 | 阶段 | 模块内容 | 方言覆盖数 | 100%全文本断言 | CodeFirst建表 | 完成状态 |
 | :--- | :--- | :---: | :---: | :---: | :---: |
-| **Phase 1** | SELECT 投影与基础查询 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
+| **Phase 1** | SELECT 投影与基础查询 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
 | **Phase 2** | WHERE 条件分支与操作符 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
 | **Phase 3** | JOIN 多表连接与关联查询 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
 | **Phase 4** | GROUP BY, HAVING 与聚合 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
