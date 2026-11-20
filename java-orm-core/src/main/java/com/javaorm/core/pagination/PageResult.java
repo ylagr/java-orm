@@ -38,6 +38,10 @@ public class PageResult<T> implements Page<T> {
         return data;
     }
 
+    public List<T> getList() {
+        return data;
+    }
+
     @Override
     public List<T> getRecords() {
         return data;

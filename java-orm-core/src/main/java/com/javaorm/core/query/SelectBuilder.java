@@ -37,6 +37,24 @@ public class SelectBuilder<T> implements Query<T> {
     private final List<IncludeSpec> includes = new ArrayList<>();
     private int aliasSeq = 0;
 
+    private Class<?> resultDtoClass;
+    private boolean autoInclude;
+    private final Set<String> extraRequiredColumns = new LinkedHashSet<>();
+
+    public void addExtraRequiredColumn(String colName) {
+        if (colName != null && !colName.isEmpty()) {
+            this.extraRequiredColumns.add(colName);
+        }
+    }
+
+    public boolean isAutoInclude() {
+        return autoInclude;
+    }
+
+    public Class<?> getResultDtoClass() {
+        return resultDtoClass;
+    }
+
     public List<IncludeSpec> getIncludeSpecs() {
         return Collections.unmodifiableList(includes);
     }
@@ -65,7 +83,11 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Class<T> getResultClass() {
+        if (resultDtoClass != null) {
+            return (Class<T>) resultDtoClass;
+        }
         return rootEntityClass;
     }
 
@@ -440,6 +462,31 @@ public class SelectBuilder<T> implements Query<T> {
             }
         }
         return this;
+    }
+
+    /**
+     * 将当前查询切换为针对指定 DTO/VO 类的自动关联装配查询（selectAutoInclude）。
+     * <p>
+     * 核心规则：
+     * 1. 严格限制：该功能只能在 DTO/VO 类上使用，严禁在 Entity 实体类上直接使用；
+     * 2. 列裁剪投影（Selective Projection）：SQL 主查询只查 DTO 声明的标量属性与关联装配所需的 Key 列；
+     * 3. 杜绝笛卡尔积（Split/Batch IN Query）：自动识别嵌套 DTO 对象或 DTO 集合属性，分批批量查询；
+     * 4. 递归级联装配：子 DTO 若仍包含嵌套关系，递归执行 selectAutoInclude 装配，支持无限层级。
+     *
+     * @param dtoClass 目标 DTO/VO 类（不能是实体类）
+     * @param <TReturn> DTO 类型
+     * @return 强类型 SelectBuilder<TReturn>
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public <TReturn> SelectBuilder<TReturn> selectAutoInclude(Class<TReturn> dtoClass) {
+        com.javaorm.core.hydration.AutoIncludeProcessor.validateDtoClass(dtoClass, this.rootEntityClass);
+        this.resultDtoClass = dtoClass;
+        this.autoInclude = true;
+        com.javaorm.core.hydration.AutoIncludeProcessor.configureAutoIncludeProjection(
+                this.statement, this.rootMetadata, dtoClass, this.getConfig(), this.extraRequiredColumns
+        );
+        return (SelectBuilder<TReturn>) this;
     }
 
     /**
@@ -1255,7 +1302,27 @@ public class SelectBuilder<T> implements Query<T> {
         return list(conn);
     }
 
+    @SuppressWarnings("unchecked")
     public List<T> list(Connection conn) {
+        if (resultDtoClass != null && autoInclude) {
+            try {
+                return (List<T>) com.javaorm.core.hydration.AutoIncludeProcessor.executeAndHydrate(
+                        conn,
+                        statement,
+                        resultDtoClass,
+                        rootMetadata,
+                        getDialect(),
+                        getConfig(),
+                        getDataSource(),
+                        env
+                );
+            } catch (Exception e) {
+                if (e instanceof RuntimeException) {
+                    throw (RuntimeException) e;
+                }
+                throw new RuntimeException("Failed to execute selectAutoInclude for DTO: " + resultDtoClass.getName(), e);
+            }
+        }
         return env.executeSelectList(conn, statement, rootMetadata, includes);
     }
 

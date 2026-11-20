@@ -162,4 +162,16 @@ public interface Query<T> {
         }
         return this;
     }
+
+    /**
+     * 将当前查询切换为针对指定 DTO/VO 类的自动关联装配查询（selectAutoInclude）。
+     * 该功能仅支持在 DTO/VO 类上使用，严禁在 Entity 实体类上使用。
+     *
+     * @param dtoClass 目标 DTO/VO 类型
+     * @param <TReturn> DTO 类型泛型
+     * @return 强类型 Query<TReturn>
+     */
+    default <TReturn> Query<TReturn> selectAutoInclude(Class<TReturn> dtoClass) {
+        throw new UnsupportedOperationException("selectAutoInclude is not supported on " + getClass().getName());
+    }
 }

@@ -3316,4 +3316,20 @@ public class WhereBuilder<T> implements Query<T> {
         Query.super.useDataSource(dataSourceName);
         return this;
     }
+
+    /**
+     * 将当前查询切换为针对指定 DTO/VO 类的自动关联装配查询（selectAutoInclude）。
+     * 只能在 DTO/VO 类上使用，严禁在 Entity 实体类上直接使用。
+     *
+     * @param dtoClass 目标 DTO/VO 类
+     * @param <TReturn> DTO 类型
+     * @return 强类型 SelectBuilder<TReturn>
+     */
+    @Override
+    public <TReturn> SelectBuilder<TReturn> selectAutoInclude(Class<TReturn> dtoClass) {
+        if (rootQuery instanceof SelectBuilder) {
+            return ((SelectBuilder<?>) rootQuery).selectAutoInclude(dtoClass);
+        }
+        throw new IllegalStateException("selectAutoInclude requires a SelectBuilder root query");
+    }
 }
