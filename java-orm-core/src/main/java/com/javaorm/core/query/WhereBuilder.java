@@ -2902,8 +2902,18 @@ public class WhereBuilder<T> implements Query<T> {
         return this;
     }
 
+    public <R> WhereBuilder<T> orderByAsc(Function<T, R> getter) {
+        orderBy(getter).asc();
+        return this;
+    }
+
     public <R> WhereBuilder<T> orderByDesc(R val) {
         orderBy(val).desc();
+        return this;
+    }
+
+    public <R> WhereBuilder<T> orderByDesc(Function<T, R> getter) {
+        orderBy(getter).desc();
         return this;
     }
 

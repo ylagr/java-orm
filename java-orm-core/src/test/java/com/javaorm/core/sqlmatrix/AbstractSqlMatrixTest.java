@@ -357,7 +357,42 @@ public abstract class AbstractSqlMatrixTest {
         Assert.assertEquals("H2 方言参数不匹配", expectedParamList, h2Result.getParams());
     }
 
-    private static SqlAndParams toSqlAndParams(Query query, Dialect dialect) {
+    /**
+     * 支持针对不同方言独立指定参数列表的全文本精确断言（例如分页在 MySQL 为 [limit, offset]，在 Oracle 为 [offset, limit]）。
+     */
+    protected static void assertMatrixSqlWithDialectParams(Supplier<Query> querySupplier,
+                                                          String expectedMysql, List<Object> expectedMysqlParams,
+                                                          String expectedPg, List<Object> expectedPgParams,
+                                                          String expectedOracle, List<Object> expectedOracleParams,
+                                                          String expectedSqlite, List<Object> expectedSqliteParams,
+                                                          String expectedH2, List<Object> expectedH2Params) {
+        // 1. MySQL 断言
+        SqlAndParams mysqlResult = toSqlAndParams(querySupplier.get(), MYSQL);
+        Assert.assertEquals("MySQL 方言 SQL 不匹配", expectedMysql, mysqlResult.getSql());
+        Assert.assertEquals("MySQL 方言参数不匹配", expectedMysqlParams, mysqlResult.getParams());
+
+        // 2. PostgreSQL 断言
+        SqlAndParams pgResult = toSqlAndParams(querySupplier.get(), PG);
+        Assert.assertEquals("PostgreSQL 方言 SQL 不匹配", expectedPg, pgResult.getSql());
+        Assert.assertEquals("PostgreSQL 方言参数不匹配", expectedPgParams, pgResult.getParams());
+
+        // 3. Oracle 断言
+        SqlAndParams oracleResult = toSqlAndParams(querySupplier.get(), ORACLE);
+        Assert.assertEquals("Oracle 方言 SQL 不匹配", expectedOracle, oracleResult.getSql());
+        Assert.assertEquals("Oracle 方言参数不匹配", expectedOracleParams, oracleResult.getParams());
+
+        // 4. SQLite 断言
+        SqlAndParams sqliteResult = toSqlAndParams(querySupplier.get(), SQLITE);
+        Assert.assertEquals("SQLite 方言 SQL 不匹配", expectedSqlite, sqliteResult.getSql());
+        Assert.assertEquals("SQLite 方言参数不匹配", expectedSqliteParams, sqliteResult.getParams());
+
+        // 5. H2 断言
+        SqlAndParams h2Result = toSqlAndParams(querySupplier.get(), H2);
+        Assert.assertEquals("H2 方言 SQL 不匹配", expectedH2, h2Result.getSql());
+        Assert.assertEquals("H2 方言参数不匹配", expectedH2Params, h2Result.getParams());
+    }
+
+    protected static SqlAndParams toSqlAndParams(Query query, Dialect dialect) {
         if (query instanceof SelectBuilder) {
             return ((SelectBuilder<?>) query).toSqlAndParams(dialect);
         } else if (query instanceof WhereBuilder) {

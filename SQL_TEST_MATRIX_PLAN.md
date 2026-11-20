@@ -145,8 +145,8 @@
 | **Phase 2** | WHERE 条件分支与操作符 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
 | **Phase 3** | JOIN 多表连接与关联查询 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
 | **Phase 4** | GROUP BY, HAVING 与聚合 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
-| **Phase 5** | ORDER BY, LIMIT 与分页 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 进行中 |
-| **Phase 6** | 子查询与集合操作 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
+| **Phase 5** | ORDER BY, LIMIT 与分页 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
+| **Phase 6** | 子查询与集合操作 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 进行中 |
 | **Phase 7** | 窗口函数, CASE WHEN, CTE, 悲观锁 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
 | **Phase 8** | INSERT, 批量与 Upsert | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |
 | **Phase 9** | UPDATE, 增量更新与脏检查 | 5 (MySQL/PG/Oracle/SQLite/H2) | [ ] | [ ] | 待开始 |

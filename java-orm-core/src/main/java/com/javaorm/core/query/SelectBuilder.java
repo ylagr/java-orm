@@ -1017,8 +1017,18 @@ public class SelectBuilder<T> implements Query<T> {
         return this;
     }
 
+    public <R> SelectBuilder<T> orderByAsc(Function<T, R> getter) {
+        orderBy(getter).asc();
+        return this;
+    }
+
     public <R> SelectBuilder<T> orderByDesc(R val) {
         orderBy(val).desc();
+        return this;
+    }
+
+    public <R> SelectBuilder<T> orderByDesc(Function<T, R> getter) {
+        orderBy(getter).desc();
         return this;
     }
 
