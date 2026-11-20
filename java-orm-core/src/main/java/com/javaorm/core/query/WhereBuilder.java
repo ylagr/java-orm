@@ -3168,4 +3168,19 @@ public class WhereBuilder<T> implements Query<T> {
     public WhereBuilder<T> forUpdateSkipLocked() {
         return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE_SKIP_LOCKED);
     }
+
+    @Override
+    public WhereBuilder<T> tracking() {
+        return tracking(true);
+    }
+
+    @Override
+    public WhereBuilder<T> tracking(boolean enable) {
+        if (rootQuery != null) {
+            rootQuery.tracking(enable);
+        } else if (statement instanceof SelectStatement) {
+            ((SelectStatement) statement).setTracking(enable);
+        }
+        return this;
+    }
 }

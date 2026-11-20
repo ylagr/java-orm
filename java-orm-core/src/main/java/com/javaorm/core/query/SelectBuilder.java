@@ -1697,4 +1697,17 @@ public class SelectBuilder<T> implements Query<T> {
     public SelectBuilder<T> forUpdateSkipLocked() {
         return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE_SKIP_LOCKED);
     }
+
+    @Override
+    public SelectBuilder<T> tracking() {
+        return tracking(true);
+    }
+
+    @Override
+    public SelectBuilder<T> tracking(boolean enable) {
+        if (this.statement != null) {
+            this.statement.setTracking(enable);
+        }
+        return this;
+    }
 }

@@ -368,14 +368,25 @@ public class UpdateBuilder<T> {
         if (env != null && env.getConfig() != null && env.getConfig().getAutoFillHandler() != null && metadata != null) {
             env.getConfig().getAutoFillHandler().updateFill(entity, metadata);
         }
+        com.javaorm.core.track.TrackManager tm = (env != null && env.getConfig() != null) ? env.getConfig().getTrackManager() : null;
+        com.javaorm.core.track.EntitySnapshot snapshot = tm != null ? tm.getSnapshot(entity) : null;
+        java.util.Set<String> dirtyCols = snapshot != null ? snapshot.getDirtyColumnNames() : null;
+
         for (ColumnMetadata col : metadata.getColumns()) {
             if (col.isPrimaryKey() || col.isIgnored()) {
                 continue;
             }
-            Object val = col.getValue(entity);
-            if (selective && val == null) {
-                continue;
+            if (snapshot != null) {
+                if (!dirtyCols.contains(col.getColumnName())) {
+                    continue;
+                }
+            } else {
+                Object val = col.getValue(entity);
+                if (selective && val == null) {
+                    continue;
+                }
             }
+            Object val = col.getValue(entity);
             statement.addSet(col.getColumnName(), val);
         }
         return this;
@@ -423,6 +434,18 @@ public class UpdateBuilder<T> {
             throw new IllegalArgumentException("Primary key value is null for entity update");
         }
 
+        // 实体快照变脏检测 (Dirty Checking)
+        com.javaorm.core.track.TrackManager trackManager = env.getConfig() != null ? env.getConfig().getTrackManager() : null;
+        com.javaorm.core.track.EntitySnapshot snapshot = trackManager != null ? trackManager.getSnapshot(entity) : null;
+        java.util.Set<String> dirtyColumns = snapshot != null ? snapshot.getDirtyColumnNames() : null;
+
+        if (snapshot != null) {
+            // 如果处于追踪状态，但没有任何字段被修改：直接返回 0，跳过任何网络 IO 与 SQL 执行
+            if (dirtyColumns == null || dirtyColumns.isEmpty()) {
+                return 0;
+            }
+        }
+
         UpdateBuilder<E> builder = new UpdateBuilder<>(env, clazz);
         ColumnMetadata versionCol = meta.getVersionColumn();
         Object currentVersion = null;
@@ -435,10 +458,18 @@ public class UpdateBuilder<T> {
             if (col.isVersion()) {
                 continue; // 版本号由专门的乐观锁逻辑处理
             }
-            Object val = col.getValue(entity);
-            if (selective && val == null) {
-                continue;
+            if (snapshot != null) {
+                // 快照模式下，只更新发生了变脏的列
+                if (!dirtyColumns.contains(col.getColumnName())) {
+                    continue;
+                }
+            } else if (selective) {
+                Object val = col.getValue(entity);
+                if (val == null) {
+                    continue;
+                }
             }
+            Object val = col.getValue(entity);
             builder.statement.addSet(col.getColumnName(), val);
         }
 
@@ -479,6 +510,10 @@ public class UpdateBuilder<T> {
                 throw new com.javaorm.core.exception.OptimisticLockException(clazz, idVal, currentVersion);
             }
             versionCol.setValue(entity, nextVersion);
+        }
+        // 更新成功后，自动同步刷新快照，以便后续继续修改与更新
+        if (snapshot != null && affected > 0) {
+            snapshot.updateSnapshot();
         }
         return affected;
     }

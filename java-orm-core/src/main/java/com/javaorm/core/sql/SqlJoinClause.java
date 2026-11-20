@@ -193,4 +193,10 @@ public class SqlJoinClause<T> implements Query<T> {
         selectStream.forUpdate(lockMode);
         return this;
     }
+
+    @Override
+    public Query<T> tracking(boolean enable) {
+        selectStream.tracking(enable);
+        return this;
+    }
 }

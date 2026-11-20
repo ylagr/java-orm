@@ -109,4 +109,16 @@ public interface Query<T> {
     default Query<T> forUpdateSkipLocked() {
         return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE_SKIP_LOCKED);
     }
+
+    /**
+     * 开启实体变脏追踪（在实体装配时自动拍摄快照，用于差异更新与脏检查）
+     */
+    default Query<T> tracking() {
+        return tracking(true);
+    }
+
+    /**
+     * 设置是否开启实体变脏追踪
+     */
+    Query<T> tracking(boolean enable);
 }

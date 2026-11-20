@@ -592,4 +592,16 @@ public class SqlSelectStream<T> implements Query<T> {
     public SqlSelectStream<T> forUpdateSkipLocked() {
         return forUpdate(com.javaorm.core.ast.LockMode.FOR_UPDATE_SKIP_LOCKED);
     }
+
+    @Override
+    public SqlSelectStream<T> tracking() {
+        return tracking(true);
+    }
+
+    @Override
+    public SqlSelectStream<T> tracking(boolean enable) {
+        ensureQuery();
+        this.query.tracking(enable);
+        return this;
+    }
 }

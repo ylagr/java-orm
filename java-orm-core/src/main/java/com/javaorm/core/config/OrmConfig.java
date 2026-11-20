@@ -259,4 +259,35 @@ public class OrmConfig {
         this.codeFirstAlterModeMask = bitmask;
         return this;
     }
+
+    private boolean autoTrack = false;
+    private com.javaorm.core.track.TrackManager trackManager = new com.javaorm.core.track.TrackManager();
+
+    public boolean isAutoTrack() {
+        return autoTrack;
+    }
+
+    public OrmConfig setAutoTrack(boolean autoTrack) {
+        this.autoTrack = autoTrack;
+        return this;
+    }
+
+    public OrmConfig autoTrack(boolean autoTrack) {
+        return setAutoTrack(autoTrack);
+    }
+
+    public com.javaorm.core.track.TrackManager getTrackManager() {
+        return trackManager;
+    }
+
+    public OrmConfig setTrackManager(com.javaorm.core.track.TrackManager trackManager) {
+        if (trackManager != null) {
+            this.trackManager = trackManager;
+        }
+        return this;
+    }
+
+    public OrmConfig trackManager(com.javaorm.core.track.TrackManager trackManager) {
+        return setTrackManager(trackManager);
+    }
 }

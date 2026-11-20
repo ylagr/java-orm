@@ -673,6 +673,114 @@ public class JavaOrm {
         }
     }
 
+    /**
+     * 获取全局变脏追踪管理器
+     */
+    public com.javaorm.core.track.TrackManager getTrackManager() {
+        return this.config.getTrackManager();
+    }
+
+    /**
+     * 将实体纳入快照追踪（拍摄当前状态快照）
+     */
+    public <T> T attach(T entity) {
+        if (entity != null && this.config.getTrackManager() != null) {
+            this.config.getTrackManager().attach(entity, this.config);
+        }
+        return entity;
+    }
+
+    /**
+     * 批量将实体纳入快照追踪
+     */
+    public <T> void attachAll(Iterable<T> entities) {
+        if (entities != null && this.config.getTrackManager() != null) {
+            for (T entity : entities) {
+                if (entity != null) {
+                    this.config.getTrackManager().attach(entity, this.config);
+                }
+            }
+        }
+    }
+
+    /**
+     * 从追踪管理器中移除实体
+     */
+    public void detach(Object entity) {
+        if (entity != null && this.config.getTrackManager() != null) {
+            this.config.getTrackManager().detach(entity);
+        }
+    }
+
+    /**
+     * 清空所有被追踪的实体快照
+     */
+    public void clearTrack() {
+        if (this.config.getTrackManager() != null) {
+            this.config.getTrackManager().clear();
+        }
+    }
+
+    /**
+     * 获取指定实体的快照对象
+     */
+    public com.javaorm.core.track.EntitySnapshot getSnapshot(Object entity) {
+        if (entity != null && this.config.getTrackManager() != null) {
+            return this.config.getTrackManager().getSnapshot(entity);
+        }
+        return null;
+    }
+
+    /**
+     * 判断实体是否被追踪
+     */
+    public boolean isTracking(Object entity) {
+        if (entity != null && this.config.getTrackManager() != null) {
+            return this.config.getTrackManager().isTracking(entity);
+        }
+        return false;
+    }
+
+    /**
+     * 判断实体自快照以来是否发生了属性变更（变脏）
+     */
+    public boolean isDirty(Object entity) {
+        if (entity != null && this.config.getTrackManager() != null) {
+            return this.config.getTrackManager().isDirty(entity);
+        }
+        return false;
+    }
+
+    /**
+     * 获取实体自快照以来发生变脏的属性名列表
+     */
+    public java.util.List<String> getDirtyProperties(Object entity) {
+        if (entity != null && this.config.getTrackManager() != null) {
+            return this.config.getTrackManager().getDirtyProperties(entity);
+        }
+        return java.util.Collections.emptyList();
+    }
+
+    /**
+     * 获取实体自快照以来发生变脏的数据库列与最新值映射（以列名为键）
+     */
+    public java.util.Map<String, Object> getDirtyColumns(Object entity) {
+        if (entity != null && this.config.getTrackManager() != null) {
+            return this.config.getTrackManager().getDirtyColumns(entity);
+        }
+        return java.util.Collections.emptyMap();
+    }
+
+    /**
+     * 获取实体自快照以来发生变脏的数据库列名集合
+     */
+    public java.util.Set<String> getDirtyColumnNames(Object entity) {
+        if (entity != null && this.config.getTrackManager() != null) {
+            return this.config.getTrackManager().getDirtyColumnNames(entity);
+        }
+        return java.util.Collections.emptySet();
+    }
+
     private static Dialect detectDialect(DataSource dataSource) {
         try (Connection conn = dataSource.getConnection()) {
             String prodName = conn.getMetaData().getDatabaseProductName();

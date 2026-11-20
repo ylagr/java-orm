@@ -54,6 +54,7 @@ public class EntityHydrator {
                     colMapping[i] = metadata.getColumnByDbName(colLabel);
                 }
 
+                boolean shouldTrack = (stmt != null && stmt.isTracking()) || (config != null && config.isAutoTrack());
                 while (rs.next()) {
                     @SuppressWarnings("unchecked")
                     T entity = (T) metadata.newInstance();
@@ -63,6 +64,9 @@ public class EntityHydrator {
                             Object val = rs.getObject(i);
                             col.setValue(entity, val);
                         }
+                    }
+                    if (shouldTrack && config != null && config.getTrackManager() != null) {
+                        config.getTrackManager().attach(entity, metadata);
                     }
                     list.add(entity);
                 }

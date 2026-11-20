@@ -28,6 +28,8 @@
   在应用启动时（如 Spring Boot 配置类中）仅需配置一次 `MyBatisPlusAdapter.create(sqlSessionFactory)`，即可无缝继承 MyBatis-Plus 的所有能力（自动挂载 `MetaObjectHandler` 插入/更新审计填充、动态表名、多租户行级隔离、防全表更新删除 BlockAttack 插件、Spring 声明式事务、枚举转换、分页插件与注解），后续业务代码 **100% 仅使用纯粹的 JavaORM**，无需再写 Mapper XML 或 BaseMapper！
 - 🛡️ **多级乐观锁机制（Optimistic Locking）**：
   原生支持 `@JoVersion`，通过桥接同时支持 MyBatis-Plus `@Version` 与 EasyQuery `@Version`。更新时自动带上 `WHERE version = ?` 并递增 `version + 1`，并发冲突自动抛出强类型 `OptimisticLockException`。
+- 🎯 **实体快照与变脏检测（Dirty Checking / 差异增量更新）**：
+  基于纯物理内存地址（`IdentityWeakKey`）与 `ReferenceQueue` 实现的高性能非侵入式变更追踪。查询时通过 `.tracking()` 或全局 `autoTrack(true)` 拍摄初始状态快照；更新时智能比对真实变脏字段，**仅将发生实质变更的列加入 UPDATE SET 子句**；未变脏时**直接跳过网络 I/O 与 SQL 执行**（避免无效数据库交互与假性版本号递增）；与 `@JoVersion` 乐观锁无缝协同；内存随 GC 自动回收，彻底根绝内存泄露与实体重写 `equals/hashCode` 导致的状态冲突。
 - 📝 **通用元数据自动填充（AutoFillHandler & MetaObjectHandler 桥接）**：
   提供原生的 `AutoFillHandler` 接口与 `@JoAutoFill`（支持 `INSERT`, `UPDATE`, `INSERT_UPDATE`），在插入与更新时自动触发租户、创建人、更新人、时间戳等审计字段填充；通过 SPI 深度桥接 MyBatis-Plus 的 `@TableField(fill = FieldFill.xxx)` 与 `MetaObjectHandler`。
 - 📄 **通用无侵入分页模式（Zero-Invasive Pagination）**：
@@ -1002,6 +1004,66 @@ orm.insertOrUpdateBatch(userList)
     .updateColumns(User::getBalance, User::getUpdateTime)
     .execute();
 ```
+
+---
+
+### 14. 实体快照变脏检测（Dirty Checking / 差异增量更新）
+
+在复杂的企业级业务开发中，开发者常常需要“先查询实体、进行业务校验与计算、然后更新实体”。
+传统 ORM 在该模式下通常存在两大严重弊端：
+1. **全量字段覆盖更新（Full Column Overwrite）**：即便只修改了一个 `status` 状态字段，生成的 UPDATE 语句也会将整个实体数十个字段全部 SET 一遍。这不仅徒增网络传输开销与数据库写日志（WAL/Redo Log）压力，在并发环境下极易产生**不同业务逻辑互相覆盖未修改字段**的“脏写/丢失更新”灾难。
+2. **无效网络 I/O 与假性乐观锁递增**：若经过复杂业务判断后实体没有任何字段发生变化，传统 ORM 依然会向数据库盲目发送 UPDATE 语句，不仅浪费数据库 I/O，还会无谓地递增 `@JoVersion` 版本号或误报乐观锁冲突。
+
+Java-ORM 引入了**高性能、零侵入、零内存泄漏的实体快照与变脏检测体系（Dirty Checking）**：
+
+#### 核心设计机制：
+1. **纯物理内存地址追踪（IdentityWeakKey）**：
+   底层基于 `System.identityHashCode` 与 `==` 物理地址判等，实体重写 `equals` / `hashCode`（如业务上按 `id` 判等）也绝不会产生状态冲突与快照覆盖。
+2. **零内存泄漏（ReferenceQueue 自动回收）**：
+   结合弱引用与引用队列，实体生命周期结束离开作用域被 GC 回收后，底层快照映射自动清理，彻底杜绝内存溢出风险。
+3. **高保真差异比对**：
+   - 数值与 `BigDecimal` 采用 `compareTo` 精度等价比对，消除 `10.0` vs `10.00` 假性变脏。
+   - 复杂字段与自定义转换器（`ValueConverter`）自动按序列化值深层比对。
+   - 修改为相同值或改动后又改回初始值时，自动识别为未变脏。
+4. **智能跳过无效 I/O 与乐观锁协同**：
+   未变脏时调用 `orm.update(entity)` **直接返回 0，不向数据库发送任何网络 SQL**，且不递增 `@JoVersion` 版本号；发生变脏时，**仅将变脏的列与版本号递增列加入 SET 子句**。更新成功后，快照自动刷新为最新基准，支持连续链式业务更新。
+
+#### 使用示例：
+```java
+// 1. 局部按需追踪：通过 .tracking() 开启快照录制
+User user = orm.select(User.class)
+    .where().eq(User::getId, 100L)
+    .tracking()  // 开启变脏追踪，在对象装配时自动拍摄初始快照
+    .first();
+
+// 2. 没有任何修改直接 update：跳过网络 IO，不发 SQL，直接返回 0
+int affectedZero = orm.update(user); // 返回 0，未发送 SQL，version 不递增
+
+// 3. 仅修改 age 属性
+user.setAge(26);
+
+// 此时可随时感知实体的变脏状态
+boolean dirty = orm.isDirty(user);                          // true
+List<String> dirtyProps = orm.getDirtyProperties(user);     // ["age"]
+Set<String> dirtyCols = orm.getDirtyColumnNames(user);      // ["age"]
+
+// 4. 执行更新：只更新变脏的列！
+// 生成的 SQL: UPDATE "user" SET "age" = ?, "version" = ? WHERE "version" = ? AND "id" = ?
+// 其它未变更的 20+ 个字段绝不出现在 SET 中！
+int affected = orm.update(user); // 返回 1，更新成功，快照自动同步为最新状态
+
+// 5. 更新完成后快照已刷新，若未继续修改，再次 update 依然返回 0
+int affectedAgain = orm.update(user); // 返回 0
+
+// 6. 全局无感追踪（适合习惯 Hibernate / JPA 风格的团队）：
+orm.getConfig().setAutoTrack(true);
+// 此时所有通过 orm.select() / orm.query() 查询出的实体都会自动拍摄快照！
+
+// 7. 手动脱管与纳入追踪
+orm.attach(user);   // 手动拍摄当前状态为快照
+orm.detach(user);   // 显式脱管，后续 update 恢复为普通全量/非空更新
+```
+
 
 ---
 

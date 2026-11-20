@@ -412,4 +412,17 @@ public class SqlExecution<T> implements Query<T> {
         }
         return this;
     }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Query<T> tracking(boolean enable) {
+        if (operation instanceof Query<?>) {
+            ((Query<T>) operation).tracking(enable);
+        } else if (operation instanceof SqlSelectStream<?>) {
+            ((SqlSelectStream<T>) operation).tracking(enable);
+        } else if (operation instanceof SelectBuilder<?>) {
+            ((SelectBuilder<T>) operation).tracking(enable);
+        }
+        return this;
+    }
 }

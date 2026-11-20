@@ -21,6 +21,7 @@ public class SelectStatement implements Statement {
     private Integer offset;
     private boolean distinct;
     private LockMode lockMode = LockMode.NONE;
+    private boolean tracking = false;
     private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
     private com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter;
     private String targetDataSource;
@@ -225,6 +226,7 @@ public class SelectStatement implements Statement {
         copy.offset = this.offset;
         copy.distinct = this.distinct;
         copy.lockMode = this.lockMode;
+        copy.tracking = this.tracking;
         copy.shardingRouter = this.shardingRouter;
         copy.dataSourceRouter = this.dataSourceRouter;
         copy.targetDataSource = this.targetDataSource;
@@ -238,5 +240,13 @@ public class SelectStatement implements Statement {
 
     public void setLockMode(LockMode lockMode) {
         this.lockMode = lockMode != null ? lockMode : LockMode.NONE;
+    }
+
+    public boolean isTracking() {
+        return tracking;
+    }
+
+    public void setTracking(boolean tracking) {
+        this.tracking = tracking;
     }
 }
