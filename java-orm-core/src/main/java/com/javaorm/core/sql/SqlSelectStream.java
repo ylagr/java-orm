@@ -11,6 +11,7 @@ import com.javaorm.core.metadata.EntityMetadataManager;
 import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.RecordingContext;
 import com.javaorm.core.query.Cte;
+import com.javaorm.core.query.HavingBuilder;
 import com.javaorm.core.query.Query;
 import com.javaorm.core.query.SelectBuilder;
 import com.javaorm.core.query.WhereBuilder;
@@ -434,6 +435,19 @@ public class SqlSelectStream<T> implements Query<T> {
     public SqlSelectStream<T> groupBy(Object... expressions) {
         ensureQuery();
         query.groupBy(expressions);
+        return this;
+    }
+
+    @SuppressWarnings("unchecked")
+    public HavingBuilder<T> having() {
+        ensureQuery();
+        return (HavingBuilder<T>) query.having();
+    }
+
+    @SuppressWarnings("unchecked")
+    public SqlSelectStream<T> having(Consumer<HavingBuilder<T>> consumer) {
+        ensureQuery();
+        consumer.accept((HavingBuilder<T>) query.having());
         return this;
     }
 

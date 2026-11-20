@@ -263,6 +263,10 @@ public class HavingBuilder<T> {
         return query.toSqlAndParams();
     }
 
+    public com.javaorm.core.dialect.SqlAndParams toSqlAndParams(com.javaorm.core.dialect.Dialect dialect) {
+        return query.toSqlAndParams(dialect);
+    }
+
     public String toSql() {
         return query.toSql();
     }
