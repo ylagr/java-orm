@@ -139,6 +139,7 @@ public class SelectBuilder<T> implements Query<T> {
         this.rootMetadata = rootEntityClass != null ? EntityMetadataManager.get(rootEntityClass, this.env.getConfig()) : null;
         String rootAlias = cte.getAlias() != null ? cte.getAlias() : nextAlias();
         this.statement = new SelectStatement(rootEntityClass, cte.getName(), rootAlias);
+        this.statement.setConfig(this.env.getConfig());
         this.statement.addCte(cte.toClause());
         if (rootEntityClass != null) {
             RecordingContext.registerAlias(rootEntityClass, rootAlias);
