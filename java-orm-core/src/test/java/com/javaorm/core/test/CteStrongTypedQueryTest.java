@@ -117,7 +117,7 @@ public class CteStrongTypedQueryTest {
             stmt.execute("DROP TABLE IF EXISTS \"t_student\"");
             stmt.execute("DROP TABLE IF EXISTS \"t_teacher\"");
             stmt.execute("DROP TABLE IF EXISTS \"t_department\"");
-            stmt.execute("CREATE TABLE \"t_teacher\" (\"id\" BIGINT PRIMARY KEY, \"teacher_name\" VARCHAR(100), \"age\" INT)");
+            stmt.execute("CREATE TABLE \"t_teacher\" (\"id\" BIGINT PRIMARY KEY, \"teacher_name\" VARCHAR(100), \"age\" INT, \"title\" VARCHAR(100), \"school_id\" BIGINT)");
             stmt.execute("CREATE TABLE \"t_student\" (\"id\" BIGINT PRIMARY KEY, \"student_name\" VARCHAR(100), \"age\" INT, \"teacher_id\" BIGINT, \"is_deleted\" INT DEFAULT 0, \"create_time\" TIMESTAMP)");
             stmt.execute("CREATE TABLE \"t_department\" (\"id\" BIGINT PRIMARY KEY, \"parent_id\" BIGINT, \"name\" VARCHAR(100))");
 
@@ -164,9 +164,9 @@ public class CteStrongTypedQueryTest {
 
         String sql = mainQuery.toSql();
         assertTrue("SQL should start with WITH \"adult_students\" AS",
-                sql.startsWith("WITH \"adult_students\" AS (SELECT t0.* FROM \"t_student\" t0 WHERE t0.\"is_deleted\" = ? AND (t0.\"age\" > ?))"));
+                sql.startsWith("WITH \"adult_students\" AS (SELECT t0.\"id\", t0.\"student_name\", t0.\"age\", t0.\"teacher_id\", t0.\"is_deleted\", t0.\"create_time\" FROM \"t_student\" t0 WHERE t0.\"is_deleted\" = ? AND (t0.\"age\" > ?))"));
         assertTrue("SQL should select from CTE",
-                sql.contains("SELECT t0.* FROM \"adult_students\" t0 WHERE t0.\"age\" < ?"));
+                sql.contains("SELECT t0.\"id\", t0.\"student_name\", t0.\"age\", t0.\"teacher_id\", t0.\"is_deleted\", t0.\"create_time\" FROM \"adult_students\" t0 WHERE t0.\"age\" < ?"));
 
         List<Student> list = mainQuery.toList();
         assertNotNull(list);
@@ -234,7 +234,7 @@ public class CteStrongTypedQueryTest {
         String sql = mainQuery.toSql();
 
         // 验证拓扑依赖顺序：c1 在前，c2 在后，且 c2 内部不重复声明 WITH
-        assertTrue(sql.contains("WITH \"c1\" AS (SELECT t0.* FROM \"t_student\" t0 WHERE t0.\"is_deleted\" = ? AND (t0.\"age\" >= ?)), \"c2\" AS (SELECT t0.* FROM \"c1\" t0 WHERE t0.\"age\" <= ?) SELECT t0.* FROM \"c2\" t0"));
+        assertTrue(sql.contains("WITH \"c1\" AS (SELECT t0.\"id\", t0.\"student_name\", t0.\"age\", t0.\"teacher_id\", t0.\"is_deleted\", t0.\"create_time\" FROM \"t_student\" t0 WHERE t0.\"is_deleted\" = ? AND (t0.\"age\" >= ?)), \"c2\" AS (SELECT t0.\"id\", t0.\"student_name\", t0.\"age\", t0.\"teacher_id\", t0.\"is_deleted\", t0.\"create_time\" FROM \"c1\" t0 WHERE t0.\"age\" <= ?) SELECT t0.\"id\", t0.\"student_name\", t0.\"age\", t0.\"teacher_id\", t0.\"is_deleted\", t0.\"create_time\" FROM \"c2\" t0"));
 
         List<Student> list = mainQuery.toList();
         // Alice(20), Bob(22), Charlie(22)

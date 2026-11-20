@@ -4,6 +4,9 @@ import com.javaorm.core.ast.*;
 import com.javaorm.core.function.BuiltinSqlFunction;
 import com.javaorm.core.function.FunctionRenderer;
 import com.javaorm.core.function.SqlFunction;
+import com.javaorm.core.metadata.ColumnMetadata;
+import com.javaorm.core.metadata.EntityMetadata;
+import com.javaorm.core.metadata.EntityMetadataManager;
 import com.javaorm.core.operator.SqlOperator;
 import com.javaorm.core.query.SelectBuilder;
 
@@ -226,7 +229,19 @@ public abstract class AbstractDialect implements Dialect {
                 sql.append(stmt.getSelectColumns().get(i));
             }
         } else {
-            sql.append(renderTablePrefix(stmt.getRootTableAlias())).append("*");
+            Class<?> entityClass = stmt.getEntityClass();
+            EntityMetadata metadata = entityClass != null ? EntityMetadataManager.get(entityClass) : null;
+            if (metadata != null && !metadata.getColumns().isEmpty()) {
+                String prefix = renderTablePrefix(stmt.getRootTableAlias());
+                int colIdx = 0;
+                for (ColumnMetadata col : metadata.getColumns()) {
+                    if (colIdx > 0) sql.append(", ");
+                    sql.append(prefix).append(quote(col.getColumnName()));
+                    colIdx++;
+                }
+            } else {
+                sql.append(renderTablePrefix(stmt.getRootTableAlias())).append("*");
+            }
         }
 
         // 2. FROM

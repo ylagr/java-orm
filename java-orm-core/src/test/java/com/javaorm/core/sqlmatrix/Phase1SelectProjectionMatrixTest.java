@@ -22,11 +22,11 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
     public void testSelectAllEntityColumns() {
         assertMatrixSql(
                 () -> orm.select(MatrixUser.class),
-                "SELECT t0.* FROM `matrix_user` t0",
-                "SELECT t0.* FROM \"matrix_user\" t0",
-                "SELECT t0.* FROM \"matrix_user\" t0",
-                "SELECT t0.* FROM \"matrix_user\" t0",
-                "SELECT t0.* FROM \"matrix_user\" t0"
+                "SELECT t0.`id`, t0.`username`, t0.`email`, t0.`age`, t0.`status`, t0.`score`, t0.`create_time`, t0.`is_deleted` FROM `matrix_user` t0",
+                "SELECT t0.\"id\", t0.\"username\", t0.\"email\", t0.\"age\", t0.\"status\", t0.\"score\", t0.\"create_time\", t0.\"is_deleted\" FROM \"matrix_user\" t0",
+                "SELECT t0.\"id\", t0.\"username\", t0.\"email\", t0.\"age\", t0.\"status\", t0.\"score\", t0.\"create_time\", t0.\"is_deleted\" FROM \"matrix_user\" t0",
+                "SELECT t0.\"id\", t0.\"username\", t0.\"email\", t0.\"age\", t0.\"status\", t0.\"score\", t0.\"create_time\", t0.\"is_deleted\" FROM \"matrix_user\" t0",
+                "SELECT t0.\"id\", t0.\"username\", t0.\"email\", t0.\"age\", t0.\"status\", t0.\"score\", t0.\"create_time\", t0.\"is_deleted\" FROM \"matrix_user\" t0"
         );
     }
 

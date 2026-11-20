@@ -160,7 +160,7 @@ public class WhereConditionAndFlatApiTest {
                 .toSqlAndParams();
 
         String sql3 = sp3.getSql();
-        assertFalse("Must not compare with id: " + sql3, sql3.contains("t0.\"id\""));
+        assertFalse("Must not compare with id in where: " + sql3, sql3.contains("= t0.\"id\"") || sql3.contains("t0.\"id\" ="));
         assertTrue("Must compare age with teacher_id: " + sql3, sql3.contains("t0.\"age\" = t0.\"teacher_id\""));
         assertNull("ThreadLocal must be clean after sp3", RecordingContext.finish());
     }
