@@ -27,11 +27,20 @@ public class SelectStatement implements Statement {
     private com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter;
     private String targetDataSource;
     private Boolean allowFullShardingScan;
+    private com.javaorm.core.config.OrmConfig config;
 
     public SelectStatement(Class<?> rootEntityClass, String rootTableName, String rootTableAlias) {
         this.rootEntityClass = rootEntityClass;
         this.rootTableName = rootTableName;
         this.rootTableAlias = rootTableAlias;
+    }
+
+    public com.javaorm.core.config.OrmConfig getConfig() {
+        return config;
+    }
+
+    public void setConfig(com.javaorm.core.config.OrmConfig config) {
+        this.config = config;
     }
 
     public void addSelectColumn(String col) {
@@ -233,6 +242,7 @@ public class SelectStatement implements Statement {
         copy.dataSourceRouter = this.dataSourceRouter;
         copy.targetDataSource = this.targetDataSource;
         copy.allowFullShardingScan = this.allowFullShardingScan;
+        copy.config = this.config;
         return copy;
     }
 

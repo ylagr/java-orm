@@ -40,6 +40,9 @@ public class JavaOrm {
             this.config.getDataSourceManager().setDefaultDataSource(dataSource);
         }
         this.dialect = dialect != null ? dialect : detectDialect(dataSource);
+        if (this.dialect instanceof com.javaorm.core.dialect.OracleDialect && !this.config.isCustomNameConversion()) {
+            this.config.setNameConversion(new com.javaorm.core.config.UpperUnderlinedNameConversion());
+        }
         if (this.config.getCodeFirstMode() != null && this.config.getCodeFirstMode() != com.javaorm.core.codefirst.CodeFirstMode.NONE) {
             codeFirst().syncAll();
         }

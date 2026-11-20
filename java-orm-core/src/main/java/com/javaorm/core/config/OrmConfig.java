@@ -11,6 +11,7 @@ import java.util.function.Supplier;
 public class OrmConfig {
 
     private NameConversion nameConversion = new UnderlinedNameConversion();
+    private boolean customNameConversion = false;
     private boolean printSql = false;
     private String defaultLogicDeleteProperty = null; // 全局逻辑删除字段名（若实体无注解时生效）
     private Object defaultLogicDeleteNormalValue = 0;
@@ -26,8 +27,13 @@ public class OrmConfig {
     public OrmConfig setNameConversion(NameConversion nameConversion) {
         if (nameConversion != null) {
             this.nameConversion = nameConversion;
+            this.customNameConversion = true;
         }
         return this;
+    }
+
+    public boolean isCustomNameConversion() {
+        return customNameConversion;
     }
 
     public boolean isPrintSql() {

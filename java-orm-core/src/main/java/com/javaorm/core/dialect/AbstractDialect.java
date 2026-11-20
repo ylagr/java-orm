@@ -230,7 +230,9 @@ public abstract class AbstractDialect implements Dialect {
             }
         } else {
             Class<?> entityClass = stmt.getEntityClass();
-            EntityMetadata metadata = entityClass != null ? EntityMetadataManager.get(entityClass) : null;
+            EntityMetadata metadata = entityClass != null
+                    ? (stmt.getConfig() != null ? EntityMetadataManager.get(entityClass, stmt.getConfig()) : EntityMetadataManager.get(entityClass))
+                    : null;
             if (metadata != null && !metadata.getColumns().isEmpty()) {
                 String prefix = renderTablePrefix(stmt.getRootTableAlias());
                 int colIdx = 0;

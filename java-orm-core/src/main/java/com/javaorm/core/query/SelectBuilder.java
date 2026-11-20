@@ -92,11 +92,13 @@ public class SelectBuilder<T> implements Query<T> {
 
         if (!allocateAlias) {
             this.statement = new SelectStatement(rootEntityClass, rootMetadata != null ? rootMetadata.getTableName() : null, null);
+            this.statement.setConfig(this.env.getConfig());
             return;
         }
 
         String rootAlias = nextAlias();
         this.statement = new SelectStatement(rootEntityClass, rootMetadata != null ? rootMetadata.getTableName() : null, rootAlias);
+        this.statement.setConfig(this.env.getConfig());
         RecordingContext.registerAlias(rootEntityClass, rootAlias);
 
         injectSystemConditions(rootAlias);
@@ -121,6 +123,7 @@ public class SelectBuilder<T> implements Query<T> {
             }
         }
         this.statement = new SelectStatement(rootEntityClass, rootMetadata != null ? rootMetadata.getTableName() : null, rootAlias);
+        this.statement.setConfig(this.env.getConfig());
         RecordingContext.registerAlias(rootEntityClass, rootAlias);
 
         injectSystemConditions(rootAlias);

@@ -36,6 +36,14 @@
    - **第一阶段（优先推进）**：**SQL 计算与渲染覆盖（SQL AST / Segment Tree / Dialect Generator）**，要求达到 100% 的分支覆盖，确保任意复杂查询在所有方言下生成的 SQL 绝对正确。
    - **第二阶段（功能稳定后）**：**框架执行生命周期代码覆盖（Connection、Transaction、Interceptor、Hydrator、Cache、Reflection）**。
 
+8. **方言连接模式隔离、Quote 与大小写敏感性验证（Case Sensitivity & Quote Isolation）**：
+   - 严禁仅依赖带有宽容参数（如 `CASE_INSENSITIVE_IDENTIFIERS=TRUE;DATABASE_TO_LOWER=TRUE`）的单一内存库掩盖大小写敏感问题；
+   - 必须针对各数据库连接特性进行针对性严格模式隔离验证：
+     - **MySQL 模式**：强制使用 `MySQLDialect` + 反引号 (`) 运行，严禁混入双引号，防止 1064 语法错误；
+     - **PostgreSQL 模式**：使用 `PostgreSQLDialect` + 小写双引号 (") 运行，与 PG 小写字典精准契合；
+     - **Oracle 严格模式**：使用 `OracleDialect` 自动推导 `UpperUnderlinedNameConversion`（大写下划线）+ 大写双引号 (") 运行，去掉任何忽略大小写开关，杜绝 `ORA-00904` 标识符无效陷阱；
+     - **大小写敏感陷阱测试**：包含反面测试验证，证明在未转大写时小写双引号必然报错，确保框架对大小写转换的保障坚如磐石。
+
 ---
 
 ## 二、 跨方言支持矩阵
@@ -141,6 +149,7 @@
 
 | 阶段 | 模块内容 | 方言覆盖数 | 100%全文本断言 | CodeFirst建表 | 完成状态 |
 | :--- | :--- | :---: | :---: | :---: | :---: |
+| **Dialect Isolation** | 方言连接模式与大小写/Quote隔离矩阵 | 3 (MySQL反引号/PG小写双引号/Oracle大写双引号) | [x] | [x] | **已完成 (100%全绿)** |
 | **Phase 1** | SELECT 投影与基础查询 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
 | **Phase 2** | WHERE 条件分支与操作符 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
 | **Phase 3** | JOIN 多表连接与关联查询 | 5 (MySQL/PG/Oracle/SQLite/H2) | [x] | [x] | **已完成 (100%全绿)** |
