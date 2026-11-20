@@ -44,6 +44,10 @@ public class HavingBuilder<T> {
         return statement;
     }
 
+    public SelectBuilder<T> getQuery() {
+        return query;
+    }
+
     private LogicalOperator currentLogOp = LogicalOperator.AND;
 
     public HavingBuilder<T> and() {
