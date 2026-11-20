@@ -31,13 +31,17 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
  * SQL 全方言全覆盖矩阵单测基类。
  * 1. 严格禁止手写 DDL 建表 SQL，100% 采用 CodeFirst 方式自动同步实体到数据库；
  * 2. 统一管理 5 大数据库方言实例 (MySQL, PostgreSQL, Oracle, SQLite, H2)；
- * 3. 提供 100% 全文本精确匹配断言工具方法，拒绝模糊匹配。
+ * 3. 隔离维护 MySQL, PostgreSQL, Oracle (严格大小写敏感) 三大真实物理连接与数据源；
+ * 4. 提供 100% 全文本精确匹配断言工具方法，拒绝模糊匹配；
+ * 5. 全面支持在 MySQL、PostgreSQL、Oracle 真实物理连接下执行真实 JDBC 查询并做实体数据断言。
  */
 public abstract class AbstractSqlMatrixTest {
 
@@ -47,11 +51,19 @@ public abstract class AbstractSqlMatrixTest {
     public static final SQLiteDialect SQLITE = new SQLiteDialect();
     public static final H2Dialect H2 = new H2Dialect();
 
-    protected static DataSource dataSource;
+    protected static DataSource mysqlDataSource;
+    protected static DataSource pgDataSource;
+    protected static DataSource oracleDataSource;
+
+    protected static JavaOrm mysqlOrm;
+    protected static JavaOrm pgOrm;
+    protected static JavaOrm oracleOrm;
+
+    // 默认兼容保留
     protected static JavaOrm orm;
 
     // 测试实体 1：用户表
-    @JoTable(name = "matrix_user")
+    @JoTable
     public static class MatrixUser {
         @JoId
         @JoGeneratedValue(strategy = GenerationType.IDENTITY)
@@ -93,7 +105,7 @@ public abstract class AbstractSqlMatrixTest {
     }
 
     // 测试实体 2：订单表
-    @JoTable(name = "matrix_order")
+    @JoTable
     public static class MatrixOrder {
         @JoId
         @JoGeneratedValue(strategy = GenerationType.IDENTITY)
@@ -126,7 +138,7 @@ public abstract class AbstractSqlMatrixTest {
     }
 
     // 测试实体 3：订单明细项表
-    @JoTable(name = "matrix_order_item")
+    @JoTable
     public static class MatrixOrderItem {
         @JoId
         @JoGeneratedValue(strategy = GenerationType.IDENTITY)
@@ -155,7 +167,7 @@ public abstract class AbstractSqlMatrixTest {
     }
 
     // 测试实体 4：分类表（用于自连接与笛卡尔积测试）
-    @JoTable(name = "matrix_category")
+    @JoTable
     public static class MatrixCategory {
         @JoId
         @JoGeneratedValue(strategy = GenerationType.IDENTITY)
@@ -176,37 +188,71 @@ public abstract class AbstractSqlMatrixTest {
 
     @BeforeClass
     public static void initMatrixEnvironment() throws Exception {
-        JdbcDataSource ds = new JdbcDataSource();
-        ds.setURL("jdbc:h2:mem:sql_matrix_db;DB_CLOSE_DELAY=-1;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE");
-        ds.setUser("sa");
-        ds.setPassword("");
-        dataSource = ds;
+        // 1. MySQL 隔离环境 (MODE=MySQL)
+        JdbcDataSource mysqlDs = new JdbcDataSource();
+        mysqlDs.setURL("jdbc:h2:mem:sql_matrix_mysql_db;DB_CLOSE_DELAY=-1;MODE=MySQL");
+        mysqlDs.setUser("sa");
+        mysqlDs.setPassword("");
+        mysqlDataSource = mysqlDs;
+        OrmConfig mysqlConfig = new OrmConfig().setCodeFirstMode(CodeFirstMode.UPDATE).setPrintSql(false);
+        mysqlOrm = JavaOrm.create(mysqlDataSource, MYSQL, mysqlConfig);
 
-        OrmConfig config = new OrmConfig()
+        // 2. PostgreSQL 隔离环境 (MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE 符合 PG 默认小写字典规范)
+        JdbcDataSource pgDs = new JdbcDataSource();
+        pgDs.setURL("jdbc:h2:mem:sql_matrix_pg_db;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE");
+        pgDs.setUser("sa");
+        pgDs.setPassword("");
+        pgDataSource = pgDs;
+        OrmConfig pgConfig = new OrmConfig().setCodeFirstMode(CodeFirstMode.UPDATE).setPrintSql(false);
+        pgOrm = JavaOrm.create(pgDataSource, PG, pgConfig);
+
+        // 3. Oracle 严格隔离环境 (MODE=Oracle，无 DATABASE_TO_LOWER，无 CASE_INSENSITIVE_IDENTIFIERS)
+        JdbcDataSource oracleDs = new JdbcDataSource();
+        oracleDs.setURL("jdbc:h2:mem:sql_matrix_oracle_db;DB_CLOSE_DELAY=-1;MODE=Oracle");
+        oracleDs.setUser("sa");
+        oracleDs.setPassword("");
+        oracleDataSource = oracleDs;
+        OrmConfig oracleConfig = new OrmConfig()
                 .setCodeFirstMode(CodeFirstMode.UPDATE)
+                .setNameConversion(new com.javaorm.core.config.UpperUnderlinedNameConversion())
                 .setPrintSql(false);
-        orm = JavaOrm.create(dataSource, H2, config);
+        oracleOrm = JavaOrm.create(oracleDataSource, ORACLE, oracleConfig);
 
-        // 清理旧表（仅做 drop table if exists 清理，严禁手写 create table）
-        try (Connection conn = dataSource.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("DROP TABLE IF EXISTS matrix_user");
-            stmt.execute("DROP TABLE IF EXISTS matrix_order");
-            stmt.execute("DROP TABLE IF EXISTS matrix_order_item");
-            stmt.execute("DROP TABLE IF EXISTS matrix_category");
-        }
+        // 默认兼容
+        orm = mysqlOrm;
 
-        // 100% 通过 CodeFirst 纯实体建表！
-        orm.codeFirst().syncTable(MatrixUser.class);
-        orm.codeFirst().syncTable(MatrixOrder.class);
-        orm.codeFirst().syncTable(MatrixOrderItem.class);
-        orm.codeFirst().syncTable(MatrixCategory.class);
-
-        // 100% 通过 CodeFirst 方式初始化测试种子数据（绝不手写原生 INSERT SQL）
-        initSeedData();
+        // 对三大独立环境执行 CodeFirst 纯实体建表与种子数据填充
+        setupEnvironment(mysqlOrm);
+        setupEnvironment(pgOrm);
+        setupEnvironment(oracleOrm);
     }
 
-    private static void initSeedData() {
+    private static void setupEnvironment(JavaOrm targetOrm) {
+        try (java.sql.Connection conn = targetOrm.getDataSource().getConnection();
+             java.sql.Statement stmt = conn.createStatement()) {
+            stmt.execute("DROP TABLE IF EXISTS matrix_order_item");
+            stmt.execute("DROP TABLE IF EXISTS matrix_order");
+            stmt.execute("DROP TABLE IF EXISTS matrix_category");
+            stmt.execute("DROP TABLE IF EXISTS matrix_user");
+            stmt.execute("DROP TABLE IF EXISTS \"MATRIX_ORDER_ITEM\"");
+            stmt.execute("DROP TABLE IF EXISTS \"MATRIX_ORDER\"");
+            stmt.execute("DROP TABLE IF EXISTS \"MATRIX_CATEGORY\"");
+            stmt.execute("DROP TABLE IF EXISTS \"MATRIX_USER\"");
+            stmt.execute("DROP TABLE IF EXISTS \"matrix_order_item\"");
+            stmt.execute("DROP TABLE IF EXISTS \"matrix_order\"");
+            stmt.execute("DROP TABLE IF EXISTS \"matrix_category\"");
+            stmt.execute("DROP TABLE IF EXISTS \"matrix_user\"");
+        } catch (Exception ignored) {
+        }
+        targetOrm.codeFirst().syncTable(MatrixUser.class);
+        targetOrm.codeFirst().syncTable(MatrixOrder.class);
+        targetOrm.codeFirst().syncTable(MatrixOrderItem.class);
+        targetOrm.codeFirst().syncTable(MatrixCategory.class);
+
+        initSeedData(targetOrm);
+    }
+
+    private static void initSeedData(JavaOrm targetOrm) {
         LocalDateTime now = LocalDateTime.now();
 
         MatrixUser u1 = new MatrixUser();
@@ -245,7 +291,10 @@ public abstract class AbstractSqlMatrixTest {
         u4.setCreateTime(now);
         u4.setIsDeleted(0);
 
-        orm.insertBatch(Arrays.asList(u1, u2, u3, u4)).execute();
+        targetOrm.insert(u1);
+        targetOrm.insert(u2);
+        targetOrm.insert(u3);
+        targetOrm.insert(u4);
 
         MatrixOrder o1 = new MatrixOrder();
         o1.setUserId(u1.getId());
@@ -276,7 +325,10 @@ public abstract class AbstractSqlMatrixTest {
         o4.setStatus(1);
         o4.setCreateTime(now);
 
-        orm.insertBatch(Arrays.asList(o1, o2, o3, o4)).execute();
+        targetOrm.insert(o1);
+        targetOrm.insert(o2);
+        targetOrm.insert(o3);
+        targetOrm.insert(o4);
 
         // 订单明细
         MatrixOrderItem item1 = new MatrixOrderItem();
@@ -297,7 +349,9 @@ public abstract class AbstractSqlMatrixTest {
         item3.setPrice(new BigDecimal("299.00"));
         item3.setQuantity(1);
 
-        orm.insertBatch(Arrays.asList(item1, item2, item3)).execute();
+        targetOrm.insert(item1);
+        targetOrm.insert(item2);
+        targetOrm.insert(item3);
 
         // 分类（用于自连接）
         MatrixCategory c1 = new MatrixCategory();
@@ -316,13 +370,25 @@ public abstract class AbstractSqlMatrixTest {
         c4.setName("Laptop");
         c4.setParentId(2L);
 
-        orm.insertBatch(Arrays.asList(c1, c2, c3, c4)).execute();
+        targetOrm.insert(c1);
+        targetOrm.insert(c2);
+        targetOrm.insert(c3);
+        targetOrm.insert(c4);
     }
 
     /**
-     * 100% 全文本精确断言 5 大数据库方言生成的 SQL 和参数
+     * 在 MySQL、PostgreSQL、Oracle 严格模式三大真实隔离物理环境下全量执行测试动作
      */
-    protected static void assertMatrixSql(Supplier<Query> querySupplier,
+    protected static void verifyAllModes(Consumer<JavaOrm> verifier) {
+        verifier.accept(mysqlOrm);
+        verifier.accept(pgOrm);
+        verifier.accept(oracleOrm);
+    }
+
+    /**
+     * 100% 全文本精确断言 5 大数据库方言生成的 SQL 和参数（基于方言专属 ORM）
+     */
+    protected static void assertMatrixSql(Function<JavaOrm, Query<?>> queryFunc,
                                           String expectedMysql,
                                           String expectedPg,
                                           String expectedOracle,
@@ -332,33 +398,81 @@ public abstract class AbstractSqlMatrixTest {
         List<Object> expectedParamList = Arrays.asList(expectedParams);
 
         // 1. MySQL 断言
-        SqlAndParams mysqlResult = toSqlAndParams(querySupplier.get(), MYSQL);
+        SqlAndParams mysqlResult = toSqlAndParams(queryFunc.apply(mysqlOrm), MYSQL);
         Assert.assertEquals("MySQL 方言 SQL 不匹配", expectedMysql, mysqlResult.getSql());
         Assert.assertEquals("MySQL 方言参数不匹配", expectedParamList, mysqlResult.getParams());
 
         // 2. PostgreSQL 断言
-        SqlAndParams pgResult = toSqlAndParams(querySupplier.get(), PG);
+        SqlAndParams pgResult = toSqlAndParams(queryFunc.apply(pgOrm), PG);
         Assert.assertEquals("PostgreSQL 方言 SQL 不匹配", expectedPg, pgResult.getSql());
         Assert.assertEquals("PostgreSQL 方言参数不匹配", expectedParamList, pgResult.getParams());
 
-        // 3. Oracle 断言
-        SqlAndParams oracleResult = toSqlAndParams(querySupplier.get(), ORACLE);
+        // 3. Oracle 断言（使用严格 Oracle 字典全大写）
+        SqlAndParams oracleResult = toSqlAndParams(queryFunc.apply(oracleOrm), ORACLE);
         Assert.assertEquals("Oracle 方言 SQL 不匹配", expectedOracle, oracleResult.getSql());
         Assert.assertEquals("Oracle 方言参数不匹配", expectedParamList, oracleResult.getParams());
 
         // 4. SQLite 断言
-        SqlAndParams sqliteResult = toSqlAndParams(querySupplier.get(), SQLITE);
+        SqlAndParams sqliteResult = toSqlAndParams(queryFunc.apply(mysqlOrm), SQLITE);
         Assert.assertEquals("SQLite 方言 SQL 不匹配", expectedSqlite, sqliteResult.getSql());
         Assert.assertEquals("SQLite 方言参数不匹配", expectedParamList, sqliteResult.getParams());
 
         // 5. H2 断言
-        SqlAndParams h2Result = toSqlAndParams(querySupplier.get(), H2);
+        SqlAndParams h2Result = toSqlAndParams(queryFunc.apply(mysqlOrm), H2);
         Assert.assertEquals("H2 方言 SQL 不匹配", expectedH2, h2Result.getSql());
         Assert.assertEquals("H2 方言参数不匹配", expectedParamList, h2Result.getParams());
     }
 
     /**
-     * 支持针对不同方言独立指定参数列表的全文本精确断言（例如分页在 MySQL 为 [limit, offset]，在 Oracle 为 [offset, limit]）。
+     * 兼容重载：传入 Supplier<Query>
+     */
+    protected static void assertMatrixSql(Supplier<Query> querySupplier,
+                                          String expectedMysql,
+                                          String expectedPg,
+                                          String expectedOracle,
+                                          String expectedSqlite,
+                                          String expectedH2,
+                                          Object... expectedParams) {
+        assertMatrixSql(o -> querySupplier.get(), expectedMysql, expectedPg, expectedOracle, expectedSqlite, expectedH2, expectedParams);
+    }
+
+    /**
+     * 支持针对不同方言独立指定参数列表的全文本精确断言（基于方言专属 ORM）
+     */
+    protected static void assertMatrixSqlWithDialectParams(Function<JavaOrm, Query<?>> queryFunc,
+                                                          String expectedMysql, List<Object> expectedMysqlParams,
+                                                          String expectedPg, List<Object> expectedPgParams,
+                                                          String expectedOracle, List<Object> expectedOracleParams,
+                                                          String expectedSqlite, List<Object> expectedSqliteParams,
+                                                          String expectedH2, List<Object> expectedH2Params) {
+        // 1. MySQL 断言
+        SqlAndParams mysqlResult = toSqlAndParams(queryFunc.apply(mysqlOrm), MYSQL);
+        Assert.assertEquals("MySQL 方言 SQL 不匹配", expectedMysql, mysqlResult.getSql());
+        Assert.assertEquals("MySQL 方言参数不匹配", expectedMysqlParams, mysqlResult.getParams());
+
+        // 2. PostgreSQL 断言
+        SqlAndParams pgResult = toSqlAndParams(queryFunc.apply(pgOrm), PG);
+        Assert.assertEquals("PostgreSQL 方言 SQL 不匹配", expectedPg, pgResult.getSql());
+        Assert.assertEquals("PostgreSQL 方言参数不匹配", expectedPgParams, pgResult.getParams());
+
+        // 3. Oracle 断言
+        SqlAndParams oracleResult = toSqlAndParams(queryFunc.apply(oracleOrm), ORACLE);
+        Assert.assertEquals("Oracle 方言 SQL 不匹配", expectedOracle, oracleResult.getSql());
+        Assert.assertEquals("Oracle 方言参数不匹配", expectedOracleParams, oracleResult.getParams());
+
+        // 4. SQLite 断言
+        SqlAndParams sqliteResult = toSqlAndParams(queryFunc.apply(mysqlOrm), SQLITE);
+        Assert.assertEquals("SQLite 方言 SQL 不匹配", expectedSqlite, sqliteResult.getSql());
+        Assert.assertEquals("SQLite 方言参数不匹配", expectedSqliteParams, sqliteResult.getParams());
+
+        // 5. H2 断言
+        SqlAndParams h2Result = toSqlAndParams(queryFunc.apply(mysqlOrm), H2);
+        Assert.assertEquals("H2 方言 SQL 不匹配", expectedH2, h2Result.getSql());
+        Assert.assertEquals("H2 方言参数不匹配", expectedH2Params, h2Result.getParams());
+    }
+
+    /**
+     * 兼容重载：传入 Supplier<Query>
      */
     protected static void assertMatrixSqlWithDialectParams(Supplier<Query> querySupplier,
                                                           String expectedMysql, List<Object> expectedMysqlParams,
@@ -366,30 +480,12 @@ public abstract class AbstractSqlMatrixTest {
                                                           String expectedOracle, List<Object> expectedOracleParams,
                                                           String expectedSqlite, List<Object> expectedSqliteParams,
                                                           String expectedH2, List<Object> expectedH2Params) {
-        // 1. MySQL 断言
-        SqlAndParams mysqlResult = toSqlAndParams(querySupplier.get(), MYSQL);
-        Assert.assertEquals("MySQL 方言 SQL 不匹配", expectedMysql, mysqlResult.getSql());
-        Assert.assertEquals("MySQL 方言参数不匹配", expectedMysqlParams, mysqlResult.getParams());
-
-        // 2. PostgreSQL 断言
-        SqlAndParams pgResult = toSqlAndParams(querySupplier.get(), PG);
-        Assert.assertEquals("PostgreSQL 方言 SQL 不匹配", expectedPg, pgResult.getSql());
-        Assert.assertEquals("PostgreSQL 方言参数不匹配", expectedPgParams, pgResult.getParams());
-
-        // 3. Oracle 断言
-        SqlAndParams oracleResult = toSqlAndParams(querySupplier.get(), ORACLE);
-        Assert.assertEquals("Oracle 方言 SQL 不匹配", expectedOracle, oracleResult.getSql());
-        Assert.assertEquals("Oracle 方言参数不匹配", expectedOracleParams, oracleResult.getParams());
-
-        // 4. SQLite 断言
-        SqlAndParams sqliteResult = toSqlAndParams(querySupplier.get(), SQLITE);
-        Assert.assertEquals("SQLite 方言 SQL 不匹配", expectedSqlite, sqliteResult.getSql());
-        Assert.assertEquals("SQLite 方言参数不匹配", expectedSqliteParams, sqliteResult.getParams());
-
-        // 5. H2 断言
-        SqlAndParams h2Result = toSqlAndParams(querySupplier.get(), H2);
-        Assert.assertEquals("H2 方言 SQL 不匹配", expectedH2, h2Result.getSql());
-        Assert.assertEquals("H2 方言参数不匹配", expectedH2Params, h2Result.getParams());
+        assertMatrixSqlWithDialectParams(o -> querySupplier.get(),
+                expectedMysql, expectedMysqlParams,
+                expectedPg, expectedPgParams,
+                expectedOracle, expectedOracleParams,
+                expectedSqlite, expectedSqliteParams,
+                expectedH2, expectedH2Params);
     }
 
     protected static SqlAndParams toSqlAndParams(Query query, Dialect dialect) {

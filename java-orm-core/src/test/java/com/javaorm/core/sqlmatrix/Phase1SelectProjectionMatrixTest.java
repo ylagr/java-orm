@@ -25,33 +25,35 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
     @Test
     public void testSelectAllEntityColumns() {
         assertMatrixSql(
-                () -> orm.select(MatrixUser.class),
+                o -> o.select(MatrixUser.class),
                 "SELECT t0.`id`, t0.`username`, t0.`email`, t0.`age`, t0.`status`, t0.`score`, t0.`create_time`, t0.`is_deleted` FROM `matrix_user` t0",
                 "SELECT t0.\"id\", t0.\"username\", t0.\"email\", t0.\"age\", t0.\"status\", t0.\"score\", t0.\"create_time\", t0.\"is_deleted\" FROM \"matrix_user\" t0",
-                "SELECT t0.\"id\", t0.\"username\", t0.\"email\", t0.\"age\", t0.\"status\", t0.\"score\", t0.\"create_time\", t0.\"is_deleted\" FROM \"matrix_user\" t0",
+                "SELECT t0.\"ID\", t0.\"USERNAME\", t0.\"EMAIL\", t0.\"AGE\", t0.\"STATUS\", t0.\"SCORE\", t0.\"CREATE_TIME\", t0.\"IS_DELETED\" FROM \"MATRIX_USER\" t0",
                 "SELECT t0.\"id\", t0.\"username\", t0.\"email\", t0.\"age\", t0.\"status\", t0.\"score\", t0.\"create_time\", t0.\"is_deleted\" FROM \"matrix_user\" t0",
                 "SELECT t0.\"id\", t0.\"username\", t0.\"email\", t0.\"age\", t0.\"status\", t0.\"score\", t0.\"create_time\", t0.\"is_deleted\" FROM \"matrix_user\" t0"
         );
 
-        // 真实执行并校验实体数据
-        List<MatrixUser> users = orm.select(MatrixUser.class).list();
-        Assert.assertNotNull(users);
-        Assert.assertEquals(4, users.size());
+        // 真实在三大隔离环境 (MySQL, PostgreSQL, Oracle 严格模式) 执行并校验实体数据
+        verifyAllModes(o -> {
+            List<MatrixUser> users = o.select(MatrixUser.class).list();
+            Assert.assertNotNull(users);
+            Assert.assertEquals(4, users.size());
 
-        MatrixUser alice = users.stream().filter(u -> "alice".equals(u.getUsername())).findFirst().orElse(null);
-        Assert.assertNotNull(alice);
-        Assert.assertNotNull(alice.getId());
-        Assert.assertEquals("alice@example.com", alice.getEmail());
-        Assert.assertEquals(Integer.valueOf(20), alice.getAge());
-        Assert.assertEquals(Integer.valueOf(1), alice.getStatus());
-        Assert.assertEquals(new BigDecimal("95.50"), alice.getScore());
-        Assert.assertEquals(Integer.valueOf(0), alice.getIsDeleted());
-        Assert.assertNotNull(alice.getCreateTime());
+            MatrixUser alice = users.stream().filter(u -> "alice".equals(u.getUsername())).findFirst().orElse(null);
+            Assert.assertNotNull(alice);
+            Assert.assertNotNull(alice.getId());
+            Assert.assertEquals("alice@example.com", alice.getEmail());
+            Assert.assertEquals(Integer.valueOf(20), alice.getAge());
+            Assert.assertEquals(Integer.valueOf(1), alice.getStatus());
+            Assert.assertEquals(new BigDecimal("95.50"), alice.getScore());
+            Assert.assertEquals(Integer.valueOf(0), alice.getIsDeleted());
+            Assert.assertNotNull(alice.getCreateTime());
 
-        MatrixUser bob = users.stream().filter(u -> "bob".equals(u.getUsername())).findFirst().orElse(null);
-        Assert.assertNotNull(bob);
-        Assert.assertEquals(Integer.valueOf(25), bob.getAge());
-        Assert.assertEquals(new BigDecimal("88.00"), bob.getScore());
+            MatrixUser bob = users.stream().filter(u -> "bob".equals(u.getUsername())).findFirst().orElse(null);
+            Assert.assertNotNull(bob);
+            Assert.assertEquals(Integer.valueOf(25), bob.getAge());
+            Assert.assertEquals(new BigDecimal("88.00"), bob.getScore());
+        });
     }
 
     /**
@@ -64,26 +66,28 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
     public void testSelectSpecificColumns() {
         MatrixUser u = $(MatrixUser.class);
         assertMatrixSql(
-                () -> orm.select(MatrixUser.class).select(u.getId(), u.getUsername(), u.getAge()),
+                o -> o.select(MatrixUser.class).select(u.getId(), u.getUsername(), u.getAge()),
                 "SELECT t0.`id`, t0.`username`, t0.`age` FROM `matrix_user` t0",
                 "SELECT t0.\"id\", t0.\"username\", t0.\"age\" FROM \"matrix_user\" t0",
-                "SELECT t0.\"id\", t0.\"username\", t0.\"age\" FROM \"matrix_user\" t0",
+                "SELECT t0.\"ID\", t0.\"USERNAME\", t0.\"AGE\" FROM \"MATRIX_USER\" t0",
                 "SELECT t0.\"id\", t0.\"username\", t0.\"age\" FROM \"matrix_user\" t0",
                 "SELECT t0.\"id\", t0.\"username\", t0.\"age\" FROM \"matrix_user\" t0"
         );
 
-        // 真实执行并校验数据
-        List<MatrixUser> users = orm.select(MatrixUser.class).select(u.getId(), u.getUsername(), u.getAge()).list();
-        Assert.assertEquals(4, users.size());
+        // 真实在三大隔离环境下执行并校验数据
+        verifyAllModes(o -> {
+            List<MatrixUser> users = o.select(MatrixUser.class).select(u.getId(), u.getUsername(), u.getAge()).list();
+            Assert.assertEquals(4, users.size());
 
-        for (MatrixUser user : users) {
-            Assert.assertNotNull(user.getId());
-            Assert.assertNotNull(user.getUsername());
-            Assert.assertNotNull(user.getAge());
-            // 未选取的字段应该未被赋值（保持默认 null）
-            Assert.assertNull(user.getEmail());
-            Assert.assertNull(user.getScore());
-        }
+            for (MatrixUser user : users) {
+                Assert.assertNotNull(user.getId());
+                Assert.assertNotNull(user.getUsername());
+                Assert.assertNotNull(user.getAge());
+                // 未选取的字段应该未被赋值（保持默认 null）
+                Assert.assertNull(user.getEmail());
+                Assert.assertNull(user.getScore());
+            }
+        });
     }
 
     /**
@@ -96,21 +100,23 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
     public void testSelectWithTableAndColumnAlias() {
         MatrixUser u = $(MatrixUser.class);
         assertMatrixSql(
-                () -> orm.select(MatrixUser.class).as("u").select(u.getId(), col(u.getUsername()).as("user_name")),
+                o -> o.select(MatrixUser.class).as("u").select(u.getId(), col(u.getUsername()).as("user_name")),
                 "SELECT `u`.`id`, `u`.`username` AS `user_name` FROM `matrix_user` `u`",
                 "SELECT \"u\".\"id\", \"u\".\"username\" AS \"user_name\" FROM \"matrix_user\" \"u\"",
-                "SELECT \"u\".\"id\", \"u\".\"username\" AS \"user_name\" FROM \"matrix_user\" \"u\"",
+                "SELECT \"u\".\"ID\", \"u\".\"USERNAME\" AS \"user_name\" FROM \"MATRIX_USER\" \"u\"",
                 "SELECT \"u\".\"id\", \"u\".\"username\" AS \"user_name\" FROM \"matrix_user\" \"u\"",
                 "SELECT \"u\".\"id\", \"u\".\"username\" AS \"user_name\" FROM \"matrix_user\" \"u\""
         );
 
         // 真实执行并校验 Map 数据
-        List<Map<String, Object>> maps = orm.select(MatrixUser.class).as("u").select(u.getId(), col(u.getUsername()).as("user_name")).maps();
-        Assert.assertEquals(4, maps.size());
-        Map<String, Object> first = maps.get(0);
-        Assert.assertTrue("结果集必须包含别名列 user_name", first.containsKey("user_name") || first.containsKey("USER_NAME"));
-        Object nameVal = first.get("user_name") != null ? first.get("user_name") : first.get("USER_NAME");
-        Assert.assertNotNull(nameVal);
+        verifyAllModes(o -> {
+            List<Map<String, Object>> maps = o.select(MatrixUser.class).as("u").select(u.getId(), col(u.getUsername()).as("user_name")).maps();
+            Assert.assertEquals(4, maps.size());
+            Map<String, Object> first = maps.get(0);
+            Assert.assertTrue("结果集必须包含别名列 user_name", first.containsKey("user_name") || first.containsKey("USER_NAME"));
+            Object nameVal = first.get("user_name") != null ? first.get("user_name") : first.get("USER_NAME");
+            Assert.assertNotNull(nameVal);
+        });
     }
 
     /**
@@ -123,18 +129,19 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
     public void testSelectDistinct() {
         MatrixUser u = $(MatrixUser.class);
         assertMatrixSql(
-                () -> orm.select(MatrixUser.class).distinct().select(u.getStatus(), u.getAge()),
+                o -> o.select(MatrixUser.class).distinct().select(u.getStatus(), u.getAge()),
                 "SELECT DISTINCT t0.`status`, t0.`age` FROM `matrix_user` t0",
                 "SELECT DISTINCT t0.\"status\", t0.\"age\" FROM \"matrix_user\" t0",
-                "SELECT DISTINCT t0.\"status\", t0.\"age\" FROM \"matrix_user\" t0",
+                "SELECT DISTINCT t0.\"STATUS\", t0.\"AGE\" FROM \"MATRIX_USER\" t0",
                 "SELECT DISTINCT t0.\"status\", t0.\"age\" FROM \"matrix_user\" t0",
                 "SELECT DISTINCT t0.\"status\", t0.\"age\" FROM \"matrix_user\" t0"
         );
 
         // 真实执行并校验去重结果
-        List<MatrixUser> list = orm.select(MatrixUser.class).distinct().select(u.getStatus(), u.getAge()).list();
-        // 原本 4 条数据：(1, 20), (1, 25), (0, 30), (1, 20) -> 去重后应恰好为 3 条！
-        Assert.assertEquals("DISTINCT 去重后应为 3 条", 3, list.size());
+        verifyAllModes(o -> {
+            List<MatrixUser> list = o.select(MatrixUser.class).distinct().select(u.getStatus(), u.getAge()).list();
+            Assert.assertEquals("DISTINCT 去重后应为 3 条", 3, list.size());
+        });
     }
 
     /**
@@ -149,29 +156,31 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
 
         // 1. COUNT(*) 校验
         assertMatrixSql(
-                () -> orm.select(MatrixUser.class).select(count()),
+                o -> o.select(MatrixUser.class).select(count()),
                 "SELECT COUNT(1) FROM `matrix_user` t0",
                 "SELECT COUNT(1) FROM \"matrix_user\" t0",
-                "SELECT COUNT(1) FROM \"matrix_user\" t0",
+                "SELECT COUNT(1) FROM \"MATRIX_USER\" t0",
                 "SELECT COUNT(1) FROM \"matrix_user\" t0",
                 "SELECT COUNT(1) FROM \"matrix_user\" t0"
         );
-        long totalCount = orm.select(MatrixUser.class).count();
-        Assert.assertEquals(4L, totalCount);
+        verifyAllModes(o -> {
+            long totalCount = o.select(MatrixUser.class).count();
+            Assert.assertEquals(4L, totalCount);
+        });
 
         // 2. COUNT(col) 校验
         assertMatrixSql(
-                () -> orm.select(MatrixUser.class).select(count(u.getId()).as("user_count")),
+                o -> o.select(MatrixUser.class).select(count(u.getId()).as("user_count")),
                 "SELECT COUNT(t0.`id`) AS `user_count` FROM `matrix_user` t0",
                 "SELECT COUNT(t0.\"id\") AS \"user_count\" FROM \"matrix_user\" t0",
-                "SELECT COUNT(t0.\"id\") AS \"user_count\" FROM \"matrix_user\" t0",
+                "SELECT COUNT(t0.\"ID\") AS \"user_count\" FROM \"MATRIX_USER\" t0",
                 "SELECT COUNT(t0.\"id\") AS \"user_count\" FROM \"matrix_user\" t0",
                 "SELECT COUNT(t0.\"id\") AS \"user_count\" FROM \"matrix_user\" t0"
         );
 
         // 3. SUM, AVG, MIN, MAX 组合投影与计算值校验
         assertMatrixSql(
-                () -> orm.select(MatrixUser.class).select(
+                o -> o.select(MatrixUser.class).select(
                         sum(u.getScore()).as("total_score"),
                         avg(u.getAge()).as("avg_age"),
                         min(u.getAge()).as("min_age"),
@@ -179,29 +188,30 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
                 ),
                 "SELECT SUM(t0.`score`) AS `total_score`, AVG(t0.`age`) AS `avg_age`, MIN(t0.`age`) AS `min_age`, MAX(t0.`age`) AS `max_age` FROM `matrix_user` t0",
                 "SELECT SUM(t0.\"score\") AS \"total_score\", AVG(t0.\"age\") AS \"avg_age\", MIN(t0.\"age\") AS \"min_age\", MAX(t0.\"age\") AS \"max_age\" FROM \"matrix_user\" t0",
-                "SELECT SUM(t0.\"score\") AS \"total_score\", AVG(t0.\"age\") AS \"avg_age\", MIN(t0.\"age\") AS \"min_age\", MAX(t0.\"age\") AS \"max_age\" FROM \"matrix_user\" t0",
+                "SELECT SUM(t0.\"SCORE\") AS \"total_score\", AVG(t0.\"AGE\") AS \"avg_age\", MIN(t0.\"AGE\") AS \"min_age\", MAX(t0.\"AGE\") AS \"max_age\" FROM \"MATRIX_USER\" t0",
                 "SELECT SUM(t0.\"score\") AS \"total_score\", AVG(t0.\"age\") AS \"avg_age\", MIN(t0.\"age\") AS \"min_age\", MAX(t0.\"age\") AS \"max_age\" FROM \"matrix_user\" t0",
                 "SELECT SUM(t0.\"score\") AS \"total_score\", AVG(t0.\"age\") AS \"avg_age\", MIN(t0.\"age\") AS \"min_age\", MAX(t0.\"age\") AS \"max_age\" FROM \"matrix_user\" t0"
         );
 
-        List<Map<String, Object>> aggList = orm.select(MatrixUser.class).select(
-                sum(u.getScore()).as("total_score"),
-                avg(u.getAge()).as("avg_age"),
-                min(u.getAge()).as("min_age"),
-                max(u.getAge()).as("max_age")
-        ).maps();
-        Assert.assertFalse(aggList.isEmpty());
-        Map<String, Object> aggMap = aggList.get(0);
+        verifyAllModes(o -> {
+            List<Map<String, Object>> aggList = o.select(MatrixUser.class).select(
+                    sum(u.getScore()).as("total_score"),
+                    avg(u.getAge()).as("avg_age"),
+                    min(u.getAge()).as("min_age"),
+                    max(u.getAge()).as("max_age")
+            ).maps();
+            Assert.assertFalse(aggList.isEmpty());
+            Map<String, Object> aggMap = aggList.get(0);
 
-        // 兼容大写/小写 Key (H2在不同模式下可能大写)
-        Number totalScore = (Number) (aggMap.get("total_score") != null ? aggMap.get("total_score") : aggMap.get("TOTAL_SCORE"));
-        Number minAge = (Number) (aggMap.get("min_age") != null ? aggMap.get("min_age") : aggMap.get("MIN_AGE"));
-        Number maxAge = (Number) (aggMap.get("max_age") != null ? aggMap.get("max_age") : aggMap.get("MAX_AGE"));
+            // 兼容大写/小写 Key
+            Number totalScore = (Number) (aggMap.get("total_score") != null ? aggMap.get("total_score") : aggMap.get("TOTAL_SCORE"));
+            Number minAge = (Number) (aggMap.get("min_age") != null ? aggMap.get("min_age") : aggMap.get("MIN_AGE"));
+            Number maxAge = (Number) (aggMap.get("max_age") != null ? aggMap.get("max_age") : aggMap.get("MAX_AGE"));
 
-        // 95.50 + 88.00 + 72.50 + 60.00 = 316.00
-        Assert.assertEquals(316.0, totalScore.doubleValue(), 0.01);
-        Assert.assertEquals(20, minAge.intValue());
-        Assert.assertEquals(30, maxAge.intValue());
+            Assert.assertEquals(316.0, totalScore.doubleValue(), 0.01);
+            Assert.assertEquals(20, minAge.intValue());
+            Assert.assertEquals(30, maxAge.intValue());
+        });
     }
 
     /**
@@ -213,31 +223,35 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
     @Test
     public void testArithmeticExpressionProjection() {
         assertMatrixSql(
-                () -> orm.select(MatrixUser.class).select(
+                o -> o.select(MatrixUser.class).select(
                         raw("age + 1").as("next_age"),
                         raw("score * 0.8").as("discount_score")
                 ),
                 "SELECT age + 1 AS `next_age`, score * 0.8 AS `discount_score` FROM `matrix_user` t0",
                 "SELECT age + 1 AS \"next_age\", score * 0.8 AS \"discount_score\" FROM \"matrix_user\" t0",
-                "SELECT age + 1 AS \"next_age\", score * 0.8 AS \"discount_score\" FROM \"matrix_user\" t0",
+                "SELECT age + 1 AS \"next_age\", score * 0.8 AS \"discount_score\" FROM \"MATRIX_USER\" t0",
                 "SELECT age + 1 AS \"next_age\", score * 0.8 AS \"discount_score\" FROM \"matrix_user\" t0",
                 "SELECT age + 1 AS \"next_age\", score * 0.8 AS \"discount_score\" FROM \"matrix_user\" t0"
         );
 
-        List<Map<String, Object>> exprList = orm.select(MatrixUser.class)
-                .select(
-                        raw("age + 1").as("next_age"),
-                        raw("score * 0.8").as("discount_score")
-                )
-                .where().eq($(MatrixUser.class).getUsername(), "alice")
-                .maps();
+        verifyAllModes(o -> {
+            // 在严格 Oracle 模式下，未被 quote 的列名在建表时是大写 "AGE", "SCORE"，在 H2 Oracle 模式下 raw("age + 1") / raw("\"AGE\" + 1")
+            // 注意：H2 MODE=Oracle 下不带引号的标识符不区分大小写，或者大写匹配
+            List<Map<String, Object>> exprList = o.select(MatrixUser.class)
+                    .select(
+                            raw("age + 1").as("next_age"),
+                            raw("score * 0.8").as("discount_score")
+                    )
+                    .where().eq($(MatrixUser.class).getUsername(), "alice")
+                    .maps();
 
-        Assert.assertEquals(1, exprList.size());
-        Map<String, Object> aliceExpr = exprList.get(0);
-        Number nextAge = (Number) (aliceExpr.get("next_age") != null ? aliceExpr.get("next_age") : aliceExpr.get("NEXT_AGE"));
-        Number discountScore = (Number) (aliceExpr.get("discount_score") != null ? aliceExpr.get("discount_score") : aliceExpr.get("DISCOUNT_SCORE"));
+            Assert.assertEquals(1, exprList.size());
+            Map<String, Object> aliceExpr = exprList.get(0);
+            Number nextAge = (Number) (aliceExpr.get("next_age") != null ? aliceExpr.get("next_age") : aliceExpr.get("NEXT_AGE"));
+            Number discountScore = (Number) (aliceExpr.get("discount_score") != null ? aliceExpr.get("discount_score") : aliceExpr.get("DISCOUNT_SCORE"));
 
-        Assert.assertEquals(21, nextAge.intValue());
-        Assert.assertEquals(76.4, discountScore.doubleValue(), 0.01);
+            Assert.assertEquals(21, nextAge.intValue());
+            Assert.assertEquals(76.4, discountScore.doubleValue(), 0.01);
+        });
     }
 }

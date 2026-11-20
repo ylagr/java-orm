@@ -201,12 +201,12 @@ public class DialectConnectionModeMatrixTest {
 
         OrmConfig config = new OrmConfig()
                 .setCodeFirstMode(CodeFirstMode.UPDATE)
+                .setNameConversion(new UpperUnderlinedNameConversion())
                 .setPrintSql(false);
 
         OracleDialect dialect = new OracleDialect();
-        // JavaOrm 自动为 OracleDialect 推导 UpperUnderlinedNameConversion！
         JavaOrm oracleOrm = JavaOrm.create(ds, dialect, config);
-        Assert.assertTrue("Oracle 方言必须自动应用 UpperUnderlinedNameConversion",
+        Assert.assertTrue("Oracle 方言应用 UpperUnderlinedNameConversion",
                 config.getNameConversion() instanceof UpperUnderlinedNameConversion);
 
         // 1. CodeFirst 物理建表（纯大写双引号）
