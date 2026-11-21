@@ -6,7 +6,9 @@ import com.javaorm.core.annotation.JoColumn;
 import com.javaorm.core.annotation.JoGeneratedValue;
 import com.javaorm.core.annotation.JoId;
 import com.javaorm.core.annotation.JoLogicDelete;
+import com.javaorm.core.annotation.JoNavigate;
 import com.javaorm.core.annotation.JoTable;
+import com.javaorm.core.annotation.RelationType;
 import com.javaorm.core.codefirst.CodeFirstMode;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.Dialect;
@@ -103,6 +105,11 @@ public abstract class AbstractSqlMatrixTest {
         public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
         public Integer getIsDeleted() { return isDeleted; }
         public void setIsDeleted(Integer isDeleted) { this.isDeleted = isDeleted; }
+
+        @JoNavigate(value = RelationType.ONE_TO_MANY, selfProperty = "id", targetProperty = "userId")
+        private List<MatrixOrder> orders;
+        public List<MatrixOrder> getOrders() { return orders; }
+        public void setOrders(List<MatrixOrder> orders) { this.orders = orders; }
     }
 
     // 测试实体 2：订单表
@@ -124,6 +131,12 @@ public abstract class AbstractSqlMatrixTest {
 
         private LocalDateTime createTime;
 
+        @JoNavigate(value = RelationType.MANY_TO_ONE, selfProperty = "userId", targetProperty = "id")
+        private MatrixUser user;
+
+        @JoNavigate(value = RelationType.ONE_TO_MANY, selfProperty = "id", targetProperty = "orderId")
+        private List<MatrixOrderItem> items;
+
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
         public Long getUserId() { return userId; }
@@ -136,6 +149,10 @@ public abstract class AbstractSqlMatrixTest {
         public void setStatus(Integer status) { this.status = status; }
         public LocalDateTime getCreateTime() { return createTime; }
         public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
+        public MatrixUser getUser() { return user; }
+        public void setUser(MatrixUser user) { this.user = user; }
+        public List<MatrixOrderItem> getItems() { return items; }
+        public void setItems(List<MatrixOrderItem> items) { this.items = items; }
     }
 
     // 测试实体 3：订单明细项表
@@ -155,6 +172,9 @@ public abstract class AbstractSqlMatrixTest {
 
         private Integer quantity;
 
+        @JoNavigate(value = RelationType.MANY_TO_ONE, selfProperty = "orderId", targetProperty = "id")
+        private MatrixOrder order;
+
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
         public Long getOrderId() { return orderId; }
@@ -165,6 +185,8 @@ public abstract class AbstractSqlMatrixTest {
         public void setPrice(BigDecimal price) { this.price = price; }
         public Integer getQuantity() { return quantity; }
         public void setQuantity(Integer quantity) { this.quantity = quantity; }
+        public MatrixOrder getOrder() { return order; }
+        public void setOrder(MatrixOrder order) { this.order = order; }
     }
 
     // 测试实体 4：分类表（用于自连接与笛卡尔积测试）

@@ -127,7 +127,7 @@ public class IncludeProcessor {
         for (Object target : allTargets) {
             Object pkVal = targetPkCol != null ? targetPkCol.getValue(target) : null;
             if (pkVal != null) {
-                targetMap.put(pkVal, target);
+                targetMap.put(normalizeKey(pkVal), target);
             }
         }
 
@@ -135,7 +135,7 @@ public class IncludeProcessor {
         for (T entity : rootEntities) {
             Object fk = selfFkCol.getValue(entity);
             if (fk != null) {
-                Object matched = targetMap.get(fk);
+                Object matched = targetMap.get(normalizeKey(fk));
                 relation.setValue(entity, matched);
             }
         }
@@ -188,15 +188,23 @@ public class IncludeProcessor {
         for (Object child : allChildren) {
             Object fkVal = childFkCol != null ? childFkCol.getValue(child) : null;
             if (fkVal != null) {
-                groupedChildren.computeIfAbsent(fkVal, k -> new ArrayList<>()).add(child);
+                groupedChildren.computeIfAbsent(normalizeKey(fkVal), k -> new ArrayList<>()).add(child);
             }
         }
 
         // 装配 List<Child> 回根实体
         for (T entity : rootEntities) {
             Object id = selfPkCol.getValue(entity);
-            List<Object> list = groupedChildren.getOrDefault(id, new ArrayList<>());
+            List<Object> list = groupedChildren.getOrDefault(normalizeKey(id), new ArrayList<>());
             relation.setValue(entity, list);
         }
+    }
+
+    private static Object normalizeKey(Object key) {
+        if (key == null) return null;
+        if (key instanceof Number) {
+            return ((Number) key).longValue();
+        }
+        return key.toString();
     }
 }

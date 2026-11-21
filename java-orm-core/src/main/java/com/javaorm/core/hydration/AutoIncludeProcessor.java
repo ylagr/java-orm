@@ -394,12 +394,16 @@ public class AutoIncludeProcessor {
                 rawVal = row.get(name);
             } else if (row.containsKey(name.toLowerCase())) {
                 rawVal = row.get(name.toLowerCase());
+            } else if (row.containsKey(name.toUpperCase())) {
+                rawVal = row.get(name.toUpperCase());
             } else {
                 String underscore = toUnderscore(name);
                 if (row.containsKey(underscore)) {
                     rawVal = row.get(underscore);
                 } else if (row.containsKey(underscore.toLowerCase())) {
                     rawVal = row.get(underscore.toLowerCase());
+                } else if (row.containsKey(underscore.toUpperCase())) {
+                    rawVal = row.get(underscore.toUpperCase());
                 }
             }
 
@@ -504,9 +508,11 @@ public class AutoIncludeProcessor {
             if (propName != null) {
                 if (row.containsKey(propName)) return row.get(propName);
                 if (row.containsKey(propName.toLowerCase())) return row.get(propName.toLowerCase());
+                if (row.containsKey(propName.toUpperCase())) return row.get(propName.toUpperCase());
                 String und = toUnderscore(propName);
                 if (row.containsKey(und)) return row.get(und);
                 if (row.containsKey(und.toLowerCase())) return row.get(und.toLowerCase());
+                if (row.containsKey(und.toUpperCase())) return row.get(und.toUpperCase());
             }
         }
 

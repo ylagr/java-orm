@@ -3332,4 +3332,31 @@ public class WhereBuilder<T> implements Query<T> {
         }
         throw new IllegalStateException("selectAutoInclude requires a SelectBuilder root query");
     }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public WhereBuilder<T> include(Function<T, ?> relationGetter) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder) rootQuery).include(relationGetter);
+            return this;
+        }
+        throw new IllegalStateException("include requires a SelectBuilder root query");
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <R> WhereBuilder<T> include(Function<T, ?> relationGetter, Consumer<SelectBuilder<R>> config) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder) rootQuery).include(relationGetter, config);
+            return this;
+        }
+        throw new IllegalStateException("include requires a SelectBuilder root query");
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <R> WhereBuilder<T> include(Function<T, ?> relationGetter, java.util.function.BiConsumer<SelectBuilder<R>, R> biConfig) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder) rootQuery).include(relationGetter, biConfig);
+            return this;
+        }
+        throw new IllegalStateException("include requires a SelectBuilder root query");
+    }
 }
