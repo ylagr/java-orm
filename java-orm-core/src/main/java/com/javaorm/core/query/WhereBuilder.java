@@ -3359,4 +3359,103 @@ public class WhereBuilder<T> implements Query<T> {
         }
         throw new IllegalStateException("include requires a SelectBuilder root query");
     }
+
+    public <R> WhereBuilder<T> include(R relationProxy) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder<?>) rootQuery).include(relationProxy);
+            return this;
+        }
+        throw new IllegalStateException("include requires a SelectBuilder root query");
+    }
+
+    public <R> WhereBuilder<T> include(R relationProxy, Consumer<SelectBuilder<R>> config) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder<?>) rootQuery).include(relationProxy, config);
+            return this;
+        }
+        throw new IllegalStateException("include requires a SelectBuilder root query");
+    }
+
+    public <R> WhereBuilder<T> include(R relationProxy, java.util.function.BiConsumer<SelectBuilder<R>, R> biConfig) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder<?>) rootQuery).include(relationProxy, biConfig);
+            return this;
+        }
+        throw new IllegalStateException("include requires a SelectBuilder root query");
+    }
+
+    public <E> WhereBuilder<T> include(Collection<E> relationProxy) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder<?>) rootQuery).include(relationProxy);
+            return this;
+        }
+        throw new IllegalStateException("include requires a SelectBuilder root query");
+    }
+
+    public <E> WhereBuilder<T> include(Collection<E> relationProxy, Consumer<SelectBuilder<E>> config) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder<?>) rootQuery).include(relationProxy, config);
+            return this;
+        }
+        throw new IllegalStateException("include requires a SelectBuilder root query");
+    }
+
+    public <E> WhereBuilder<T> include(Collection<E> relationProxy, java.util.function.BiConsumer<SelectBuilder<E>, E> biConfig) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder<?>) rootQuery).include(relationProxy, biConfig);
+            return this;
+        }
+        throw new IllegalStateException("include requires a SelectBuilder root query");
+    }
+
+    /**
+     * EasyQuery 集合关联加载规范：1对多/多对多使用 includes (复数)，彻底避免 Java 双泛型重载导致的 lambda 编译推导歧义与强转
+     */
+    public <E> WhereBuilder<T> includes(Collection<E> relationProxy) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder<?>) rootQuery).includes(relationProxy);
+            return this;
+        }
+        throw new IllegalStateException("includes requires a SelectBuilder root query");
+    }
+
+    public <E> WhereBuilder<T> includes(Collection<E> relationProxy, Consumer<SelectBuilder<E>> config) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder<?>) rootQuery).includes(relationProxy, config);
+            return this;
+        }
+        throw new IllegalStateException("includes requires a SelectBuilder root query");
+    }
+
+    public <E> WhereBuilder<T> includes(Collection<E> relationProxy, java.util.function.BiConsumer<SelectBuilder<E>, E> biConfig) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder<?>) rootQuery).includes(relationProxy, biConfig);
+            return this;
+        }
+        throw new IllegalStateException("includes requires a SelectBuilder root query");
+    }
+
+    public <E> WhereBuilder<T> includes(Function<T, Collection<E>> relationGetter) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder<T>) rootQuery).includes(relationGetter);
+            return this;
+        }
+        throw new IllegalStateException("includes requires a SelectBuilder root query");
+    }
+
+    public <E> WhereBuilder<T> includes(Function<T, Collection<E>> relationGetter, Consumer<SelectBuilder<E>> config) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder<T>) rootQuery).includes(relationGetter, config);
+            return this;
+        }
+        throw new IllegalStateException("includes requires a SelectBuilder root query");
+    }
+
+    public <E> WhereBuilder<T> includes(Function<T, Collection<E>> relationGetter, java.util.function.BiConsumer<SelectBuilder<E>, E> biConfig) {
+        if (rootQuery instanceof SelectBuilder) {
+            ((SelectBuilder<T>) rootQuery).includes(relationGetter, biConfig);
+            return this;
+        }
+        throw new IllegalStateException("includes requires a SelectBuilder root query");
+    }
 }

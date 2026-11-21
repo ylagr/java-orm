@@ -124,7 +124,7 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
     // =========================================================================
 
     /**
-     * 1.1 include ManyToOne 实体装配：orm.select(MatrixOrder.class).include(MatrixOrder::getUser)
+     * 1.1 include ManyToOne 实体装配：orm.proxy(MatrixOrder.class) -> include(ord.getUser())
      * 校验点：
      * 1. 主 SQL 5 大方言全文本精确断言；
      * 2. 在 MySQL, PostgreSQL, Oracle 3 大真实隔离模式下执行，严格校验返回的每个订单及回填的用户数据。
@@ -132,7 +132,10 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
     @Test
     public void testEntityIncludeManyToOne() {
         assertMatrixSql(
-                o -> o.select(MatrixOrder.class).orderBy(MatrixOrder::getId).asc().include(MatrixOrder::getUser),
+                o -> {
+                    MatrixOrder ord = o.proxy(MatrixOrder.class);
+                    return o.select(MatrixOrder.class).orderBy(ord.getId()).asc().include(ord.getUser());
+                },
                 "SELECT t0.`id`, t0.`user_id`, t0.`order_no`, t0.`amount`, t0.`status`, t0.`create_time` FROM `matrix_order` t0 ORDER BY t0.`id` ASC",
                 "SELECT t0.\"id\", t0.\"user_id\", t0.\"order_no\", t0.\"amount\", t0.\"status\", t0.\"create_time\" FROM \"matrix_order\" t0 ORDER BY t0.\"id\" ASC",
                 "SELECT t0.\"ID\", t0.\"USER_ID\", t0.\"ORDER_NO\", t0.\"AMOUNT\", t0.\"STATUS\", t0.\"CREATE_TIME\" FROM \"MATRIX_ORDER\" t0 ORDER BY t0.\"ID\" ASC",
@@ -141,9 +144,10 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
         );
 
         verifyAllModes(o -> {
+            MatrixOrder ord = o.proxy(MatrixOrder.class);
             List<MatrixOrder> orders = o.select(MatrixOrder.class)
-                    .orderBy(MatrixOrder::getId).asc()
-                    .include(MatrixOrder::getUser)
+                    .orderBy(ord.getId()).asc()
+                    .include(ord.getUser())
                     .list();
 
             Assert.assertNotNull(orders);
@@ -176,12 +180,15 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
     }
 
     /**
-     * 1.2 include OneToMany 实体集合装配：orm.select(MatrixOrder.class).include(MatrixOrder::getItems)
+     * 1.2 include OneToMany 实体集合装配：orm.proxy(MatrixOrder.class) -> include(ord.getItems())
      */
     @Test
     public void testEntityIncludeOneToMany() {
         assertMatrixSql(
-                o -> o.select(MatrixOrder.class).orderBy(MatrixOrder::getId).asc().include(MatrixOrder::getItems),
+                o -> {
+                    MatrixOrder ord = o.proxy(MatrixOrder.class);
+                    return o.select(MatrixOrder.class).orderBy(ord.getId()).asc().include(ord.getItems());
+                },
                 "SELECT t0.`id`, t0.`user_id`, t0.`order_no`, t0.`amount`, t0.`status`, t0.`create_time` FROM `matrix_order` t0 ORDER BY t0.`id` ASC",
                 "SELECT t0.\"id\", t0.\"user_id\", t0.\"order_no\", t0.\"amount\", t0.\"status\", t0.\"create_time\" FROM \"matrix_order\" t0 ORDER BY t0.\"id\" ASC",
                 "SELECT t0.\"ID\", t0.\"USER_ID\", t0.\"ORDER_NO\", t0.\"AMOUNT\", t0.\"STATUS\", t0.\"CREATE_TIME\" FROM \"MATRIX_ORDER\" t0 ORDER BY t0.\"ID\" ASC",
@@ -190,9 +197,10 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
         );
 
         verifyAllModes(o -> {
+            MatrixOrder ord = o.proxy(MatrixOrder.class);
             List<MatrixOrder> orders = o.select(MatrixOrder.class)
-                    .orderBy(MatrixOrder::getId).asc()
-                    .include(MatrixOrder::getItems)
+                    .orderBy(ord.getId()).asc()
+                    .include(ord.getItems())
                     .list();
 
             Assert.assertNotNull(orders);
@@ -225,13 +233,15 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
 
     /**
      * 1.3 双向与多级嵌套实体装配：User -> Orders -> Items
+     * 采用 EasyQuery 规范：单实体 include，集合实体 includes (复数) + (q, childProxy) -> ... 零强转规范
      */
     @Test
     public void testEntityIncludeMultiLevelNested() {
         verifyAllModes(o -> {
+            MatrixUser u = o.proxy(MatrixUser.class);
             List<MatrixUser> users = o.select(MatrixUser.class)
-                    .where().eq(MatrixUser::getUsername, "alice")
-                    .include(MatrixUser::getOrders, (Consumer<SelectBuilder<MatrixOrder>>) q -> q.include(MatrixOrder::getItems))
+                    .where().eq(u.getUsername(), "alice")
+                    .includes(u.getOrders(), (q, ord) -> q.includes(ord.getItems()))
                     .list();
 
             Assert.assertNotNull(users);
@@ -257,13 +267,15 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
 
     /**
      * 1.4 带有独立子条件过滤的 include 装配：只回填金额 >= 200 的订单
+     * 采用 EasyQuery 集合 includes(relation, (q, ord) -> ...) 零强转规范
      */
     @Test
     public void testEntityIncludeWithCondition() {
         verifyAllModes(o -> {
+            MatrixUser u = o.proxy(MatrixUser.class);
             List<MatrixUser> users = o.select(MatrixUser.class)
-                    .where().eq(MatrixUser::getUsername, "alice")
-                    .include(MatrixUser::getOrders, (Consumer<SelectBuilder<MatrixOrder>>) q -> q.where().ge(MatrixOrder::getAmount, new BigDecimal("200.00")))
+                    .where().eq(u.getUsername(), "alice")
+                    .includes(u.getOrders(), (q, ord) -> q.where().ge(ord.getAmount(), new BigDecimal("200.00")))
                     .list();
 
             Assert.assertNotNull(users);
@@ -274,6 +286,34 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
             // ORD-001 (199.90) 被过滤，只有 ORD-002 (299.00) 被回填
             Assert.assertEquals(1, alice.getOrders().size());
             Assert.assertEquals("ORD-002", alice.getOrders().get(0).getOrderNo());
+        });
+    }
+
+    /**
+     * 1.5 ManyToOne 带有独立子条件过滤的 include 装配：只有指定条件的关联方才回填
+     * 采用 include(ord.getUser(), (q, userProxy) -> ...) 零强转规范
+     */
+    @Test
+    public void testEntityIncludeManyToOneWithCondition() {
+        verifyAllModes(o -> {
+            MatrixOrder ord = o.proxy(MatrixOrder.class);
+            List<MatrixOrder> orders = o.select(MatrixOrder.class)
+                    .orderBy(ord.getId()).asc()
+                    .include(ord.getUser(), (q, u) -> q.where().eq(u.getUsername(), "bob"))
+                    .list();
+
+            Assert.assertNotNull(orders);
+            Assert.assertEquals(4, orders.size());
+
+            // ORD-001 (user is alice, does not match filter bob -> null)
+            Assert.assertNull(orders.get(0).getUser());
+            // ORD-002 (user is alice -> null)
+            Assert.assertNull(orders.get(1).getUser());
+            // ORD-003 (user is bob -> hydrated)
+            Assert.assertNotNull(orders.get(2).getUser());
+            Assert.assertEquals("bob", orders.get(2).getUser().getUsername());
+            // ORD-999 -> null
+            Assert.assertNull(orders.get(3).getUser());
         });
     }
 
@@ -314,7 +354,8 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
 
             // 在 WhereBuilder 链式后调用实体同样拦截
             try {
-                o.select(MatrixUser.class).where().eq(MatrixUser::getId, 1L).selectAutoInclude(MatrixUser.class);
+                MatrixUser u = o.proxy(MatrixUser.class);
+                o.select(MatrixUser.class).where().eq(u.getId(), 1L).selectAutoInclude(MatrixUser.class);
                 Assert.fail("Expected IllegalArgumentException on WhereBuilder");
             } catch (IllegalArgumentException e) {
                 Assert.assertTrue(e.getMessage().contains("selectAutoInclude only supports DTO/VO class, cannot be used on Entity class"));
@@ -351,8 +392,9 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
     @Test
     public void testSelectAutoIncludeManyToOneExecution() {
         verifyAllModes(o -> {
+            MatrixOrder ord = o.proxy(MatrixOrder.class);
             List<MatrixOrderDto> orders = o.select(MatrixOrder.class)
-                    .orderBy(MatrixOrder::getId).asc()
+                    .orderBy(ord.getId()).asc()
                     .selectAutoInclude(MatrixOrderDto.class)
                     .list();
 
@@ -392,8 +434,9 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
     @Test
     public void testSelectAutoIncludeWithoutFkInDto() {
         verifyAllModes(o -> {
+            MatrixOrder ord = o.proxy(MatrixOrder.class);
             List<MatrixOrderWithoutFkDto> orders = o.select(MatrixOrder.class)
-                    .orderBy(MatrixOrder::getId).asc()
+                    .orderBy(ord.getId()).asc()
                     .selectAutoInclude(MatrixOrderWithoutFkDto.class)
                     .list();
 
@@ -418,8 +461,9 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
     @Test
     public void testSelectAutoIncludeOneToManyExecution() {
         verifyAllModes(o -> {
+            MatrixOrder ord = o.proxy(MatrixOrder.class);
             List<MatrixOrderWithItemsDto> orders = o.select(MatrixOrder.class)
-                    .orderBy(MatrixOrder::getId).asc()
+                    .orderBy(ord.getId()).asc()
                     .selectAutoInclude(MatrixOrderWithItemsDto.class)
                     .list();
 
@@ -455,8 +499,9 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
     @Test
     public void testSelectAutoIncludeMultiLevelRecursiveExecution() {
         verifyAllModes(o -> {
+            MatrixUser u = o.proxy(MatrixUser.class);
             MatrixUserWithOrdersAndItemsDto alice = o.select(MatrixUser.class)
-                    .where().eq(MatrixUser::getUsername, "alice")
+                    .where().eq(u.getUsername(), "alice")
                     .selectAutoInclude(MatrixUserWithOrdersAndItemsDto.class)
                     .firstOrNull();
 
@@ -489,9 +534,10 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
     @Test
     public void testSelectAutoIncludeTerminalAndPaging() {
         verifyAllModes(o -> {
+            MatrixOrder ord = o.proxy(MatrixOrder.class);
             // 1. firstOrNull
             MatrixOrderDto first = o.select(MatrixOrder.class)
-                    .where().eq(MatrixOrder::getOrderNo, "ORD-001")
+                    .where().eq(ord.getOrderNo(), "ORD-001")
                     .selectAutoInclude(MatrixOrderDto.class)
                     .firstOrNull();
             Assert.assertNotNull(first);
@@ -501,7 +547,7 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
 
             // 2. single
             MatrixOrderDto single = o.select(MatrixOrder.class)
-                    .where().eq(MatrixOrder::getOrderNo, "ORD-003")
+                    .where().eq(ord.getOrderNo(), "ORD-003")
                     .selectAutoInclude(MatrixOrderDto.class)
                     .single();
             Assert.assertNotNull(single);
@@ -511,7 +557,7 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
 
             // 3. toPageResult 分页
             PageResult<MatrixOrderDto> page = o.select(MatrixOrder.class)
-                    .orderBy(MatrixOrder::getId).asc()
+                    .orderBy(ord.getId()).asc()
                     .selectAutoInclude(MatrixOrderDto.class)
                     .toPageResult(1, 2);
 

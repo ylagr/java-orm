@@ -989,6 +989,72 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     /**
+     * EasyQuery 集合关联加载规范：1对多/多对多使用 includes (复数)，彻底避免 Java 双泛型重载导致的 lambda 编译推导歧义与强转
+     */
+    public <E> SelectBuilder<T> includes(Collection<E> relationProxy) {
+        return include(relationProxy);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <E> SelectBuilder<T> includes(Collection<E> relationProxy, Consumer<SelectBuilder<E>> config) {
+        return include(relationProxy, config);
+    }
+
+    public <E> SelectBuilder<T> includes(Collection<E> relationProxy, BiConsumer<SelectBuilder<E>, E> biConfig) {
+        PropertyPath path = RecordingContext.finish();
+        if (path != null) {
+            includes.add(IncludeSpec.ofBi(path, biConfig));
+        }
+        return this;
+    }
+
+    public <E> SelectBuilder<T> includes(Function<T, Collection<E>> relationGetter) {
+        RecordingContext.start(rootEntityClass);
+        try {
+            T proxy = ProxyFactory.getProxy(rootEntityClass);
+            relationGetter.apply(proxy);
+            PropertyPath path = RecordingContext.finish();
+            if (path != null) {
+                includes.add(new IncludeSpec(path));
+            }
+        } finally {
+            RecordingContext.clearRecording();
+        }
+        return this;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <E> SelectBuilder<T> includes(Function<T, Collection<E>> relationGetter, Consumer<SelectBuilder<E>> config) {
+        RecordingContext.start(rootEntityClass);
+        try {
+            T proxy = ProxyFactory.getProxy(rootEntityClass);
+            relationGetter.apply(proxy);
+            PropertyPath path = RecordingContext.finish();
+            if (path != null) {
+                includes.add(new IncludeSpec(path, (Consumer<SelectBuilder<?>>) (Consumer<?>) config));
+            }
+        } finally {
+            RecordingContext.clearRecording();
+        }
+        return this;
+    }
+
+    public <E> SelectBuilder<T> includes(Function<T, Collection<E>> relationGetter, BiConsumer<SelectBuilder<E>, E> biConfig) {
+        RecordingContext.start(rootEntityClass);
+        try {
+            T proxy = ProxyFactory.getProxy(rootEntityClass);
+            relationGetter.apply(proxy);
+            PropertyPath path = RecordingContext.finish();
+            if (path != null) {
+                includes.add(IncludeSpec.ofBi(path, biConfig));
+            }
+        } finally {
+            RecordingContext.clearRecording();
+        }
+        return this;
+    }
+
+    /**
      * 显式重命名当前查询的根表别名（用于子查询或自连接消除歧义）
      */
     public SelectBuilder<T> as(String alias) {
