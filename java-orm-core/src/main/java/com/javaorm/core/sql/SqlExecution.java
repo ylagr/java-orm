@@ -160,6 +160,13 @@ public class SqlExecution<T> implements Query<T> {
     }
 
     /**
+     * 在当前 SQL 执行上下文中开启指定实体类的流式查询构建器
+     */
+    public <E> SelectBuilder<E> select(Class<E> entityClass) {
+        return env.createQuery(entityClass);
+    }
+
+    /**
      * 执行写操作（UPDATE / DELETE），返回受影响行数
      */
     public int exec() {

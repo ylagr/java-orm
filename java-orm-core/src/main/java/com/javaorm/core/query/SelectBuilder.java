@@ -39,7 +39,22 @@ public class SelectBuilder<T> implements Query<T> {
 
     private Class<?> resultDtoClass;
     private boolean autoInclude;
+    private boolean tracking = false;
     private final Set<String> extraRequiredColumns = new LinkedHashSet<>();
+
+    public SelectBuilder<T> asTracking() {
+        this.tracking = true;
+        return this;
+    }
+
+    public SelectBuilder<T> asNoTracking() {
+        this.tracking = false;
+        return this;
+    }
+
+    public boolean isTracking() {
+        return tracking;
+    }
 
     public void addExtraRequiredColumn(String colName) {
         if (colName != null && !colName.isEmpty()) {
@@ -404,6 +419,18 @@ public class SelectBuilder<T> implements Query<T> {
      */
     public T proxy() {
         return ProxyFactory.getProxy(rootEntityClass);
+    }
+
+    /**
+     * DTO 强类型结果投影转换（对齐 EasyQuery .select(Dto.class) API）
+     */
+    @SuppressWarnings("unchecked")
+    public <DTO> SelectBuilder<DTO> select(Class<DTO> dtoClass) {
+        if (dtoClass == null) {
+            throw new IllegalArgumentException("Target class must not be null");
+        }
+        this.resultDtoClass = dtoClass;
+        return (SelectBuilder<DTO>) this;
     }
 
     /**
@@ -1389,7 +1416,18 @@ public class SelectBuilder<T> implements Query<T> {
                 throw new RuntimeException("Failed to execute selectAutoInclude for DTO: " + resultDtoClass.getName(), e);
             }
         }
-        return env.executeSelectList(conn, statement, rootMetadata, includes);
+        if (resultDtoClass != null && !autoInclude) {
+            return (List<T>) env.executeSelectDtoList(conn, statement, resultDtoClass);
+        }
+        List<T> resultList = env.executeSelectList(conn, statement, rootMetadata, includes);
+        if (tracking && getConfig() != null && getConfig().getTrackManager() != null && resultList != null) {
+            for (T item : resultList) {
+                if (item != null) {
+                    getConfig().getTrackManager().attach(item, getConfig());
+                }
+            }
+        }
+        return resultList;
     }
 
     public List<Map<String, Object>> listMaps() {
@@ -1404,6 +1442,12 @@ public class SelectBuilder<T> implements Query<T> {
         return listMaps();
     }
 
+    public Map<String, Object> toMap() {
+        statement.setLimit(1);
+        List<Map<String, Object>> list = listMaps();
+        return (list != null && !list.isEmpty()) ? list.get(0) : null;
+    }
+
     public <V> V fetchOne(Class<V> targetType) {
         statement.setLimit(1);
         return env.executeSelectScalar(null, statement, targetType);
@@ -1411,6 +1455,12 @@ public class SelectBuilder<T> implements Query<T> {
 
     public <V> List<V> fetchList(Class<V> targetType) {
         return env.executeSelectScalarList(null, statement, targetType);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <V> List<V> selectColumn(V columnExpr) {
+        select(columnExpr);
+        return (List<V>) fetchList(Object.class);
     }
 
     public T single() {
@@ -1443,6 +1493,14 @@ public class SelectBuilder<T> implements Query<T> {
 
     public long count() {
         return env.executeSelectCount(null, statement, getDialect(), rootEntityClass);
+    }
+
+    public boolean any() {
+        return count() > 0;
+    }
+
+    public boolean exists() {
+        return any();
     }
 
     // 内部路径解析器

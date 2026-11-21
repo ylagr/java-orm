@@ -32,6 +32,7 @@ import java.util.*;
 public class AutoIncludeProcessor {
 
     private static final int CHUNK_SIZE = 500;
+    private static final ThreadLocal<Set<Class<?>>> VISITING_DTO_CLASSES = ThreadLocal.withInitial(HashSet::new);
 
     /**
      * 校验传入的 class 是否为合法 DTO/VO 类。
@@ -282,22 +283,31 @@ public class AutoIncludeProcessor {
             AutoIncludeContext.registerRow(dto, row);
         }
 
-        // 3. 自动识别 DTO 上的关联关系，并递归执行关联批量装配
-        for (DtoMetadata.DtoProperty relProp : dtoMeta.getRelationProperties()) {
-            RelationMetadata relation = relProp.getRelation();
-            if (relation == null) {
-                continue;
+        boolean isRoot = VISITING_DTO_CLASSES.get().isEmpty();
+        VISITING_DTO_CLASSES.get().add(dtoClass);
+        try {
+            // 3. 自动识别 DTO 上的关联关系，并递归执行关联批量装配
+            for (DtoMetadata.DtoProperty relProp : dtoMeta.getRelationProperties()) {
+                RelationMetadata relation = relProp.getRelation();
+                if (relation == null) {
+                    continue;
+                }
+
+                RelationType relType = relation.getRelationType();
+                if (relType == RelationType.MANY_TO_ONE || relType == RelationType.ONE_TO_ONE) {
+                    processManyToOne(conn, dtoList, dtoMeta, relProp, relation, rootMetadata, currentBatchContext, dialect, config, dataSource);
+                } else if (relType == RelationType.ONE_TO_MANY) {
+                    processOneToMany(conn, dtoList, dtoMeta, relProp, relation, rootMetadata, currentBatchContext, dialect, config, dataSource);
+                }
             }
 
-            RelationType relType = relation.getRelationType();
-            if (relType == RelationType.MANY_TO_ONE || relType == RelationType.ONE_TO_ONE) {
-                processManyToOne(conn, dtoList, dtoMeta, relProp, relation, rootMetadata, currentBatchContext, dialect, config, dataSource);
-            } else if (relType == RelationType.ONE_TO_MANY) {
-                processOneToMany(conn, dtoList, dtoMeta, relProp, relation, rootMetadata, currentBatchContext, dialect, config, dataSource);
+            return dtoList;
+        } finally {
+            VISITING_DTO_CLASSES.get().remove(dtoClass);
+            if (isRoot) {
+                VISITING_DTO_CLASSES.remove();
             }
         }
-
-        return dtoList;
     }
 
     /**
@@ -356,11 +366,15 @@ public class AutoIncludeProcessor {
             List<Object> chunk = keyList.subList(i, Math.min(i + CHUNK_SIZE, keyList.size()));
             SelectBuilder<?> childQuery = new SelectBuilder(targetEntityClass, dataSource, dialect, config);
 
-            // 若子类型是 DTO（非 Entity），递归应用 selectAutoInclude
+            // 若子类型是 DTO（非 Entity），递归应用 selectAutoInclude（防止双向循环引用）
             if (isChildDto) {
                 // 确保子查询投影包含目标键（主键）
                 childQuery.addExtraRequiredColumn(targetColName);
-                childQuery.selectAutoInclude(childClass);
+                if (!VISITING_DTO_CLASSES.get().contains(childClass)) {
+                    childQuery.selectAutoInclude(childClass);
+                } else {
+                    childQuery.select(childClass);
+                }
             }
 
             childQuery.getStatement().addWhereCondition(
@@ -460,7 +474,11 @@ public class AutoIncludeProcessor {
             // 若集合元素类型是 DTO（非 Entity），递归应用 selectAutoInclude，并强制投影子表外键
             if (isChildDto) {
                 childQuery.addExtraRequiredColumn(childFkColName);
-                childQuery.selectAutoInclude(elemClass);
+                if (!VISITING_DTO_CLASSES.get().contains(elemClass)) {
+                    childQuery.selectAutoInclude(elemClass);
+                } else {
+                    childQuery.select(elemClass);
+                }
             }
 
             childQuery.getStatement().addWhereCondition(

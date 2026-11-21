@@ -466,7 +466,6 @@ public class JavaOrm {
         return update(entityClass);
     }
 
-    @SuppressWarnings("unchecked")
     public <T> UpdateBuilder<T> updatable(T entity) {
         if (entity == null) {
             throw new IllegalArgumentException("Entity must not be null");
@@ -482,6 +481,14 @@ public class JavaOrm {
             }
         }
         return builder;
+    }
+
+    public <T> UpdateBuilder<T> updateable(Class<T> entityClass) {
+        return updatable(entityClass);
+    }
+
+    public <T> UpdateBuilder<T> updateable(T entity) {
+        return updatable(entity);
     }
 
     /**
@@ -588,6 +595,18 @@ public class JavaOrm {
             builder.whereByIds(ids);
         }
         return builder;
+    }
+
+    public <T> DeleteBuilder<T> deleteable(Class<T> entityClass) {
+        return deletable(entityClass);
+    }
+
+    public <T> DeleteBuilder<T> deleteable(T entity) {
+        return deletable(entity);
+    }
+
+    public <T> DeleteBuilder<T> deleteable(java.util.Collection<T> entities) {
+        return deletable(entities);
     }
 
 
