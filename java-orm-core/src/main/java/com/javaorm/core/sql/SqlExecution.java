@@ -120,6 +120,46 @@ public class SqlExecution<T> implements Query<T> {
     }
 
     /**
+     * 将当前查询切换为针对指定 DTO/VO 类的自动关联装配查询（selectAutoInclude）。
+     * <p>
+     * 核心规则：
+     * 1. 严格限制：该功能只能在 DTO/VO 类上使用，严禁在 Entity 实体类上直接使用；
+     * 2. 列裁剪投影（Selective Projection）：SQL 主查询只查 DTO 声明的标量属性与关联装配所需的 Key 列；
+     * 3. 杜绝笛卡尔积（Split/Batch IN Query）：自动识别嵌套 DTO 对象或 DTO 集合属性，分批批量查询；
+     * 4. 递归级联装配：子 DTO 若仍包含嵌套关系，递归执行 selectAutoInclude 装配，支持无限层级。
+     *
+     * @param dtoClass 目标 DTO/VO 类
+     * @param <DTO>    DTO 类型泛型
+     * @return 强类型 SqlExecution<DTO>
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public <DTO> SqlExecution<DTO> selectAutoInclude(Class<DTO> dtoClass) {
+        Object newOp;
+        if (operation instanceof SelectBuilder<?>) {
+            newOp = ((SelectBuilder<?>) operation).selectAutoInclude(dtoClass);
+        } else if (operation instanceof SqlSelectStream<?>) {
+            newOp = ((SqlSelectStream<?>) operation).selectAutoInclude(dtoClass);
+        } else if (operation instanceof Query<?>) {
+            newOp = ((Query<?>) operation).selectAutoInclude(dtoClass);
+        } else if (operation == null) {
+            Class<?> rootEntityClass = com.javaorm.core.hydration.AutoIncludeProcessor.inferRootEntityClass(dtoClass, env != null ? env.getConfig() : null);
+            if (rootEntityClass == null) {
+                throw new IllegalArgumentException("Unable to infer root entity class for DTO: " + dtoClass.getName() +
+                        ". Please explicitly specify entity class via e.select(Entity.class).selectAutoInclude(" + dtoClass.getSimpleName() + ".class)");
+            }
+            newOp = env.select(rootEntityClass).selectAutoInclude(dtoClass);
+        } else {
+            throw new IllegalStateException("selectAutoInclude only supports SELECT queries, current operation: " + operation);
+        }
+        SqlExecution<DTO> execution = new SqlExecution<>(this.env, newOp, dtoClass);
+        if (this.printSqlOverride != null) {
+            execution.printSql(this.printSqlOverride);
+        }
+        return execution;
+    }
+
+    /**
      * 执行写操作（UPDATE / DELETE），返回受影响行数
      */
     public int exec() {

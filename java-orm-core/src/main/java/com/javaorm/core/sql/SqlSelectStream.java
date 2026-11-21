@@ -602,6 +602,35 @@ public class SqlSelectStream<T> implements Query<T> {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
+    public <DTO> SqlSelectStream<DTO> selectAutoInclude(Class<DTO> dtoClass) {
+        ensureQuery();
+        SelectBuilder<DTO> autoQuery = this.query.selectAutoInclude(dtoClass);
+        SqlSelectStream<DTO> newStream = new SqlSelectStream<>(this.env, dtoClass, this.rawExpressions);
+        newStream.candidateRootTable = this.candidateRootTable;
+        newStream.isFullEntitySelect = this.isFullEntitySelect;
+        newStream.query = autoQuery;
+        this.env.setCurrentOperation(newStream);
+        return newStream;
+    }
+
+    public List<T> list() {
+        return toList();
+    }
+
+    public <R> List<R> list(Class<R> targetClass) {
+        return toList(targetClass);
+    }
+
+    public T single() {
+        return firstOrNull();
+    }
+
+    public <R> R single(Class<R> targetClass) {
+        return firstOrNull(targetClass);
+    }
+
+    @Override
     public T firstOrNull() {
         List<T> list = toList();
         return (list != null && !list.isEmpty()) ? list.get(0) : null;

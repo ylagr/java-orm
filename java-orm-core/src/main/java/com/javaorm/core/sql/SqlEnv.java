@@ -50,6 +50,14 @@ public class SqlEnv {
 
     private Object currentOperation;
 
+    public Object getCurrentOperation() {
+        return currentOperation;
+    }
+
+    public void setCurrentOperation(Object currentOperation) {
+        this.currentOperation = currentOperation;
+    }
+
     public SqlEnv(DataSource dataSource, Dialect dialect, OrmConfig config) {
         this.dataSource = dataSource;
         this.dialect = dialect;
@@ -350,6 +358,26 @@ public class SqlEnv {
         return createQuery(cte);
     }
 
+    /**
+     * 快捷发起指定 DTO/VO 的自动关联装配查询（selectAutoInclude）。
+     * 会自动智能推断该 DTO 对应的根实体类。
+     *
+     * @param dtoClass 目标 DTO/VO 类
+     * @param <DTO>    DTO 类型泛型
+     * @return 强类型 SelectBuilder<DTO>
+     */
+    @SuppressWarnings("unchecked")
+    public <DTO> SelectBuilder<DTO> selectAutoInclude(Class<DTO> dtoClass) {
+        Class<?> rootEntityClass = com.javaorm.core.hydration.AutoIncludeProcessor.inferRootEntityClass(dtoClass, getConfig());
+        if (rootEntityClass == null) {
+            throw new IllegalArgumentException("Unable to infer root entity class for DTO: " + dtoClass.getName() +
+                    ". Please explicitly specify entity class via e.select(Entity.class).selectAutoInclude(" + dtoClass.getSimpleName() + ".class)");
+        }
+        SelectBuilder<DTO> sb = (SelectBuilder<DTO>) select(rootEntityClass).selectAutoInclude(dtoClass);
+        this.currentOperation = sb;
+        return sb;
+    }
+
     public SqlEnv forUpdate() {
         if (currentOperation instanceof SqlSelectStream<?>) {
             ((SqlSelectStream<?>) currentOperation).forUpdate();
@@ -483,8 +511,7 @@ public class SqlEnv {
         if (currentOperation instanceof SqlSelectStream) {
             detected = ((SqlSelectStream) currentOperation).getResultClass();
         } else if (currentOperation instanceof SelectBuilder<?>) {
-            detected = ((SelectBuilder<?>) currentOperation).getRootMetadata() != null
-                    ? ((SelectBuilder<?>) currentOperation).getRootMetadata().getEntityClass() : null;
+            detected = ((SelectBuilder<?>) currentOperation).getResultClass();
         }
         return new SqlExecution<>(this, currentOperation, (Class<T>) detected);
     }
@@ -540,7 +567,7 @@ public class SqlEnv {
         if (returned instanceof SelectBuilder) {
             SelectBuilder<?> q = (SelectBuilder<?>) returned;
             this.currentOperation = q;
-            Class<?> detected = q.getRootEntityClass();
+            Class<?> detected = q.getResultClass();
             return new SqlExecution<>(this, q, (Class<T>) detected);
         }
         if (returned instanceof com.javaorm.core.mutation.UpdateBuilder) {

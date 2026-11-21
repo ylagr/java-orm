@@ -42,6 +42,10 @@ public class EntityMetadataManager {
             }
         }
 
+        public Class<?> getEntityClass() {
+            return entityClass;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -150,6 +154,17 @@ public class EntityMetadataManager {
 
     public static EntityMetadata getTableMetadata(Class<?> entityClass) {
         return get(entityClass);
+    }
+
+    public static Map<Class<?>, EntityMetadata> getAllCachedMetadata() {
+        Map<Class<?>, EntityMetadata> map = new LinkedHashMap<>();
+        for (MetadataCacheKey key : METADATA_CACHE.keySet()) {
+            EntityMetadata meta = METADATA_CACHE.get(key);
+            if (meta != null) {
+                map.put(key.getEntityClass(), meta);
+            }
+        }
+        return map;
     }
 
     private static EntityMetadata parseMetadata(Class<?> clazz, OrmConfig config) {

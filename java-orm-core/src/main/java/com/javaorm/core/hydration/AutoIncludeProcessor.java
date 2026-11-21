@@ -65,6 +65,111 @@ public class AutoIncludeProcessor {
     }
 
     /**
+     * 尝试根据 DTO/VO 类智能推断其对应的根实体（Root Entity）类。
+     * <p>
+     * 支持推断策略：
+     * 1. 命名规范推断：去除 DTO/VO 后缀，在同包、上级包、.entity / .model / .domain 等子包中查找同名实体；
+     * 2. 静态内部类包含关系推断（如单测或统一命名空间内的实体）；
+     * 3. 已注册实体元数据中心按类名检索；
+     * 4. 属性签名最佳匹配度探测。
+     *
+     * @param dtoClass 目标 DTO 类
+     * @param config   ORM 全局配置
+     * @return 推断出的根实体 Class，若无法推断则返回 null
+     */
+    public static Class<?> inferRootEntityClass(Class<?> dtoClass, OrmConfig config) {
+        if (dtoClass == null) {
+            return null;
+        }
+        String simpleName = dtoClass.getSimpleName();
+        String candidateName = null;
+        if (simpleName.endsWith("Dto") && simpleName.length() > 3) {
+            candidateName = simpleName.substring(0, simpleName.length() - 3);
+        } else if (simpleName.endsWith("DTO") && simpleName.length() > 3) {
+            candidateName = simpleName.substring(0, simpleName.length() - 3);
+        } else if (simpleName.endsWith("VO") && simpleName.length() > 2) {
+            candidateName = simpleName.substring(0, simpleName.length() - 2);
+        } else if (simpleName.endsWith("Vo") && simpleName.length() > 2) {
+            candidateName = simpleName.substring(0, simpleName.length() - 2);
+        }
+
+        // 1. 检查包含类（静态内部类场景）
+        Class<?> enclosing = dtoClass.getEnclosingClass();
+        if (enclosing != null && candidateName != null) {
+            for (Class<?> nested : enclosing.getDeclaredClasses()) {
+                if (nested.getSimpleName().equals(candidateName) && isEntityClass(nested)) {
+                    return nested;
+                }
+            }
+        }
+
+        // 2. 检查相同包与常见领域包
+        if (candidateName != null) {
+            Package pkg = dtoClass.getPackage();
+            if (pkg != null) {
+                String pkgName = pkg.getName();
+                try {
+                    Class<?> candidate = Class.forName(pkgName + "." + candidateName);
+                    if (isEntityClass(candidate)) {
+                        return candidate;
+                    }
+                } catch (ClassNotFoundException ignored) {
+                }
+                int lastDot = pkgName.lastIndexOf('.');
+                if (lastDot > 0) {
+                    String parentPkg = pkgName.substring(0, lastDot);
+                    for (String sub : Arrays.asList("", ".entity", ".model", ".domain", ".table")) {
+                        try {
+                            Class<?> candidate = Class.forName(parentPkg + sub + "." + candidateName);
+                            if (isEntityClass(candidate)) {
+                                return candidate;
+                            }
+                        } catch (ClassNotFoundException ignored) {
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. 从已缓存的所有实体元数据中按类名匹配
+        Map<Class<?>, EntityMetadata> allMeta = EntityMetadataManager.getAllCachedMetadata();
+        if (allMeta != null && candidateName != null) {
+            for (Class<?> entityClass : allMeta.keySet()) {
+                if (entityClass.getSimpleName().equalsIgnoreCase(candidateName) && isEntityClass(entityClass)) {
+                    return entityClass;
+                }
+            }
+        }
+
+        // 4. 属性签名最佳匹配度推断
+        if (allMeta != null && !allMeta.isEmpty()) {
+            List<Field> fields = getAllDeclaredFields(dtoClass);
+            Class<?> bestEntity = null;
+            int maxMatch = 0;
+            for (Map.Entry<Class<?>, EntityMetadata> entry : allMeta.entrySet()) {
+                Class<?> entityClass = entry.getKey();
+                EntityMetadata meta = entry.getValue();
+                int match = 0;
+                for (Field f : fields) {
+                    String propName = f.getName();
+                    if (meta.getColumnByProperty(propName) != null || meta.getRelation(propName) != null) {
+                        match++;
+                    }
+                }
+                if (match > maxMatch && match >= 2) {
+                    maxMatch = match;
+                    bestEntity = entityClass;
+                }
+            }
+            if (bestEntity != null) {
+                return bestEntity;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * 配置 selectAutoInclude 的 SQL 投影列（Selective Projection）。
      * 仅投影 DTO 中声明的对应实体列，以及关联装配所必需的主键/外键列。
      */

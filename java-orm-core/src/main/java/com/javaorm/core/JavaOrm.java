@@ -615,8 +615,17 @@ public class JavaOrm {
      *      .where().and(parent.getName()).eq("研发部")
      *      .orderBy(child.getId()).desc();
      * }).toList();
+    /**
+     * 创建基于当前 ORM 实例的声明式 SQL 执行门面入口，支持直接链式调用：
+     * <pre>
+     * List<MatrixOrderDto> orders = orm.sql().selectAutoInclude(MatrixOrderDto.class).list();
      * </pre>
      */
+    public SqlExecution<Object> sql() {
+        SqlEnv env = env();
+        return new SqlExecution<>(env, null);
+    }
+
     public <T> SqlExecution<T> sql(Class<T> resultClass, Consumer<SqlEnv> envConsumer) {
         if (envConsumer == null) {
             throw new IllegalArgumentException("SqlEnv consumer must not be null");

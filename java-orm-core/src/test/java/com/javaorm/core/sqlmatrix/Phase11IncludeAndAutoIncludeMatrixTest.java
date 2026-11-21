@@ -538,13 +538,12 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
             Assert.assertEquals("ORD-999", o4.getOrderNo());
             Assert.assertNull(o4.getUser());
 
-            // 模式 2: orm.sql() 模式
+            // 模式 2: orm.sql(e -> ...).selectAutoInclude(MatrixOrderDto.class).list()
             List<MatrixOrderDto> sqlOrders = o.sql(e -> {
                 MatrixOrder so = e.proxy(MatrixOrder.class);
                 e.select(MatrixOrder.class)
-                        .orderBy(so.getId()).asc()
-                        .selectAutoInclude(MatrixOrderDto.class);
-            }).list(MatrixOrderDto.class);
+                        .orderBy(so.getId()).asc();
+            }).selectAutoInclude(MatrixOrderDto.class).list();
 
             Assert.assertNotNull(sqlOrders);
             Assert.assertEquals(4, sqlOrders.size());
@@ -555,6 +554,17 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
             Assert.assertEquals("alice@example.com", sqlOrders.get(0).getUser().getEmail());
             Assert.assertEquals("bob", sqlOrders.get(2).getUser().getUsername());
             Assert.assertNull(sqlOrders.get(3).getUser());
+
+            // 模式 3: orm.sql().selectAutoInclude(MatrixOrderDto.class).list()
+            List<MatrixOrderDto> sqlDirectOrders = o.sql()
+                    .selectAutoInclude(MatrixOrderDto.class)
+                    .list();
+
+            Assert.assertNotNull(sqlDirectOrders);
+            Assert.assertEquals(4, sqlDirectOrders.size());
+            Assert.assertEquals("ORD-001", sqlDirectOrders.get(0).getOrderNo());
+            Assert.assertNotNull(sqlDirectOrders.get(0).getUser());
+            Assert.assertEquals("alice", sqlDirectOrders.get(0).getUser().getUsername());
         });
     }
 
@@ -584,13 +594,12 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
             Assert.assertNotNull(o3.getUser());
             Assert.assertEquals("bob", o3.getUser().getUsername());
 
-            // 模式 2: orm.sql() 模式
+            // 模式 2: orm.sql(e -> ...).selectAutoInclude(MatrixOrderWithoutFkDto.class).list()
             List<MatrixOrderWithoutFkDto> sqlOrders = o.sql(e -> {
                 MatrixOrder so = e.proxy(MatrixOrder.class);
                 e.select(MatrixOrder.class)
-                        .orderBy(so.getId()).asc()
-                        .selectAutoInclude(MatrixOrderWithoutFkDto.class);
-            }).list(MatrixOrderWithoutFkDto.class);
+                        .orderBy(so.getId()).asc();
+            }).selectAutoInclude(MatrixOrderWithoutFkDto.class).list();
 
             Assert.assertNotNull(sqlOrders);
             Assert.assertEquals(4, sqlOrders.size());
@@ -598,6 +607,13 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
             Assert.assertNotNull(sqlOrders.get(0).getUser());
             Assert.assertEquals("alice", sqlOrders.get(0).getUser().getUsername());
             Assert.assertEquals("bob", sqlOrders.get(2).getUser().getUsername());
+
+            // 模式 3: orm.sql().selectAutoInclude(MatrixOrderWithoutFkDto.class).list()
+            List<MatrixOrderWithoutFkDto> sqlDirectOrders = o.sql()
+                    .selectAutoInclude(MatrixOrderWithoutFkDto.class)
+                    .list();
+            Assert.assertNotNull(sqlDirectOrders);
+            Assert.assertEquals(4, sqlDirectOrders.size());
         });
     }
 
@@ -637,13 +653,12 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
             Assert.assertNotNull(o3.getItems());
             Assert.assertTrue(o3.getItems().isEmpty());
 
-            // 模式 2: orm.sql() 模式
+            // 模式 2: orm.sql(e -> ...).selectAutoInclude(MatrixOrderWithItemsDto.class).list()
             List<MatrixOrderWithItemsDto> sqlOrders = o.sql(e -> {
                 MatrixOrder so = e.proxy(MatrixOrder.class);
                 e.select(MatrixOrder.class)
-                        .orderBy(so.getId()).asc()
-                        .selectAutoInclude(MatrixOrderWithItemsDto.class);
-            }).list(MatrixOrderWithItemsDto.class);
+                        .orderBy(so.getId()).asc();
+            }).selectAutoInclude(MatrixOrderWithItemsDto.class).list();
 
             Assert.assertNotNull(sqlOrders);
             Assert.assertEquals(4, sqlOrders.size());
@@ -655,6 +670,13 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
             Assert.assertEquals("Wireless Mouse", sqlOrders.get(0).getItems().get(1).getProdName());
             Assert.assertEquals(1, sqlOrders.get(1).getItems().size());
             Assert.assertTrue(sqlOrders.get(2).getItems().isEmpty());
+
+            // 模式 3: orm.sql().selectAutoInclude(MatrixOrderWithItemsDto.class).list()
+            List<MatrixOrderWithItemsDto> sqlDirectOrders = o.sql()
+                    .selectAutoInclude(MatrixOrderWithItemsDto.class)
+                    .list();
+            Assert.assertNotNull(sqlDirectOrders);
+            Assert.assertEquals(4, sqlDirectOrders.size());
         });
     }
 
@@ -693,13 +715,12 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
             Assert.assertEquals(1, ord2.getItems().size());
             Assert.assertEquals("4K Monitor", ord2.getItems().get(0).getProdName());
 
-            // 模式 2: orm.sql() 模式
+            // 模式 2: orm.sql(e -> ...).selectAutoInclude(...).single()
             MatrixUserWithOrdersAndItemsDto sqlAlice = o.sql(e -> {
                 MatrixUser su = e.proxy(MatrixUser.class);
                 e.select(MatrixUser.class)
-                        .where().eq(su.getUsername(), "alice")
-                        .selectAutoInclude(MatrixUserWithOrdersAndItemsDto.class);
-            }).single(MatrixUserWithOrdersAndItemsDto.class);
+                        .where().eq(su.getUsername(), "alice");
+            }).selectAutoInclude(MatrixUserWithOrdersAndItemsDto.class).single();
 
             Assert.assertNotNull(sqlAlice);
             Assert.assertEquals("alice", sqlAlice.getUsername());
@@ -768,13 +789,12 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
             Assert.assertNotNull(page.getList().get(1).getUser());
             Assert.assertEquals("alice", page.getList().get(1).getUser().getUsername());
 
-            // 模式 2: orm.sql() 模式
+            // 模式 2: orm.sql().selectAutoInclude(...) 链式 firstOrNull / single / toPageResult
             MatrixOrderDto sqlFirst = o.sql(e -> {
                 MatrixOrder so = e.proxy(MatrixOrder.class);
                 e.select(MatrixOrder.class)
-                        .where().eq(so.getOrderNo(), "ORD-001")
-                        .selectAutoInclude(MatrixOrderDto.class);
-            }).firstOrNull(MatrixOrderDto.class);
+                        .where().eq(so.getOrderNo(), "ORD-001");
+            }).selectAutoInclude(MatrixOrderDto.class).firstOrNull();
             Assert.assertNotNull(sqlFirst);
             Assert.assertEquals("ORD-001", sqlFirst.getOrderNo());
             Assert.assertNotNull(sqlFirst.getUser());
@@ -783,9 +803,8 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
             MatrixOrderDto sqlSingle = o.sql(e -> {
                 MatrixOrder so = e.proxy(MatrixOrder.class);
                 e.select(MatrixOrder.class)
-                        .where().eq(so.getOrderNo(), "ORD-003")
-                        .selectAutoInclude(MatrixOrderDto.class);
-            }).single(MatrixOrderDto.class);
+                        .where().eq(so.getOrderNo(), "ORD-003");
+            }).selectAutoInclude(MatrixOrderDto.class).single();
             Assert.assertNotNull(sqlSingle);
             Assert.assertEquals("ORD-003", sqlSingle.getOrderNo());
             Assert.assertNotNull(sqlSingle.getUser());
@@ -794,9 +813,8 @@ public class Phase11IncludeAndAutoIncludeMatrixTest extends AbstractSqlMatrixTes
             PageResult<MatrixOrderDto> sqlPage = o.sql(e -> {
                 MatrixOrder so = e.proxy(MatrixOrder.class);
                 e.select(MatrixOrder.class)
-                        .orderBy(so.getId()).asc()
-                        .selectAutoInclude(MatrixOrderDto.class);
-            }).toPageResult(1, 2);
+                        .orderBy(so.getId()).asc();
+            }).selectAutoInclude(MatrixOrderDto.class).toPageResult(1, 2);
             Assert.assertNotNull(sqlPage);
             Assert.assertEquals(4L, sqlPage.getTotal());
             Assert.assertEquals(2, sqlPage.getList().size());
