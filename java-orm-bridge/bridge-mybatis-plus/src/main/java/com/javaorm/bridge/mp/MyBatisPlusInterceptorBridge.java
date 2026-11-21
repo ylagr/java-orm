@@ -89,7 +89,11 @@ public class MyBatisPlusInterceptorBridge implements SqlInterceptor {
             if (interceptor instanceof DynamicTableNameInnerInterceptor) {
                 currentSql = processDynamicTableName((DynamicTableNameInnerInterceptor) interceptor, currentSql);
             } else if (interceptor instanceof JsqlParserSupport) {
-                currentSql = ((JsqlParserSupport) interceptor).parserSingle(currentSql, null);
+                try {
+                    currentSql = ((JsqlParserSupport) interceptor).parserSingle(currentSql, null);
+                } catch (UnsupportedOperationException ignored) {
+                    // MP 拦截器未重写该 SQL 类型处理器时安全跳过
+                }
             }
         }
 
@@ -110,7 +114,11 @@ public class MyBatisPlusInterceptorBridge implements SqlInterceptor {
             if (interceptor instanceof DynamicTableNameInnerInterceptor) {
                 currentSql = processDynamicTableName((DynamicTableNameInnerInterceptor) interceptor, currentSql);
             } else if (interceptor instanceof JsqlParserSupport) {
-                currentSql = ((JsqlParserSupport) interceptor).parserSingle(currentSql, null);
+                try {
+                    currentSql = ((JsqlParserSupport) interceptor).parserSingle(currentSql, null);
+                } catch (UnsupportedOperationException ignored) {
+                    // MP 拦截器（如 BlockAttackInnerInterceptor）未重写 INSERT 处理器时安全跳过
+                }
             }
         }
 
