@@ -40,7 +40,7 @@ public class OrderService {
     public MallOrderDto getOrderDetail(Long id) {
         return orm.select(MallOrder.class)
                 .where()
-                .eq(MallOrder::getId, id)
+                .eq(t->t.getId(), id)
                 .selectAutoInclude(MallOrderDto.class)
                 .firstOrNull();
     }
