@@ -94,4 +94,17 @@ public class MetadataBridgeRegistry {
         }
         return false;
     }
+
+    /**
+     * 从注册的桥接器列表中按优先级提取关联关系/导航信息
+     */
+    public static RelationInfo resolveRelation(Class<?> entityClass, Field field, Method getter) {
+        for (MetadataBridge bridge : BRIDGES) {
+            RelationInfo info = bridge.resolveRelation(entityClass, field, getter);
+            if (info != null) {
+                return info;
+            }
+        }
+        return null;
+    }
 }

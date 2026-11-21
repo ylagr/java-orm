@@ -11,6 +11,10 @@ public class RelationMetadata {
     private Class<?> targetEntityClass;
     private String selfProperty;
     private String targetProperty;
+    private Class<?> mappingClass;
+    private String selfMappingProperty;
+    private String targetMappingProperty;
+    private String extraFilter;
     private Field field;
     private Method getter;
     private Method setter;
@@ -144,5 +148,37 @@ public class RelationMetadata {
 
     public void setSetter(Method setter) {
         this.setter = setter;
+    }
+
+    public Class<?> getMappingClass() {
+        return mappingClass;
+    }
+
+    public void setMappingClass(Class<?> mappingClass) {
+        this.mappingClass = mappingClass;
+    }
+
+    public String getSelfMappingProperty() {
+        return selfMappingProperty;
+    }
+
+    public void setSelfMappingProperty(String selfMappingProperty) {
+        this.selfMappingProperty = selfMappingProperty;
+    }
+
+    public String getTargetMappingProperty() {
+        return targetMappingProperty;
+    }
+
+    public void setTargetMappingProperty(String targetMappingProperty) {
+        this.targetMappingProperty = targetMappingProperty;
+    }
+
+    public String getExtraFilter() {
+        return extraFilter;
+    }
+
+    public void setExtraFilter(String extraFilter) {
+        this.extraFilter = extraFilter;
     }
 }

@@ -329,81 +329,62 @@ public class EntityMetadataManager {
     }
 
     private static RelationMetadata parseRelation(Field field, Method getter, Class<?> currentEntity) {
-        Annotation[] annotations = collectAnnotations(field, getter);
-        boolean isRelation = false;
-        RelationType relType = RelationType.MANY_TO_ONE;
-        String selfProp = "";
-        String targetProp = "";
-        String joinColName = "";
-
-        for (Annotation ann : annotations) {
-            String name = ann.annotationType().getName();
-            if (ann instanceof JoNavigate) {
-                JoNavigate nav = (JoNavigate) ann;
-                isRelation = true;
-                relType = nav.value();
-                selfProp = nav.selfProperty();
-                targetProp = nav.targetProperty();
-            } else if (name.endsWith(".ManyToOne")) {
-                isRelation = true;
-                relType = RelationType.MANY_TO_ONE;
-            } else if (name.endsWith(".OneToMany")) {
-                isRelation = true;
-                relType = RelationType.ONE_TO_MANY;
-            } else if (name.endsWith(".OneToOne")) {
-                isRelation = true;
-                relType = RelationType.ONE_TO_ONE;
-            } else if (name.endsWith(".JoinColumn")) {
-                joinColName = getAnnotationString(ann, "name");
-            }
-        }
-
-        // 如果字段类型本身是带有 @Table 或 @Entity 注解的类，或者 Collection 包含泛型实体
-        Class<?> targetType = field.getType();
-        if (Collection.class.isAssignableFrom(targetType)) {
-            Type genericType = field.getGenericType();
-            if (genericType instanceof ParameterizedType) {
-                Type[] args = ((ParameterizedType) genericType).getActualTypeArguments();
-                if (args.length > 0 && args[0] instanceof Class) {
-                    targetType = (Class<?>) args[0];
-                    if (isRelation || hasEntityAnnotation(targetType)) {
-                        isRelation = true;
-                        relType = RelationType.ONE_TO_MANY;
+        com.javaorm.core.bridge.RelationInfo info = com.javaorm.core.bridge.MetadataBridgeRegistry.resolveRelation(currentEntity, field, getter);
+        if (info == null) {
+            // 兼容零注解约定：如果字段类型本身是带 @Table/@Entity 注解的实体类，或者集合元素是实体类
+            Class<?> targetType = field.getType();
+            RelationType relType = RelationType.MANY_TO_ONE;
+            boolean isRelation = false;
+            if (Collection.class.isAssignableFrom(targetType)) {
+                Type genericType = field.getGenericType();
+                if (genericType instanceof ParameterizedType) {
+                    Type[] args = ((ParameterizedType) genericType).getActualTypeArguments();
+                    if (args.length > 0 && args[0] instanceof Class) {
+                        Class<?> elemType = (Class<?>) args[0];
+                        if (hasEntityAnnotation(elemType)) {
+                            targetType = elemType;
+                            relType = RelationType.ONE_TO_MANY;
+                            isRelation = true;
+                        }
                     }
                 }
+            } else if (hasEntityAnnotation(targetType)) {
+                isRelation = true;
             }
-        } else if (hasEntityAnnotation(targetType)) {
-            isRelation = true;
-        }
-
-        if (!isRelation) {
-            return null;
+            if (!isRelation) {
+                return null;
+            }
+            info = new com.javaorm.core.bridge.RelationInfo(relType, targetType, null, null);
         }
 
         RelationMetadata rel = new RelationMetadata();
         rel.setPropertyName(field.getName());
-        rel.setRelationType(relType);
-        rel.setTargetEntityClass(targetType);
+        rel.setRelationType(info.getRelationType());
+        rel.setTargetEntityClass(info.getTargetEntityClass());
+        rel.setSelfProperty(info.getSelfProperty());
+        rel.setTargetProperty(info.getTargetProperty());
+        rel.setMappingClass(info.getMappingClass());
+        rel.setSelfMappingProperty(info.getSelfMappingProperty());
+        rel.setTargetMappingProperty(info.getTargetMappingProperty());
+        rel.setExtraFilter(info.getExtraFilter());
         rel.setField(field);
 
-        // 默认外键属性推导规则
-        if (selfProp == null || selfProp.isEmpty()) {
-            if (relType == RelationType.MANY_TO_ONE || relType == RelationType.ONE_TO_ONE) {
-                // 例如 teacher -> teacherId
-                selfProp = field.getName() + "Id";
+        // 默认外键属性推导兜底
+        if (rel.getSelfProperty() == null || rel.getSelfProperty().isEmpty()) {
+            if (rel.getRelationType() == RelationType.MANY_TO_ONE || rel.getRelationType() == RelationType.ONE_TO_ONE) {
+                rel.setSelfProperty(field.getName() + "Id");
+            } else if (rel.getRelationType() == RelationType.ONE_TO_MANY) {
+                rel.setSelfProperty("id");
             }
         }
-        if (targetProp == null || targetProp.isEmpty()) {
-            if (relType == RelationType.MANY_TO_ONE || relType == RelationType.ONE_TO_ONE) {
-                targetProp = "id";
-            } else if (relType == RelationType.ONE_TO_MANY) {
-                // 一对多默认外键在对方表：例如 Student 里的 teacherId
+        if (rel.getTargetProperty() == null || rel.getTargetProperty().isEmpty()) {
+            if (rel.getRelationType() == RelationType.MANY_TO_ONE || rel.getRelationType() == RelationType.ONE_TO_ONE) {
+                rel.setTargetProperty("id");
+            } else if (rel.getRelationType() == RelationType.ONE_TO_MANY && currentEntity != null) {
                 String currentSimpleName = currentEntity.getSimpleName();
-                targetProp = Character.toLowerCase(currentSimpleName.charAt(0)) + currentSimpleName.substring(1) + "Id";
+                rel.setTargetProperty(Character.toLowerCase(currentSimpleName.charAt(0)) + currentSimpleName.substring(1) + "Id");
             }
         }
-        rel.setSelfProperty(selfProp);
-        rel.setTargetProperty(targetProp);
 
         return rel;
     }

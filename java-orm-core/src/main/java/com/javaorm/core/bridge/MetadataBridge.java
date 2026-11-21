@@ -38,4 +38,11 @@ public interface MetadataBridge {
     default Boolean resolveValueObject(Class<?> entityClass, Field field, Method getter) {
         return null;
     }
+
+    /**
+     * 解析字段或 Getter 上的关联关系/导航信息（Navigate / ManyToOne / OneToMany 等）。若此桥接器不匹配则返回 null。
+     */
+    default RelationInfo resolveRelation(Class<?> entityClass, Field field, Method getter) {
+        return null;
+    }
 }

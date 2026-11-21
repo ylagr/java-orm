@@ -256,6 +256,169 @@ public class JoMetadataBridge implements MetadataBridge {
         return null;
     }
 
+    @Override
+    public RelationInfo resolveRelation(Class<?> entityClass, Field field, Method getter) {
+        Annotation[] annotations = collectAnnotations(field, getter);
+        boolean isRelation = false;
+        RelationType relType = RelationType.MANY_TO_ONE;
+        String selfProp = "";
+        String targetProp = "";
+        Class<?> targetEntityClass = null;
+        Class<?> mappingClass = null;
+        String selfMappingProp = "";
+        String targetMappingProp = "";
+        String extraFilter = null;
+
+        Class<?> propType = field != null ? field.getType() : (getter != null ? getter.getReturnType() : null);
+        boolean isCollection = propType != null && java.util.Collection.class.isAssignableFrom(propType);
+
+        for (Annotation ann : annotations) {
+            String annName = ann.annotationType().getName();
+
+            // 1. JavaORM 专有注解 @JoNavigate
+            if (ann instanceof JoNavigate) {
+                JoNavigate nav = (JoNavigate) ann;
+                isRelation = true;
+                relType = nav.value();
+                selfProp = nav.selfProperty();
+                targetProp = nav.targetProperty();
+                break;
+            }
+
+            // 2. EasyQuery 专有注解 @Navigate (支持同名与全限定名)
+            if (annName.endsWith("Navigate")) {
+                isRelation = true;
+                Object valObj = getAnnotationObject(ann, "value");
+                if (valObj != null) {
+                    String enumName = valObj.toString();
+                    if (enumName.contains("OneToOne")) {
+                        relType = RelationType.ONE_TO_ONE;
+                    } else if (enumName.contains("OneToMany")) {
+                        relType = RelationType.ONE_TO_MANY;
+                    } else if (enumName.contains("ManyToMany")) {
+                        relType = RelationType.MANY_TO_MANY;
+                    } else {
+                        relType = RelationType.MANY_TO_ONE;
+                    }
+                }
+                String sp = getAnnotationString(ann, "selfProperty");
+                if (sp != null && !sp.isEmpty()) selfProp = sp;
+                String tp = getAnnotationString(ann, "targetProperty");
+                if (tp != null && !tp.isEmpty()) targetProp = tp;
+
+                Object mc = getAnnotationObject(ann, "mappingClass");
+                if (mc instanceof Class && mc != void.class && mc != Object.class) {
+                    mappingClass = (Class<?>) mc;
+                }
+                String smp = getAnnotationString(ann, "selfMappingProperty");
+                if (smp != null && !smp.isEmpty()) selfMappingProp = smp;
+                String tmp = getAnnotationString(ann, "targetMappingProperty");
+                if (tmp != null && !tmp.isEmpty()) targetMappingProp = tmp;
+                String extra = getAnnotationString(ann, "extraFilter");
+                if (extra != null && !extra.isEmpty()) extraFilter = extra;
+                break;
+            }
+
+            // 3. JPA 关系注解 (@ManyToOne, @OneToMany, @OneToOne, @ManyToMany)
+            if (annName.endsWith("ManyToOne")) {
+                isRelation = true;
+                relType = RelationType.MANY_TO_ONE;
+                Object te = getAnnotationObject(ann, "targetEntity");
+                if (te instanceof Class && te != void.class) targetEntityClass = (Class<?>) te;
+            } else if (annName.endsWith("OneToMany")) {
+                isRelation = true;
+                relType = RelationType.ONE_TO_MANY;
+                String mappedBy = getAnnotationString(ann, "mappedBy");
+                if (mappedBy != null && !mappedBy.isEmpty()) targetProp = mappedBy;
+                Object te = getAnnotationObject(ann, "targetEntity");
+                if (te instanceof Class && te != void.class) targetEntityClass = (Class<?>) te;
+            } else if (annName.endsWith("OneToOne")) {
+                isRelation = true;
+                relType = RelationType.ONE_TO_ONE;
+                String mappedBy = getAnnotationString(ann, "mappedBy");
+                if (mappedBy != null && !mappedBy.isEmpty()) targetProp = mappedBy;
+                Object te = getAnnotationObject(ann, "targetEntity");
+                if (te instanceof Class && te != void.class) targetEntityClass = (Class<?>) te;
+            } else if (annName.endsWith("ManyToMany")) {
+                isRelation = true;
+                relType = RelationType.MANY_TO_MANY;
+                Object te = getAnnotationObject(ann, "targetEntity");
+                if (te instanceof Class && te != void.class) targetEntityClass = (Class<?>) te;
+            }
+
+            // 4. JPA @JoinColumn
+            if (annName.endsWith("JoinColumn")) {
+                String joinCol = getAnnotationString(ann, "name");
+                String refCol = getAnnotationString(ann, "referencedColumnName");
+                if (joinCol != null && !joinCol.isEmpty() && selfProp.isEmpty()) {
+                    selfProp = joinCol;
+                }
+                if (refCol != null && !refCol.isEmpty() && targetProp.isEmpty()) {
+                    targetProp = refCol;
+                }
+            }
+        }
+
+        if (!isRelation) {
+            return null;
+        }
+
+        if (targetEntityClass == null) {
+            Class<?> rawTarget = isCollection ? getGenericType(field, getter) : propType;
+            if (rawTarget != null) {
+                if (com.javaorm.core.hydration.AutoIncludeProcessor.isEntityClass(rawTarget)) {
+                    targetEntityClass = rawTarget;
+                } else {
+                    Class<?> inferred = com.javaorm.core.hydration.AutoIncludeProcessor.inferRootEntityClass(rawTarget, null);
+                    targetEntityClass = inferred != null ? inferred : rawTarget;
+                }
+            }
+        }
+
+        String propName = field != null ? field.getName() : (getter != null ? getter.getName() : "");
+
+        if (relType == RelationType.MANY_TO_ONE || relType == RelationType.ONE_TO_ONE) {
+            if (selfProp.isEmpty()) {
+                selfProp = propName + "Id";
+            }
+            if (targetProp.isEmpty()) {
+                targetProp = "id";
+            }
+        } else if (relType == RelationType.ONE_TO_MANY) {
+            if (selfProp.isEmpty()) {
+                selfProp = "id";
+            }
+            if (targetProp.isEmpty() && entityClass != null) {
+                String entitySimple = entityClass.getSimpleName();
+                targetProp = Character.toLowerCase(entitySimple.charAt(0)) + entitySimple.substring(1) + "Id";
+            }
+        }
+
+        RelationInfo info = new RelationInfo(relType, targetEntityClass, selfProp, targetProp);
+        info.setMappingClass(mappingClass);
+        info.setSelfMappingProperty(selfMappingProp);
+        info.setTargetMappingProperty(targetMappingProp);
+        info.setExtraFilter(extraFilter);
+        return info;
+    }
+
+    private static Class<?> getGenericType(Field field, Method getter) {
+        java.lang.reflect.Type genericType = null;
+        if (field != null) {
+            genericType = field.getGenericType();
+        } else if (getter != null) {
+            genericType = getter.getGenericReturnType();
+        }
+        if (genericType instanceof java.lang.reflect.ParameterizedType) {
+            java.lang.reflect.ParameterizedType pt = (java.lang.reflect.ParameterizedType) genericType;
+            java.lang.reflect.Type[] args = pt.getActualTypeArguments();
+            if (args.length > 0 && args[0] instanceof Class) {
+                return (Class<?>) args[0];
+            }
+        }
+        return null;
+    }
+
     private static Annotation[] collectAnnotations(Field field, Method getter) {
         Annotation[] fa = field != null ? field.getAnnotations() : new Annotation[0];
         Annotation[] ga = getter != null ? getter.getAnnotations() : new Annotation[0];

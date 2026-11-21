@@ -317,6 +317,12 @@ public class AutoIncludeProcessor {
                                                DataSource dataSource) throws Exception {
         Class<?> childClass = field.getType();
         Class<?> targetEntityClass = relation.getTargetEntityClass();
+        if (targetEntityClass != null && !isEntityClass(targetEntityClass)) {
+            Class<?> inferred = inferRootEntityClass(targetEntityClass, config);
+            if (inferred != null) {
+                targetEntityClass = inferred;
+            }
+        }
         EntityMetadata targetMeta = EntityMetadataManager.get(targetEntityClass, config);
 
         String selfProp = relation.getSelfProperty();
@@ -406,6 +412,12 @@ public class AutoIncludeProcessor {
         }
 
         Class<?> targetEntityClass = relation.getTargetEntityClass();
+        if (targetEntityClass != null && !isEntityClass(targetEntityClass)) {
+            Class<?> inferred = inferRootEntityClass(targetEntityClass, config);
+            if (inferred != null) {
+                targetEntityClass = inferred;
+            }
+        }
         EntityMetadata targetMeta = EntityMetadataManager.get(targetEntityClass, config);
 
         String selfProp = relation.getSelfProperty();
@@ -536,19 +548,28 @@ public class AutoIncludeProcessor {
         }
         String name = field.getName();
 
-        // 1. 如果 DTO 字段本身标注了 @JoNavigate
-        if (field.isAnnotationPresent(JoNavigate.class)) {
-            JoNavigate nav = field.getAnnotation(JoNavigate.class);
+        // 1. 优先通过 MetadataBridgeRegistry 解析 DTO 字段本身标注的关系注解（支持 @JoNavigate, EasyQuery @Navigate, JPA 等）
+        Class<?> declaringClass = field.getDeclaringClass();
+        com.javaorm.core.bridge.RelationInfo bridgeInfo = com.javaorm.core.bridge.MetadataBridgeRegistry.resolveRelation(declaringClass, field, null);
+        if (bridgeInfo != null) {
             RelationMetadata rm = new RelationMetadata();
             rm.setPropertyName(name);
-            rm.setRelationType(nav.value());
-            rm.setSelfProperty(nav.selfProperty());
-            rm.setTargetProperty(nav.targetProperty());
-            if (Collection.class.isAssignableFrom(field.getType())) {
-                rm.setTargetEntityClass(getCollectionElementType(field));
-            } else {
-                rm.setTargetEntityClass(field.getType());
+            rm.setRelationType(bridgeInfo.getRelationType());
+            rm.setSelfProperty(bridgeInfo.getSelfProperty());
+            rm.setTargetProperty(bridgeInfo.getTargetProperty());
+            rm.setMappingClass(bridgeInfo.getMappingClass());
+            rm.setSelfMappingProperty(bridgeInfo.getSelfMappingProperty());
+            rm.setTargetMappingProperty(bridgeInfo.getTargetMappingProperty());
+            rm.setExtraFilter(bridgeInfo.getExtraFilter());
+            Class<?> targetEntity = bridgeInfo.getTargetEntityClass();
+            if (targetEntity == null) {
+                if (Collection.class.isAssignableFrom(field.getType())) {
+                    targetEntity = getCollectionElementType(field);
+                } else {
+                    targetEntity = field.getType();
+                }
             }
+            rm.setTargetEntityClass(targetEntity);
             return rm;
         }
 
