@@ -38,9 +38,10 @@ public class OrderService {
      * 获取单个订单完整详情（通过 selectAutoInclude 零反射级联提取）
      */
     public MallOrderDto getOrderDetail(Long id) {
+        MallOrder table = orm.proxy(MallOrder.class);
         return orm.select(MallOrder.class)
                 .where()
-                .eq(t->t.getId(), id)
+                .eq(table.getId(), id)
                 .selectAutoInclude(MallOrderDto.class)
                 .firstOrNull();
     }
