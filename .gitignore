@@ -10,3 +10,5 @@ temp/
 *easy-query*
 .agents
 CON
+node_modules/
+dist/
