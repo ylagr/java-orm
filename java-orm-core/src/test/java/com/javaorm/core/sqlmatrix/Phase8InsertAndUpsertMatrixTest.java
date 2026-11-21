@@ -82,6 +82,21 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals("eve_mode_test", loaded.getUsername());
             Assert.assertEquals(Integer.valueOf(22), loaded.getAge());
             Assert.assertEquals(new BigDecimal("91.00"), loaded.getScore());
+
+            // 模式 2: orm.sql() 模式
+            MatrixUser sqlUser = new MatrixUser();
+            sqlUser.setUsername("eve_sql_test");
+            sqlUser.setEmail("eve_sql@example.com");
+            sqlUser.setAge(23);
+            sqlUser.setStatus(1);
+            sqlUser.setScore(new BigDecimal("92.00"));
+            sqlUser.setCreateTime(testTime);
+            sqlUser.setIsDeleted(0);
+            int sqlRows = targetOrm.sql(e -> {
+                e.createInsert(sqlUser);
+            }).execute();
+            Assert.assertEquals(1, sqlRows);
+            Assert.assertNotNull(sqlUser.getId());
         });
     }
 
@@ -115,6 +130,17 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(2, list.size());
             Assert.assertEquals("BatchItemA", list.get(0).getProdName());
             Assert.assertEquals("BatchItemB", list.get(1).getProdName());
+
+            // 模式 2: orm.sql() 模式
+            MatrixOrderItem sqlItem = new MatrixOrderItem();
+            sqlItem.setOrderId(1L);
+            sqlItem.setProdName("BatchItemSql");
+            sqlItem.setPrice(new BigDecimal("30.00"));
+            sqlItem.setQuantity(3);
+            int sqlRows = targetOrm.sql(e -> {
+                e.createInsert(sqlItem);
+            }).execute();
+            Assert.assertEquals(1, sqlRows);
         });
     }
 
@@ -172,6 +198,18 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertNotNull(loaded);
             Assert.assertEquals("alice_upserted", loaded.getUsername());
             Assert.assertEquals(new BigDecimal("99.99"), loaded.getScore());
+
+            // 模式 2: orm.sql() 模式
+            upsertUser.setScore(new BigDecimal("100.00"));
+            int sqlAff = targetOrm.sql(e -> {
+                e.createUpsert(upsertUser);
+            }).execute();
+            Assert.assertTrue(sqlAff >= 1);
+            MatrixUser sqlLoaded = targetOrm.select(MatrixUser.class)
+                    .where().eq(MatrixUser::getId, 1L)
+                    .firstOrNull();
+            Assert.assertNotNull(sqlLoaded);
+            Assert.assertEquals(new BigDecimal("100.00"), sqlLoaded.getScore());
         });
     }
 
@@ -234,6 +272,12 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertNotNull(loaded);
             Assert.assertEquals("bob", loaded.getUsername());
             Assert.assertEquals(Integer.valueOf(25), loaded.getAge());
+
+            // 模式 2: orm.sql() 模式
+            int sqlDoNothingAff = targetOrm.sql(e -> {
+                e.createUpsert(ignoreUser).doNothing();
+            }).execute();
+            Assert.assertTrue(sqlDoNothingAff >= 0);
         });
     }
 
@@ -290,6 +334,12 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertNotNull(loaded);
             Assert.assertEquals("charlie", loaded.getUsername());
             Assert.assertEquals(new BigDecimal("100.00"), loaded.getScore());
+
+            // 模式 2: orm.sql() 模式
+            int sqlPartAff = targetOrm.sql(e -> {
+                e.createUpsert(partialUser).updateColumns(MatrixUser::getScore);
+            }).execute();
+            Assert.assertTrue(sqlPartAff >= 0);
         });
     }
 }

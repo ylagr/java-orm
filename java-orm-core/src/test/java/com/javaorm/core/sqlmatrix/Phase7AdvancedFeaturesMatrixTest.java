@@ -106,6 +106,19 @@ public class Phase7AdvancedFeaturesMatrixTest extends AbstractSqlMatrixTest {
             Map<String, Object> r4 = rows.get(3);
             Assert.assertEquals("david", r4.get("username") != null ? r4.get("username") : r4.get("USERNAME"));
             Assert.assertEquals("Junior", r4.get("age_group") != null ? r4.get("age_group") : r4.get("AGE_GROUP"));
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlRows = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                CaseWhenBuilder<?> scw = caseWhen()
+                        .when(su.getAge(), SqlOperator.GE, 30, "Senior")
+                        .when(su.getAge(), SqlOperator.GE, 25, "Middle")
+                        .elseVal("Junior")
+                        .as("age_group");
+                e.select(su.getId(), su.getUsername(), scw).from(su).orderByAsc(su.getId());
+            }).maps();
+            Assert.assertEquals(4, sqlRows.size());
+            Assert.assertEquals("Junior", sqlRows.get(0).get("age_group") != null ? sqlRows.get(0).get("age_group") : sqlRows.get(0).get("AGE_GROUP"));
         });
     }
 
@@ -156,6 +169,20 @@ public class Phase7AdvancedFeaturesMatrixTest extends AbstractSqlMatrixTest {
                 Assert.assertNotNull(row.get("rn") != null ? row.get("rn") : row.get("RN"));
                 Assert.assertNotNull(row.get("rk") != null ? row.get("rk") : row.get("RK"));
             }
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlRows = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(
+                        su.getId(),
+                        su.getUsername(),
+                        su.getStatus(),
+                        su.getScore(),
+                        rowNumber().over().partitionBy(su.getStatus()).orderBy(su.getScore()).desc().as("rn"),
+                        rank().over().partitionBy(su.getStatus()).orderBy(su.getAge()).asc().as("rk")
+                ).from(su).orderByAsc(su.getId());
+            }).maps();
+            Assert.assertEquals(4, sqlRows.size());
         });
     }
 
@@ -204,6 +231,19 @@ public class Phase7AdvancedFeaturesMatrixTest extends AbstractSqlMatrixTest {
                 Assert.assertNotNull(row.get("sum_score") != null ? row.get("sum_score") : row.get("SUM_SCORE"));
                 Assert.assertNotNull(row.get("avg_age") != null ? row.get("avg_age") : row.get("AVG_AGE"));
             }
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlRows = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(
+                        su.getId(),
+                        su.getUsername(),
+                        su.getStatus(),
+                        sum(su.getScore()).over().partitionBy(su.getStatus()).as("sum_score"),
+                        avg(su.getAge()).over().partitionBy(su.getStatus()).as("avg_age")
+                ).from(su).orderByAsc(su.getId());
+            }).maps();
+            Assert.assertEquals(4, sqlRows.size());
         });
     }
 
@@ -253,6 +293,15 @@ public class Phase7AdvancedFeaturesMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(2, list.size());
             Assert.assertEquals("alice", list.get(0).getUsername());
             Assert.assertEquals("bob", list.get(1).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = targetOrm.sql(e -> {
+                Cte<MatrixUser> sc = targetOrm.cte("high_scorers",
+                        targetOrm.select(MatrixUser.class).where().ge(MatrixUser::getScore, new BigDecimal("80.00")));
+                MatrixUser scProxy = sc.proxy();
+                e.select(sc).with(sc).where().eq(scProxy.getStatus(), 1).orderByAsc(scProxy.getId());
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlList.size());
         });
     }
 
@@ -299,6 +348,17 @@ public class Phase7AdvancedFeaturesMatrixTest extends AbstractSqlMatrixTest {
 
             Assert.assertEquals(1, list.size());
             Assert.assertEquals("alice", list.get(0).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = targetOrm.sql(e -> {
+                Cte<MatrixOrder> shoc = targetOrm.cte("high_orders",
+                        targetOrm.select(MatrixOrder.class).where().ge(MatrixOrder::getAmount, new BigDecimal("200.00")));
+                e.toExecutionFromReturn(targetOrm.select(MatrixUser.class)
+                        .with(shoc)
+                        .innerJoin(shoc, (on, user, order) -> on.eq(order.getUserId(), user.getId()))
+                        .orderByAsc(MatrixUser::getId));
+            }).list(MatrixUser.class);
+            Assert.assertEquals(1, sqlList.size());
         });
     }
 
@@ -330,6 +390,15 @@ public class Phase7AdvancedFeaturesMatrixTest extends AbstractSqlMatrixTest {
                     .list();
             Assert.assertEquals(1, list.size());
             Assert.assertEquals("alice", list.get(0).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).from(su).where().eq(su.getId(), 1L);
+                e.forUpdate();
+            }).list(MatrixUser.class);
+            Assert.assertEquals(1, sqlList.size());
+            Assert.assertEquals("alice", sqlList.get(0).getUsername());
         });
     }
 
@@ -361,6 +430,15 @@ public class Phase7AdvancedFeaturesMatrixTest extends AbstractSqlMatrixTest {
                     .list();
             Assert.assertEquals(1, list.size());
             Assert.assertEquals("alice", list.get(0).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).from(su).where().eq(su.getId(), 1L);
+                e.forUpdateNowait();
+            }).list(MatrixUser.class);
+            Assert.assertEquals(1, sqlList.size());
+            Assert.assertEquals("alice", sqlList.get(0).getUsername());
         });
     }
 
@@ -392,6 +470,16 @@ public class Phase7AdvancedFeaturesMatrixTest extends AbstractSqlMatrixTest {
                     .list();
             Assert.assertEquals(1, list.size());
             Assert.assertEquals("alice", list.get(0).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).from(su).where().eq(su.getId(), 1L);
+                e.forUpdateSkipLocked();
+            }).list(MatrixUser.class);
+            Assert.assertEquals(1, sqlList.size());
+            Assert.assertEquals("alice", sqlList.get(0).getUsername());
         });
     }
 }
+

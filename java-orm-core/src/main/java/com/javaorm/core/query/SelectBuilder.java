@@ -1352,7 +1352,7 @@ public class SelectBuilder<T> implements Query<T> {
         if (targetClass == null) {
             throw new IllegalArgumentException("Target class must not be null");
         }
-        if (targetClass == rootEntityClass) {
+        if (targetClass == rootEntityClass || (resultDtoClass != null && targetClass == resultDtoClass)) {
             return (List<R>) toList();
         }
         if (ColumnMetadata.isScalarType(targetClass)) {

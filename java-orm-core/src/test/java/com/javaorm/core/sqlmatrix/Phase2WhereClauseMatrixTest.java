@@ -42,6 +42,14 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
             List<MatrixUser> eqList = o.select(MatrixUser.class).where().eq(u.getUsername(), "alice").list();
             Assert.assertEquals(1, eqList.size());
             Assert.assertEquals("alice", eqList.get(0).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlEqList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where().eq(su.getUsername(), "alice");
+            }).list(MatrixUser.class);
+            Assert.assertEquals(1, sqlEqList.size());
+            Assert.assertEquals("alice", sqlEqList.get(0).getUsername());
         });
 
         // 2. ne (<>)
@@ -58,6 +66,14 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
             List<MatrixUser> neList = o.select(MatrixUser.class).where().ne(u.getStatus(), 1).list();
             Assert.assertEquals(1, neList.size());
             Assert.assertEquals("charlie", neList.get(0).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlNeList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where().ne(su.getStatus(), 1);
+            }).list(MatrixUser.class);
+            Assert.assertEquals(1, sqlNeList.size());
+            Assert.assertEquals("charlie", sqlNeList.get(0).getUsername());
         });
 
         // 3. gt (>), ge (>=), lt (<), le (<=)
@@ -74,6 +90,13 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
             List<MatrixUser> rangeUsers = o.select(MatrixUser.class).where().gt(u.getAge(), 20).le(u.getAge(), 30).list();
             // bob(25), charlie(30)
             Assert.assertEquals(2, rangeUsers.size());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlRangeUsers = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where().gt(su.getAge(), 20).le(su.getAge(), 30);
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlRangeUsers.size());
         });
     }
 
@@ -96,6 +119,13 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
         verifyAllModes(o -> {
             List<MatrixUser> nullList = o.select(MatrixUser.class).where().isNull(u.getEmail()).list();
             Assert.assertEquals(0, nullList.size()); // 种子数据均有 email
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlNullList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where().isNull(su.getEmail());
+            }).list(MatrixUser.class);
+            Assert.assertEquals(0, sqlNullList.size());
         });
 
         // isNotNull
@@ -110,6 +140,13 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
         verifyAllModes(o -> {
             List<MatrixUser> notNullList = o.select(MatrixUser.class).where().isNotNull(u.getEmail()).list();
             Assert.assertEquals(4, notNullList.size());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlNotNullList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where().isNotNull(su.getEmail());
+            }).list(MatrixUser.class);
+            Assert.assertEquals(4, sqlNotNullList.size());
         });
     }
 
@@ -133,6 +170,13 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
         verifyAllModes(o -> {
             List<MatrixUser> inList = o.select(MatrixUser.class).where().in(u.getUsername(), Arrays.asList("alice", "bob")).list();
             Assert.assertEquals(2, inList.size());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlInList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where().in(su.getUsername(), Arrays.asList("alice", "bob"));
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlInList.size());
         });
 
         // notIn(Collection)
@@ -148,6 +192,13 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
         verifyAllModes(o -> {
             List<MatrixUser> notInList = o.select(MatrixUser.class).where().notIn(u.getUsername(), Arrays.asList("alice", "bob")).list();
             Assert.assertEquals(2, notInList.size()); // charlie, david
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlNotInList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where().notIn(su.getUsername(), Arrays.asList("alice", "bob"));
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlNotInList.size());
         });
     }
 
@@ -172,6 +223,13 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
             List<MatrixUser> betweenList = o.select(MatrixUser.class).where().between(u.getAge(), 20, 25).list();
             // alice(20), bob(25), david(20)
             Assert.assertEquals(3, betweenList.size());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlBetweenList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where().between(su.getAge(), 20, 25);
+            }).list(MatrixUser.class);
+            Assert.assertEquals(3, sqlBetweenList.size());
         });
 
         // notBetween
@@ -189,6 +247,14 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
             // charlie(30)
             Assert.assertEquals(1, notBetweenList.size());
             Assert.assertEquals("charlie", notBetweenList.get(0).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlNotBetweenList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where().notBetween(su.getAge(), 20, 25);
+            }).list(MatrixUser.class);
+            Assert.assertEquals(1, sqlNotBetweenList.size());
+            Assert.assertEquals("charlie", sqlNotBetweenList.get(0).getUsername());
         });
     }
 
@@ -213,6 +279,13 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
             List<MatrixUser> likeList = o.select(MatrixUser.class).where().like(u.getUsername(), "%li%").list();
             // alice, charlie
             Assert.assertEquals(2, likeList.size());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlLikeList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where().like(su.getUsername(), "%li%");
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlLikeList.size());
         });
 
         // notLike
@@ -229,6 +302,13 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
             List<MatrixUser> notLikeList = o.select(MatrixUser.class).where().notLike(u.getUsername(), "%li%").list();
             // bob, david
             Assert.assertEquals(2, notLikeList.size());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlNotLikeList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where().notLike(su.getUsername(), "%li%");
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlNotLikeList.size());
         });
     }
 
@@ -259,6 +339,15 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
                     .list();
             // alice (status=1, score=95.50), bob (status=1, age=25)
             Assert.assertEquals(2, nestedUsers.size());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlNestedUsers = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where()
+                        .eq(su.getStatus(), 1)
+                        .and(w -> w.eq(su.getAge(), 25).or(w2 -> w2.ge(su.getScore(), new BigDecimal("90.00"))));
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlNestedUsers.size());
         });
     }
 
@@ -291,6 +380,16 @@ public class Phase2WhereClauseMatrixTest extends AbstractSqlMatrixTest {
                     .list();
             Assert.assertEquals(1, result.size());
             Assert.assertEquals("bob", result.get(0).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlResult = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).where()
+                        .eq(nameFilter != null, su.getUsername(), nameFilter)
+                        .eq(ageFilter != null, su.getAge(), ageFilter);
+            }).list(MatrixUser.class);
+            Assert.assertEquals(1, sqlResult.size());
+            Assert.assertEquals("bob", sqlResult.get(0).getUsername());
         });
     }
 }

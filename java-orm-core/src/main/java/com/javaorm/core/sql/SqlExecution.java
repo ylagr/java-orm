@@ -7,6 +7,7 @@ import com.javaorm.core.mutation.DeleteBuilder;
 import com.javaorm.core.mutation.UpdateBuilder;
 import com.javaorm.core.query.Query;
 import com.javaorm.core.query.SelectBuilder;
+import com.javaorm.core.query.WhereBuilder;
 
 import java.util.List;
 import java.util.Map;
@@ -141,6 +142,12 @@ public class SqlExecution<T> implements Query<T> {
         if (operation instanceof DeleteBuilder<?>) {
             return ((DeleteBuilder<?>) operation).execute();
         }
+        if (operation instanceof com.javaorm.core.mutation.InsertBuilder<?>) {
+            return ((com.javaorm.core.mutation.InsertBuilder<?>) operation).execute();
+        }
+        if (operation instanceof com.javaorm.core.mutation.UpsertBuilder<?>) {
+            return ((com.javaorm.core.mutation.UpsertBuilder<?>) operation).execute();
+        }
         if (operation instanceof com.javaorm.core.query.WhereBuilder<?>) {
             return ((com.javaorm.core.query.WhereBuilder<?>) operation).execute();
         }
@@ -148,6 +155,30 @@ public class SqlExecution<T> implements Query<T> {
             throw new IllegalStateException("Cannot call exec() / execute() on a SELECT query. Please call .toList(), .listMaps(), or .firstOrNull() instead.");
         }
         throw new IllegalStateException("No valid SQL operation configured in SqlEnv. Please call e.select(), e.update(), or e.delete().");
+    }
+
+    /**
+     * 执行查询操作并返回列表（toList 别名）
+     */
+    public <R> List<R> list() {
+        return toList();
+    }
+
+    public <R> List<R> list(Class<R> targetClass) {
+        return toList(targetClass);
+    }
+
+    /**
+     * 执行查询并返回首条记录（firstOrNull 别名）
+     */
+    @SuppressWarnings("unchecked")
+    public <R> R single() {
+        return firstOrNull();
+    }
+
+    @SuppressWarnings("unchecked")
+    public <R> R single(Class<R> targetClass) {
+        return firstOrNull(targetClass);
     }
 
     /**
@@ -228,6 +259,10 @@ public class SqlExecution<T> implements Query<T> {
             return ((SelectBuilder<?>) operation).listMaps();
         }
         throw new IllegalStateException("Cannot call listMaps() on an UPDATE or DELETE operation. Please call .exec() instead.");
+    }
+
+    public List<Map<String, Object>> maps() {
+        return listMaps();
     }
 
     /**
@@ -314,21 +349,31 @@ public class SqlExecution<T> implements Query<T> {
         throw new IllegalStateException("Cannot call count() on an UPDATE or DELETE operation.");
     }
 
-    @SuppressWarnings("unchecked")
-    public com.javaorm.core.pagination.PageResult<T> toPage(long pageNum, long pageSize) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <R> com.javaorm.core.pagination.PageResult<R> toPage(long pageNum, long pageSize) {
         if (operation instanceof SelectBuilder<?>) {
-            return (com.javaorm.core.pagination.PageResult<T>) ((SelectBuilder<T>) operation).toPage(pageNum, pageSize);
+            return (com.javaorm.core.pagination.PageResult<R>) ((SelectBuilder) operation).toPage(pageNum, pageSize);
+        }
+        if (operation instanceof com.javaorm.core.query.WhereBuilder<?>) {
+            return (com.javaorm.core.pagination.PageResult<R>) ((com.javaorm.core.query.WhereBuilder) operation).toPage(pageNum, pageSize);
         }
         if (operation instanceof SqlSelectStream<?>) {
-            return ((SqlSelectStream<T>) operation).toPage(pageNum, pageSize);
+            return (com.javaorm.core.pagination.PageResult<R>) ((SqlSelectStream) operation).toPage(pageNum, pageSize);
         }
         throw new IllegalStateException("Cannot call toPage() on a non-query operation.");
+    }
+
+    public <R> com.javaorm.core.pagination.PageResult<R> toPageResult(long pageNum, long pageSize) {
+        return toPage(pageNum, pageSize);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     public <P> P toPage(long pageNum, long pageSize, com.javaorm.core.pagination.PageFactory<T, P> pageFactory) {
         if (operation instanceof SelectBuilder<?>) {
             return (P) ((SelectBuilder) operation).toPage(pageNum, pageSize, pageFactory);
+        }
+        if (operation instanceof com.javaorm.core.query.WhereBuilder<?>) {
+            return (P) ((com.javaorm.core.query.WhereBuilder) operation).toPage(pageNum, pageSize, pageFactory);
         }
         if (operation instanceof SqlSelectStream<?>) {
             return (P) ((SqlSelectStream) operation).toPage(pageNum, pageSize, pageFactory);
@@ -341,6 +386,9 @@ public class SqlExecution<T> implements Query<T> {
         if (operation instanceof SelectBuilder<?>) {
             return (P) ((SelectBuilder) operation).toPage(page);
         }
+        if (operation instanceof com.javaorm.core.query.WhereBuilder<?>) {
+            return (P) ((com.javaorm.core.query.WhereBuilder) operation).toPage(page);
+        }
         if (operation instanceof SqlSelectStream<?>) {
             return (P) ((SqlSelectStream) operation).toPage(page);
         }
@@ -351,6 +399,9 @@ public class SqlExecution<T> implements Query<T> {
     public <P> P toPage(P page, com.javaorm.core.pagination.PageAdapter<P> adapter) {
         if (operation instanceof SelectBuilder<?>) {
             return (P) ((SelectBuilder) operation).toPage(page, adapter);
+        }
+        if (operation instanceof com.javaorm.core.query.WhereBuilder<?>) {
+            return (P) ((com.javaorm.core.query.WhereBuilder) operation).toPage(page, adapter);
         }
         if (operation instanceof SqlSelectStream<?>) {
             return (P) ((SqlSelectStream) operation).toPage(page, adapter);
@@ -392,6 +443,12 @@ public class SqlExecution<T> implements Query<T> {
         if (operation instanceof DeleteBuilder<?>) {
             return ((DeleteBuilder<?>) operation).toSqlAndParams();
         }
+        if (operation instanceof com.javaorm.core.mutation.InsertBuilder<?>) {
+            return ((com.javaorm.core.mutation.InsertBuilder<?>) operation).toSqlAndParams();
+        }
+        if (operation instanceof com.javaorm.core.mutation.UpsertBuilder<?>) {
+            return ((com.javaorm.core.mutation.UpsertBuilder<?>) operation).toSqlAndParams();
+        }
         throw new IllegalStateException("No valid SQL operation configured in SqlEnv.");
     }
 
@@ -405,6 +462,21 @@ public class SqlExecution<T> implements Query<T> {
         if (operation instanceof SqlJoinClause<?>) {
             return ((SqlJoinClause<?>) operation).toSqlAndParams(dialect);
         }
+        if (operation instanceof UpdateBuilder<?>) {
+            return ((UpdateBuilder<?>) operation).toSqlAndParams(dialect);
+        }
+        if (operation instanceof DeleteBuilder<?>) {
+            return ((DeleteBuilder<?>) operation).toSqlAndParams(dialect);
+        }
+        if (operation instanceof WhereBuilder<?>) {
+            return ((WhereBuilder<?>) operation).toSqlAndParams(dialect);
+        }
+        if (operation instanceof com.javaorm.core.mutation.InsertBuilder<?>) {
+            return ((com.javaorm.core.mutation.InsertBuilder<?>) operation).toSqlAndParams(dialect);
+        }
+        if (operation instanceof com.javaorm.core.mutation.UpsertBuilder<?>) {
+            return ((com.javaorm.core.mutation.UpsertBuilder<?>) operation).toSqlAndParams(dialect);
+        }
         if (operation instanceof Query<?>) {
             Query<?> q = (Query<?>) operation;
             if (q instanceof SelectBuilder<?>) {
@@ -412,6 +484,9 @@ public class SqlExecution<T> implements Query<T> {
             }
             if (q instanceof SqlSelectStream<?>) {
                 return ((SqlSelectStream<?>) q).toSqlAndParams(dialect);
+            }
+            if (q instanceof WhereBuilder<?>) {
+                return ((WhereBuilder<?>) q).toSqlAndParams(dialect);
             }
         }
         throw new IllegalStateException("Operation does not support toSqlAndParams with Dialect: " + operation);

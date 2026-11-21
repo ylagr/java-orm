@@ -56,6 +56,13 @@ public class Phase9UpdateMatrixTest extends AbstractSqlMatrixTest {
                     .firstOrNull();
             Assert.assertNotNull(loaded);
             Assert.assertEquals(Integer.valueOf(2), loaded.getStatus());
+
+            // 模式 2: orm.sql() 模式
+            int sqlRows = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.update(su).set(su.getStatus(), 2).where().eq(su.getId(), 1L);
+            }).execute();
+            Assert.assertEquals(1, sqlRows);
         });
     }
 
@@ -98,6 +105,14 @@ public class Phase9UpdateMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertNotNull(loaded);
             Assert.assertEquals(Integer.valueOf(28), loaded.getAge());
             Assert.assertEquals(new BigDecimal("88.88"), loaded.getScore());
+
+            // 模式 2: orm.sql() 模式
+            int sqlRows = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.update(su).set(su.getAge(), 28).set(su.getScore(), new BigDecimal("88.88"))
+                        .where().eq(su.getId(), 2L).and().eq(su.getStatus(), 1);
+            }).execute();
+            Assert.assertEquals(1, sqlRows);
         });
     }
 
@@ -143,6 +158,13 @@ public class Phase9UpdateMatrixTest extends AbstractSqlMatrixTest {
                     .firstOrNull();
             Assert.assertNotNull(after);
             Assert.assertEquals(Integer.valueOf(originAge + 1), after.getAge());
+
+            // 模式 2: orm.sql() 模式
+            int sqlRows = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.update(su).set(su.getAge(), SQL.increment(1)).where().eq(su.getId(), 2L);
+            }).execute();
+            Assert.assertEquals(1, sqlRows);
         });
     }
 
@@ -188,6 +210,13 @@ public class Phase9UpdateMatrixTest extends AbstractSqlMatrixTest {
                     .firstOrNull();
             Assert.assertNotNull(after);
             Assert.assertEquals(originScore.subtract(new BigDecimal("5.00")), after.getScore());
+
+            // 模式 2: orm.sql() 模式
+            int sqlRows = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.update(su).set(su.getScore(), SQL.decrement(new BigDecimal("5.00"))).where().eq(su.getId(), 2L);
+            }).execute();
+            Assert.assertEquals(1, sqlRows);
         });
     }
 
@@ -238,6 +267,13 @@ public class Phase9UpdateMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals("charlie", loaded.getUsername());
             Assert.assertEquals("charlie_selective@example.com", loaded.getEmail());
             Assert.assertEquals(Integer.valueOf(35), loaded.getAge());
+
+            // 模式 2: orm.sql() 模式
+            int sqlRows = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.update(su).set(su.getEmail(), "charlie_selective@example.com").set(su.getAge(), 35).where().eq(su.getId(), 3L);
+            }).execute();
+            Assert.assertEquals(1, sqlRows);
         });
     }
 
@@ -272,6 +308,13 @@ public class Phase9UpdateMatrixTest extends AbstractSqlMatrixTest {
             // 其他未修改列保持不变
             Assert.assertEquals("david@example.com", reloaded.getEmail());
             Assert.assertEquals(Integer.valueOf(20), reloaded.getAge());
+
+            // 模式 2: orm.sql() 模式
+            int sqlRows = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.update(su).set(su.getUsername(), "david_dirty_updated").where().eq(su.getId(), 4L);
+            }).execute();
+            Assert.assertEquals(1, sqlRows);
         });
     }
 }

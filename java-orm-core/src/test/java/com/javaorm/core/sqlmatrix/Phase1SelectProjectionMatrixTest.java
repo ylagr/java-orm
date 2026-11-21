@@ -35,6 +35,7 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
 
         // 真实在三大隔离环境 (MySQL, PostgreSQL, Oracle 严格模式) 执行并校验实体数据
         verifyAllModes(o -> {
+            // 模式 1: 直接流式 select
             List<MatrixUser> users = o.select(MatrixUser.class).list();
             Assert.assertNotNull(users);
             Assert.assertEquals(4, users.size());
@@ -53,6 +54,17 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertNotNull(bob);
             Assert.assertEquals(Integer.valueOf(25), bob.getAge());
             Assert.assertEquals(new BigDecimal("88.00"), bob.getScore());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlUsers = o.sql(e -> {
+                e.select(MatrixUser.class);
+            }).toList();
+            Assert.assertNotNull(sqlUsers);
+            Assert.assertEquals(4, sqlUsers.size());
+            MatrixUser sqlAlice = sqlUsers.stream().filter(u -> "alice".equals(u.getUsername())).findFirst().orElse(null);
+            Assert.assertNotNull(sqlAlice);
+            Assert.assertEquals("alice@example.com", sqlAlice.getEmail());
+            Assert.assertEquals(new BigDecimal("95.50"), sqlAlice.getScore());
         });
     }
 
@@ -87,6 +99,20 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
                 Assert.assertNull(user.getEmail());
                 Assert.assertNull(user.getScore());
             }
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlUsers = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su.getId(), su.getUsername(), su.getAge()).from(su);
+            }).list(MatrixUser.class);
+            Assert.assertEquals(4, sqlUsers.size());
+            for (MatrixUser user : sqlUsers) {
+                Assert.assertNotNull(user.getId());
+                Assert.assertNotNull(user.getUsername());
+                Assert.assertNotNull(user.getAge());
+                Assert.assertNull(user.getEmail());
+                Assert.assertNull(user.getScore());
+            }
         });
     }
 
@@ -116,6 +142,15 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertTrue("结果集必须包含别名列 user_name", first.containsKey("user_name") || first.containsKey("USER_NAME"));
             Object nameVal = first.get("user_name") != null ? first.get("user_name") : first.get("USER_NAME");
             Assert.assertNotNull(nameVal);
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlMaps = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class, "u");
+                e.select(su.getId(), col(su.getUsername()).as("user_name")).from(su);
+            }).maps();
+            Assert.assertEquals(4, sqlMaps.size());
+            Map<String, Object> sqlFirst = sqlMaps.get(0);
+            Assert.assertTrue("结果集必须包含别名列 user_name", sqlFirst.containsKey("user_name") || sqlFirst.containsKey("USER_NAME"));
         });
     }
 
@@ -141,6 +176,13 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
         verifyAllModes(o -> {
             List<MatrixUser> list = o.select(MatrixUser.class).distinct().select(u.getStatus(), u.getAge()).list();
             Assert.assertEquals("DISTINCT 去重后应为 3 条", 3, list.size());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su.getStatus(), su.getAge()).from(su).distinct();
+            }).list(MatrixUser.class);
+            Assert.assertEquals("DISTINCT 去重后应为 3 条", 3, sqlList.size());
         });
     }
 
@@ -166,6 +208,13 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
         verifyAllModes(o -> {
             long totalCount = o.select(MatrixUser.class).count();
             Assert.assertEquals(4L, totalCount);
+
+            // 模式 2: orm.sql() 模式
+            long sqlTotalCount = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(count()).from(su);
+            }).count();
+            Assert.assertEquals(4L, sqlTotalCount);
         });
 
         // 2. COUNT(col) 校验
@@ -211,6 +260,21 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(316.0, totalScore.doubleValue(), 0.01);
             Assert.assertEquals(20, minAge.intValue());
             Assert.assertEquals(30, maxAge.intValue());
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlAggList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(
+                        sum(su.getScore()).as("total_score"),
+                        avg(su.getAge()).as("avg_age"),
+                        min(su.getAge()).as("min_age"),
+                        max(su.getAge()).as("max_age")
+                ).from(su);
+            }).maps();
+            Assert.assertFalse(sqlAggList.isEmpty());
+            Map<String, Object> sqlAggMap = sqlAggList.get(0);
+            Number sqlTotalScore = (Number) (sqlAggMap.get("total_score") != null ? sqlAggMap.get("total_score") : sqlAggMap.get("TOTAL_SCORE"));
+            Assert.assertEquals(316.0, sqlTotalScore.doubleValue(), 0.01);
         });
     }
 
@@ -252,6 +316,19 @@ public class Phase1SelectProjectionMatrixTest extends AbstractSqlMatrixTest {
 
             Assert.assertEquals(21, nextAge.intValue());
             Assert.assertEquals(76.4, discountScore.doubleValue(), 0.01);
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlExprList = o.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(
+                        raw("age + 1").as("next_age"),
+                        raw("score * 0.8").as("discount_score")
+                ).from(su).where().eq(su.getUsername(), "alice");
+            }).maps();
+            Assert.assertEquals(1, sqlExprList.size());
+            Map<String, Object> sqlAliceExpr = sqlExprList.get(0);
+            Number sqlNextAge = (Number) (sqlAliceExpr.get("next_age") != null ? sqlAliceExpr.get("next_age") : sqlAliceExpr.get("NEXT_AGE"));
+            Assert.assertEquals(21, sqlNextAge.intValue());
         });
     }
 }

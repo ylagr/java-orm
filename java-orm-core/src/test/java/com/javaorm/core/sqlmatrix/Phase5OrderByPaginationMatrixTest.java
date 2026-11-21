@@ -85,6 +85,14 @@ public class Phase5OrderByPaginationMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(Integer.valueOf(20), ascList.get(1).getAge());
             Assert.assertEquals(Integer.valueOf(25), ascList.get(2).getAge());
             Assert.assertEquals(Integer.valueOf(30), ascList.get(3).getAge());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlAscList = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).from(su).orderByAsc(su.getAge());
+            }).list(MatrixUser.class);
+            Assert.assertEquals(4, sqlAscList.size());
+            Assert.assertEquals(Integer.valueOf(20), sqlAscList.get(0).getAge());
         });
 
         // 5.1.2 降序 (DESC)
@@ -109,6 +117,14 @@ public class Phase5OrderByPaginationMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(Integer.valueOf(25), descList.get(1).getAge());
             Assert.assertEquals(Integer.valueOf(20), descList.get(2).getAge());
             Assert.assertEquals(Integer.valueOf(20), descList.get(3).getAge());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlDescList = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).from(su).orderByDesc(su.getAge());
+            }).list(MatrixUser.class);
+            Assert.assertEquals(4, sqlDescList.size());
+            Assert.assertEquals(Integer.valueOf(30), sqlDescList.get(0).getAge());
         });
     }
 
@@ -148,6 +164,17 @@ public class Phase5OrderByPaginationMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals("bob", list.get(2).getUsername());
             // status = 0 (charlie: 30)
             Assert.assertEquals("charlie", list.get(3).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).from(su)
+                        .orderByDesc(su.getStatus())
+                        .orderByAsc(su.getAge())
+                        .orderByAsc(su.getId());
+            }).list(MatrixUser.class);
+            Assert.assertEquals(4, sqlList.size());
+            Assert.assertEquals("alice", sqlList.get(0).getUsername());
         });
     }
 
@@ -245,6 +272,14 @@ public class Phase5OrderByPaginationMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(2, list.size());
             Assert.assertEquals("alice", list.get(0).getUsername());
             Assert.assertEquals("bob", list.get(1).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).from(su).orderByAsc(su.getId()).limit(2);
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlList.size());
+            Assert.assertEquals("alice", sqlList.get(0).getUsername());
         });
     }
 
@@ -285,6 +320,14 @@ public class Phase5OrderByPaginationMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(2, list.size());
             Assert.assertEquals("bob", list.get(0).getUsername());
             Assert.assertEquals("charlie", list.get(1).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).from(su).orderByAsc(su.getId()).limit(2).offset(1);
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlList.size());
+            Assert.assertEquals("bob", sqlList.get(0).getUsername());
         });
     }
 
@@ -323,6 +366,14 @@ public class Phase5OrderByPaginationMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(2, page1.size());
             Assert.assertEquals("alice", page1.get(0).getUsername());
             Assert.assertEquals("bob", page1.get(1).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlPage1 = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).from(su).orderByAsc(su.getId()).page(1, 2);
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlPage1.size());
+            Assert.assertEquals("alice", sqlPage1.get(0).getUsername());
         });
 
         // 5.6.2 第 2 页: page(2, 2) -> offset = 2, limit = 2
@@ -355,6 +406,14 @@ public class Phase5OrderByPaginationMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(2, page2.size());
             Assert.assertEquals("charlie", page2.get(0).getUsername());
             Assert.assertEquals("david", page2.get(1).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlPage2 = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).from(su).orderByAsc(su.getId()).page(2, 2);
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlPage2.size());
+            Assert.assertEquals("charlie", sqlPage2.get(0).getUsername());
         });
     }
 
@@ -410,6 +469,16 @@ public class Phase5OrderByPaginationMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertTrue(filteredPage.hasPrevious());
             Assert.assertEquals(1, filteredPage.getData().size());
             Assert.assertEquals("david", filteredPage.getData().get(0).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            PageResult<MatrixUser> sqlPageResult = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).from(su).orderByAsc(su.getId());
+            }).toPageResult(1, 2);
+            Assert.assertNotNull(sqlPageResult);
+            Assert.assertEquals(4L, sqlPageResult.getTotal());
+            Assert.assertEquals(2, sqlPageResult.getData().size());
+            Assert.assertEquals("alice", sqlPageResult.getData().get(0).getUsername());
         });
     }
 

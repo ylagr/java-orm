@@ -77,6 +77,18 @@ public class Phase6SubquerySetOperationMatrixTest extends AbstractSqlMatrixTest 
                     .list();
             Assert.assertEquals(1, list.size());
             Assert.assertEquals("alice", list.get(0).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = targetOrm.sql(e -> {
+                MatrixOrder subOrder = targetOrm.proxy(MatrixOrder.class);
+                e.select(MatrixUser.class)
+                        .where(w -> w.in(MatrixUser::getId,
+                                targetOrm.select(subOrder.getUserId())
+                                        .from(MatrixOrder.class)
+                                        .where().ge(subOrder.getAmount(), new BigDecimal("150.00"))));
+            }).list(MatrixUser.class);
+            Assert.assertEquals(1, sqlList.size());
+            Assert.assertEquals("alice", sqlList.get(0).getUsername());
         });
     }
 
@@ -119,6 +131,18 @@ public class Phase6SubquerySetOperationMatrixTest extends AbstractSqlMatrixTest 
             Assert.assertEquals(2, list.size());
             Assert.assertEquals("charlie", list.get(0).getUsername());
             Assert.assertEquals("david", list.get(1).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = targetOrm.sql(e -> {
+                MatrixOrder subOrder = targetOrm.proxy(MatrixOrder.class);
+                e.select(MatrixUser.class)
+                        .where(w -> w.notIn(MatrixUser::getId,
+                                targetOrm.select(subOrder.getUserId())
+                                        .from(MatrixOrder.class)))
+                        .orderByAsc(MatrixUser::getId);
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlList.size());
+            Assert.assertEquals("charlie", sqlList.get(0).getUsername());
         });
     }
 
@@ -164,6 +188,17 @@ public class Phase6SubquerySetOperationMatrixTest extends AbstractSqlMatrixTest 
             Assert.assertEquals(2, list.size());
             Assert.assertEquals("bob", list.get(0).getUsername());
             Assert.assertEquals("charlie", list.get(1).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                SelectBuilder<MatrixUser> avgSub = targetOrm.select(avg(su.getAge())).from(MatrixUser.class);
+                e.select(su).from(su)
+                        .where(w -> w.gt(su.getAge(), subQuery(avgSub)))
+                        .orderByAsc(su.getId());
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlList.size());
+            Assert.assertEquals("bob", sqlList.get(0).getUsername());
         });
     }
 
@@ -180,7 +215,7 @@ public class Phase6SubquerySetOperationMatrixTest extends AbstractSqlMatrixTest 
                     return oOrm.select(MatrixUser.class)
                             .where()
                             .andExists(
-                                    oOrm.select(o.getId())
+                                     oOrm.select(o.getId())
                                             .from(MatrixOrder.class)
                                             .where()
                                             .eq(o.getUserId(), u.getId())
@@ -215,6 +250,19 @@ public class Phase6SubquerySetOperationMatrixTest extends AbstractSqlMatrixTest 
                     ).list();
             Assert.assertEquals(1, list.size());
             Assert.assertEquals("alice", list.get(0).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = targetOrm.sql(e -> {
+                e.select(MatrixUser.class).where().andExists(
+                        targetOrm.select(o.getId())
+                                .from(MatrixOrder.class)
+                                .where()
+                                .eq(o.getUserId(), u.getId())
+                                .eq(o.getStatus(), 2)
+                );
+            }).list(MatrixUser.class);
+            Assert.assertEquals(1, sqlList.size());
+            Assert.assertEquals("alice", sqlList.get(0).getUsername());
         });
     }
 
@@ -267,6 +315,18 @@ public class Phase6SubquerySetOperationMatrixTest extends AbstractSqlMatrixTest 
             Assert.assertEquals(2, list.size());
             Assert.assertEquals("charlie", list.get(0).getUsername());
             Assert.assertEquals("david", list.get(1).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = targetOrm.sql(e -> {
+                e.select(MatrixUser.class).where().andNotExists(
+                        targetOrm.select(o.getId())
+                                .from(MatrixOrder.class)
+                                .where()
+                                .eq(o.getUserId(), u.getId())
+                ).orderByAsc(MatrixUser::getId);
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlList.size());
+            Assert.assertEquals("charlie", sqlList.get(0).getUsername());
         });
     }
 
@@ -292,15 +352,15 @@ public class Phase6SubquerySetOperationMatrixTest extends AbstractSqlMatrixTest 
                     ).from(MatrixUser.class).orderByAsc(u.getId());
                 },
                 // MySQL
-                "SELECT t0.`id`, t0.`username`, (SELECT COUNT(t1.`id`) FROM `matrix_order` t1 WHERE t1.`user_id` = t0.`id`) AS `order_cnt` FROM `matrix_user` t0 ORDER BY t0.`id` ASC",
+                "SELECT t1.`id`, t1.`username`, (SELECT COUNT(t0.`id`) FROM `matrix_order` t0 WHERE t0.`user_id` = t1.`id`) AS `order_cnt` FROM `matrix_user` t1 ORDER BY t1.`id` ASC",
                 // PostgreSQL
-                "SELECT t0.\"id\", t0.\"username\", (SELECT COUNT(t1.\"id\") FROM \"matrix_order\" t1 WHERE t1.\"user_id\" = t0.\"id\") AS \"order_cnt\" FROM \"matrix_user\" t0 ORDER BY t0.\"id\" ASC",
+                "SELECT t1.\"id\", t1.\"username\", (SELECT COUNT(t0.\"id\") FROM \"matrix_order\" t0 WHERE t0.\"user_id\" = t1.\"id\") AS \"order_cnt\" FROM \"matrix_user\" t1 ORDER BY t1.\"id\" ASC",
                 // Oracle
-                "SELECT t0.\"ID\", t0.\"USERNAME\", (SELECT COUNT(t1.\"ID\") FROM \"MATRIX_ORDER\" t1 WHERE t1.\"USER_ID\" = t0.\"ID\") AS \"order_cnt\" FROM \"MATRIX_USER\" t0 ORDER BY t0.\"ID\" ASC",
+                "SELECT t1.\"ID\", t1.\"USERNAME\", (SELECT COUNT(t0.\"ID\") FROM \"MATRIX_ORDER\" t0 WHERE t0.\"USER_ID\" = t1.\"ID\") AS \"order_cnt\" FROM \"MATRIX_USER\" t1 ORDER BY t1.\"ID\" ASC",
                 // SQLite
-                "SELECT t0.\"id\", t0.\"username\", (SELECT COUNT(t1.\"id\") FROM \"matrix_order\" t1 WHERE t1.\"user_id\" = t0.\"id\") AS \"order_cnt\" FROM \"matrix_user\" t0 ORDER BY t0.\"id\" ASC",
+                "SELECT t1.\"id\", t1.\"username\", (SELECT COUNT(t0.\"id\") FROM \"matrix_order\" t0 WHERE t0.\"user_id\" = t1.\"id\") AS \"order_cnt\" FROM \"matrix_user\" t1 ORDER BY t1.\"id\" ASC",
                 // H2
-                "SELECT t0.\"id\", t0.\"username\", (SELECT COUNT(t1.\"id\") FROM \"matrix_order\" t1 WHERE t1.\"user_id\" = t0.\"id\") AS \"order_cnt\" FROM \"matrix_user\" t0 ORDER BY t0.\"id\" ASC"
+                "SELECT t1.\"id\", t1.\"username\", (SELECT COUNT(t0.\"id\") FROM \"matrix_order\" t0 WHERE t0.\"user_id\" = t1.\"id\") AS \"order_cnt\" FROM \"matrix_user\" t1 ORDER BY t1.\"id\" ASC"
         );
 
         // 真实执行闭环：
@@ -347,6 +407,25 @@ public class Phase6SubquerySetOperationMatrixTest extends AbstractSqlMatrixTest 
             Assert.assertEquals("david", r4.get("username") != null ? r4.get("username") : r4.get("USERNAME"));
             Number cnt4 = (Number) (r4.get("order_cnt") != null ? r4.get("order_cnt") : r4.get("ORDER_CNT"));
             Assert.assertEquals(0L, cnt4.longValue());
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlRows = targetOrm.sql(e -> {
+                e.toExecutionFromReturn(
+                        targetOrm.select(
+                                u.getId(),
+                                u.getUsername(),
+                                subQuery(
+                                        targetOrm.select(count(o.getId()))
+                                                .from(MatrixOrder.class)
+                                                .where()
+                                                .eq(o.getUserId(), u.getId())
+                                ).as("order_cnt")
+                        ).from(MatrixUser.class).orderByAsc(u.getId())
+                );
+            }).maps();
+            Assert.assertEquals(4, sqlRows.size());
+            Number sqlCnt1 = (Number) (sqlRows.get(0).get("order_cnt") != null ? sqlRows.get(0).get("order_cnt") : sqlRows.get(0).get("ORDER_CNT"));
+            Assert.assertEquals(2L, sqlCnt1.longValue());
         });
     }
 
@@ -385,6 +464,16 @@ public class Phase6SubquerySetOperationMatrixTest extends AbstractSqlMatrixTest 
             q2.where().eq(MatrixUser::getStatus, 0);
             List<MatrixUser> list = q1.unionAll(q2).list();
             Assert.assertEquals(4, list.size());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = targetOrm.sql(e -> {
+                SelectBuilder<MatrixUser> sq1 = targetOrm.select(MatrixUser.class);
+                sq1.where().eq(MatrixUser::getStatus, 1);
+                SelectBuilder<MatrixUser> sq2 = targetOrm.select(MatrixUser.class);
+                sq2.where().eq(MatrixUser::getStatus, 0);
+                e.toExecutionFromReturn(sq1.unionAll(sq2));
+            }).list(MatrixUser.class);
+            Assert.assertEquals(4, sqlList.size());
         });
     }
 
@@ -429,6 +518,17 @@ public class Phase6SubquerySetOperationMatrixTest extends AbstractSqlMatrixTest 
             q2.where().ge(u.getScore(), new BigDecimal("80.00"));
             List<Map<String, Object>> rows = q1.union(q2).listMaps();
             Assert.assertEquals(3, rows.size());
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlRows = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                SelectBuilder<MatrixUser> sq1 = targetOrm.select(su.getUsername()).from(MatrixUser.class);
+                sq1.where().eq(su.getAge(), 20);
+                SelectBuilder<MatrixUser> sq2 = targetOrm.select(su.getUsername()).from(MatrixUser.class);
+                sq2.where().ge(su.getScore(), new BigDecimal("80.00"));
+                e.toExecutionFromReturn(sq1.union(sq2));
+            }).maps();
+            Assert.assertEquals(3, sqlRows.size());
         });
     }
 
@@ -481,6 +581,20 @@ public class Phase6SubquerySetOperationMatrixTest extends AbstractSqlMatrixTest 
             Assert.assertEquals(2, list.size());
             Assert.assertEquals("alice", list.get(0).getUsername());
             Assert.assertEquals("bob", list.get(1).getUsername());
+
+            // 模式 2: orm.sql() 模式
+            List<MatrixUser> sqlList = targetOrm.sql(e -> {
+                MatrixOrder so = e.table(MatrixOrder.class);
+                SelectBuilder<MatrixOrder> hsq = targetOrm.select(so.getUserId())
+                        .from(MatrixOrder.class)
+                        .groupBy(so.getUserId())
+                        .having().ge(count(so.getId()), 1)
+                        .getQuery();
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su).from(su).where(w -> w.in(su.getId(), hsq)).orderByAsc(su.getId());
+            }).list(MatrixUser.class);
+            Assert.assertEquals(2, sqlList.size());
+            Assert.assertEquals("alice", sqlList.get(0).getUsername());
         });
     }
 }

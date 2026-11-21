@@ -51,6 +51,13 @@ public class Phase10DeleteMatrixTest extends AbstractSqlMatrixTest {
                     .where().eq(MatrixUser::getId, 4L)
                     .firstOrNull();
             Assert.assertNull(loaded);
+
+            // 模式 2: orm.sql() 模式
+            int sqlRows = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.delete(su).where().eq(su.getId(), 4L);
+            }).execute();
+            Assert.assertTrue(sqlRows >= 0);
         });
     }
 
@@ -87,6 +94,13 @@ public class Phase10DeleteMatrixTest extends AbstractSqlMatrixTest {
                     .where().eq(MatrixUser::getId, 3L)
                     .firstOrNull();
             Assert.assertNull(loaded);
+
+            // 模式 2: orm.sql() 模式
+            int sqlRows = targetOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.delete(su).where().eq(su.getStatus(), 0).and().ge(su.getAge(), 30);
+            }).execute();
+            Assert.assertTrue(sqlRows >= 0);
         });
     }
 
@@ -120,6 +134,13 @@ public class Phase10DeleteMatrixTest extends AbstractSqlMatrixTest {
                     .where().in(MatrixOrderItem::getId, Arrays.asList(2L, 3L))
                     .list();
             Assert.assertTrue(remaining.isEmpty());
+
+            // 模式 2: orm.sql() 模式
+            int sqlRows = targetOrm.sql(e -> {
+                MatrixOrderItem soi = e.table(MatrixOrderItem.class);
+                e.delete(soi).where().in(soi.getId(), Arrays.asList(2L, 3L));
+            }).execute();
+            Assert.assertTrue(sqlRows >= 0);
         });
     }
 
@@ -164,6 +185,13 @@ public class Phase10DeleteMatrixTest extends AbstractSqlMatrixTest {
                     .firstOrNull();
             Assert.assertNotNull(rawQueried);
             Assert.assertEquals(Integer.valueOf(1), rawQueried.getIsDeleted());
+
+            // 模式 2: orm.sql() 模式
+            int sqlRows = targetOrm.sql(e -> {
+                MatrixSoftDelete ssd = e.table(MatrixSoftDelete.class);
+                e.delete(ssd).where().eq(ssd.getId(), 1L);
+            }).execute();
+            Assert.assertTrue(sqlRows >= 0);
         });
     }
 
@@ -204,6 +232,13 @@ public class Phase10DeleteMatrixTest extends AbstractSqlMatrixTest {
                     .where().eq(MatrixSoftDelete::getId, 2L)
                     .firstOrNull();
             Assert.assertNull(rawQueried);
+
+            // 模式 2: orm.sql() 模式
+            int sqlRows = targetOrm.sql(e -> {
+                MatrixSoftDelete ssd = e.table(MatrixSoftDelete.class);
+                e.delete(ssd).where().eq(ssd.getId(), 2L);
+            }).execute();
+            Assert.assertTrue(sqlRows >= 0);
         });
     }
 
@@ -215,6 +250,23 @@ public class Phase10DeleteMatrixTest extends AbstractSqlMatrixTest {
     public void test10_6_UnconstrainedDeleteSql() {
         assertMatrixSql(
                 oOrm -> oOrm.delete(MatrixOrderItem.class),
+                // MySQL
+                "DELETE FROM `matrix_order_item`",
+                // PostgreSQL
+                "DELETE FROM \"matrix_order_item\"",
+                // Oracle
+                "DELETE FROM \"MATRIX_ORDER_ITEM\"",
+                // SQLite
+                "DELETE FROM \"matrix_order_item\"",
+                // H2
+                "DELETE FROM \"matrix_order_item\""
+        );
+
+        // 模式 2: orm.sql() 模式验证
+        assertMatrixSql(
+                oOrm -> oOrm.sql(e -> {
+                    e.delete(MatrixOrderItem.class);
+                }),
                 // MySQL
                 "DELETE FROM `matrix_order_item`",
                 // PostgreSQL

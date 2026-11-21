@@ -93,6 +93,18 @@ public class Phase4GroupByHavingMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(1, ((Number) rows.get(1).get("status")).intValue());
             Assert.assertEquals(3L, ((Number) rows.get(1).get("user_count")).longValue());
             Assert.assertEquals(21.67, ((Number) rows.get(1).get("avg_age")).doubleValue(), 0.05);
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlRows = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su.getStatus(), count(su.getId()).as("user_count"), avg(su.getAge()).as("avg_age"))
+                        .from(su)
+                        .groupBy(su.getStatus())
+                        .orderByAsc(su.getStatus());
+            }).maps();
+            Assert.assertEquals(2, sqlRows.size());
+            Assert.assertEquals(0, ((Number) sqlRows.get(0).get("status")).intValue());
+            Assert.assertEquals(1L, ((Number) sqlRows.get(0).get("user_count")).longValue());
         });
     }
 
@@ -157,6 +169,17 @@ public class Phase4GroupByHavingMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(30, ((Number) rows.get(2).get("age")).intValue());
             Assert.assertEquals(0, ((Number) rows.get(2).get("status")).intValue());
             Assert.assertEquals(1L, ((Number) rows.get(2).get("cnt")).longValue());
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlRows = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su.getAge(), su.getStatus(), count(su.getId()).as("cnt"))
+                        .from(su)
+                        .groupBy(su.getAge(), su.getStatus())
+                        .orderByAsc(su.getAge())
+                        .orderByAsc(su.getStatus());
+            }).maps();
+            Assert.assertEquals(3, sqlRows.size());
         });
     }
 
@@ -218,6 +241,19 @@ public class Phase4GroupByHavingMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(1, rows.size());
             Assert.assertEquals(1, ((Number) rows.get(0).get("status")).intValue());
             Assert.assertEquals(3L, ((Number) rows.get(0).get("user_count")).longValue());
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlRows = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su.getStatus(), count(su.getId()).as("user_count"))
+                        .from(su)
+                        .groupBy(su.getStatus())
+                        .having(h -> h.gt(count(su.getId()), 1))
+                        .orderByAsc(su.getStatus());
+            }).maps();
+            Assert.assertEquals(1, sqlRows.size());
+            Assert.assertEquals(1, ((Number) sqlRows.get(0).get("status")).intValue());
+            Assert.assertEquals(3L, ((Number) sqlRows.get(0).get("user_count")).longValue());
         });
     }
 
@@ -286,6 +322,21 @@ public class Phase4GroupByHavingMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(1L, ((Number) rows.get(0).get("user_id")).longValue());
             Assert.assertEquals(2L, ((Number) rows.get(0).get("order_count")).longValue());
             Assert.assertEquals(new BigDecimal("498.90"), new BigDecimal(rows.get(0).get("total_amount").toString()));
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlRows = oOrm.sql(e -> {
+                MatrixOrder so = e.table(MatrixOrder.class);
+                e.select(so.getUserId(), count(so.getId()).as("order_count"), sum(so.getAmount()).as("total_amount"))
+                        .from(so)
+                        .groupBy(so.getUserId())
+                        .having(h -> {
+                            h.ge(count(so.getId()), 2);
+                            h.gt(sum(so.getAmount()), new BigDecimal("200.00"));
+                        })
+                        .orderByAsc(so.getUserId());
+            }).maps();
+            Assert.assertEquals(1, sqlRows.size());
+            Assert.assertEquals(1L, ((Number) sqlRows.get(0).get("user_id")).longValue());
         });
     }
 
@@ -363,6 +414,18 @@ public class Phase4GroupByHavingMatrixTest extends AbstractSqlMatrixTest {
             Assert.assertEquals(30, ((Number) rows.get(2).get("age")).intValue());
             Assert.assertEquals(1L, ((Number) rows.get(2).get("cnt")).longValue());
             Assert.assertEquals(72.50, ((Number) rows.get(2).get("avg_score")).doubleValue(), 0.01);
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlRows = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su.getAge(), count(su.getId()).as("cnt"), avg(su.getScore()).as("avg_score"))
+                        .from(su)
+                        .where().ge(su.getScore(), new BigDecimal("70.00"))
+                        .groupBy(su.getAge())
+                        .having(h -> h.ge(count(su.getId()), 1))
+                        .orderByAsc(su.getAge());
+            }).maps();
+            Assert.assertEquals(3, sqlRows.size());
         });
     }
 
@@ -419,6 +482,17 @@ public class Phase4GroupByHavingMatrixTest extends AbstractSqlMatrixTest {
 
             Assert.assertEquals(0, ((Number) rows.get(1).get("status")).intValue());
             Assert.assertEquals(1L, ((Number) rows.get(1).get("cnt")).longValue());
+
+            // 模式 2: orm.sql() 模式
+            List<Map<String, Object>> sqlRows = oOrm.sql(e -> {
+                MatrixUser su = e.table(MatrixUser.class);
+                e.select(su.getStatus(), count(su.getId()).as("cnt"))
+                        .from(su)
+                        .groupBy(su.getStatus())
+                        .orderByDesc(count(su.getId()));
+            }).maps();
+            Assert.assertEquals(2, sqlRows.size());
+            Assert.assertEquals(1, ((Number) sqlRows.get(0).get("status")).intValue());
         });
     }
 

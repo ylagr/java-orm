@@ -143,6 +143,17 @@ public class SqlEnv {
     }
 
     /**
+     * 获取指定实体的录制代理单例对象
+     */
+    public <T> T proxy(Class<T> entityClass) {
+        return com.javaorm.core.proxy.ProxyFactory.getProxy(entityClass);
+    }
+
+    public <T> T proxy(Cte<T> cte) {
+        return cte.proxy();
+    }
+
+    /**
      * 声明 CTE 临时表，返回带别名的 CTE 实例
      */
     public <R> Cte<R> table(Cte<R> cte) {
@@ -339,6 +350,33 @@ public class SqlEnv {
         return createQuery(cte);
     }
 
+    public SqlEnv forUpdate() {
+        if (currentOperation instanceof SqlSelectStream<?>) {
+            ((SqlSelectStream<?>) currentOperation).forUpdate();
+        } else if (currentOperation instanceof SelectBuilder<?>) {
+            ((SelectBuilder<?>) currentOperation).forUpdate();
+        }
+        return this;
+    }
+
+    public SqlEnv forUpdateNowait() {
+        if (currentOperation instanceof SqlSelectStream<?>) {
+            ((SqlSelectStream<?>) currentOperation).forUpdateNowait();
+        } else if (currentOperation instanceof SelectBuilder<?>) {
+            ((SelectBuilder<?>) currentOperation).forUpdateNowait();
+        }
+        return this;
+    }
+
+    public SqlEnv forUpdateSkipLocked() {
+        if (currentOperation instanceof SqlSelectStream<?>) {
+            ((SqlSelectStream<?>) currentOperation).forUpdateSkipLocked();
+        } else if (currentOperation instanceof SelectBuilder<?>) {
+            ((SelectBuilder<?>) currentOperation).forUpdateSkipLocked();
+        }
+        return this;
+    }
+
     public <T> SelectBuilder<T> createQuery(Class<T> entityClass) {
         SelectBuilder<T> q = new SelectBuilder<>(this, entityClass);
         this.currentOperation = q;
@@ -420,7 +458,9 @@ public class SqlEnv {
     }
 
     public <T> com.javaorm.core.mutation.InsertBuilder<T> createInsert(T entity) {
-        return new com.javaorm.core.mutation.InsertBuilder<>(this, entity);
+        com.javaorm.core.mutation.InsertBuilder<T> builder = new com.javaorm.core.mutation.InsertBuilder<>(this, entity);
+        this.currentOperation = builder;
+        return builder;
     }
 
     // ========== 4.6 UPSERT 工厂 ==========
@@ -430,7 +470,9 @@ public class SqlEnv {
     }
 
     public <T> com.javaorm.core.mutation.UpsertBuilder<T> createUpsert(T entity) {
-        return new com.javaorm.core.mutation.UpsertBuilder<>(this, entity);
+        com.javaorm.core.mutation.UpsertBuilder<T> builder = new com.javaorm.core.mutation.UpsertBuilder<>(this, entity);
+        this.currentOperation = builder;
+        return builder;
     }
 
     // ========== 5. 输出统一执行门面 ==========
@@ -516,10 +558,15 @@ public class SqlEnv {
             this.currentOperation = db;
             return new SqlExecution<>(this, db, null);
         }
-        if (returned instanceof SqlDeleteStream) {
-            SqlDeleteStream sds = (SqlDeleteStream) returned;
-            this.currentOperation = sds;
-            return new SqlExecution<>(this, sds, null);
+        if (returned instanceof com.javaorm.core.mutation.InsertBuilder) {
+            com.javaorm.core.mutation.InsertBuilder<?> ib = (com.javaorm.core.mutation.InsertBuilder<?>) returned;
+            this.currentOperation = ib;
+            return new SqlExecution<>(this, ib, null);
+        }
+        if (returned instanceof com.javaorm.core.mutation.UpsertBuilder) {
+            com.javaorm.core.mutation.UpsertBuilder<?> ub = (com.javaorm.core.mutation.UpsertBuilder<?>) returned;
+            this.currentOperation = ub;
+            return new SqlExecution<>(this, ub, null);
         }
         return toExecution();
     }
