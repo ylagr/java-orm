@@ -334,10 +334,10 @@ public class ComprehensiveAllSqlFeaturesTest {
         assertNotNull(res1);
         assertEquals(0, ((Number) (res1.get("total_age") != null ? res1.get("total_age") : res1.get("TOTAL_AGE"))).intValue());
 
-        // 2. orm.sql 模式下使用 e.coalesce 和 e.sum
+        // 2. orm.sql 模式下使用 SQL.coalesce 和 SQL.sum
         List<Map<String, Object>> res2 = orm.sql(e -> {
             Student st = e.table(Student.class, "st");
-            e.select(e.coalesce(e.sum(st.getAge()), 0).as("total_age"))
+            e.select(coalesce(sum(st.getAge()), 0).as("total_age"))
                     .from(st)
                     .where().eq(st.getId(), 999999L);
         }).listMaps();
