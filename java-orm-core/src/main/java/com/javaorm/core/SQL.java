@@ -9,6 +9,7 @@ import com.javaorm.core.proxy.RecordingContext;
 import com.javaorm.core.query.SelectBuilder;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -1009,17 +1010,59 @@ public class SQL {
         return new FunctionExpression<>(BuiltinSqlFunction.IFNULL, toExpression(prop), def);
     }
 
+    public static <T> FunctionExpression<T> ifNull(SqlExpression<T> expr, Object defVal) {
+        return new FunctionExpression<>(BuiltinSqlFunction.IFNULL, toExpressions(expr, defVal));
+    }
+
+    public static <T> FunctionExpression<T> ifNull(SqlExpression<T> expr, SqlExpression<? extends T> defExpr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.IFNULL, toExpressions(expr, defExpr));
+    }
+
     public static <T> FunctionExpression<T> nvl(T prop, T def) {
         return ifNull(prop, def);
+    }
+
+    public static <T> FunctionExpression<T> nvl(SqlExpression<T> expr, Object defVal) {
+        return ifNull(expr, defVal);
+    }
+
+    public static <T> FunctionExpression<T> nvl(SqlExpression<T> expr, SqlExpression<? extends T> defExpr) {
+        return ifNull(expr, defExpr);
     }
 
     public static <T> FunctionExpression<T> nullOrDefault(T prop, T def) {
         return ifNull(prop, def);
     }
 
+    public static <T> FunctionExpression<T> nullOrDefault(SqlExpression<T> expr, Object defVal) {
+        return ifNull(expr, defVal);
+    }
+
+    public static <T> FunctionExpression<T> nullOrDefault(SqlExpression<T> expr, SqlExpression<? extends T> defExpr) {
+        return ifNull(expr, defExpr);
+    }
+
     @SafeVarargs
     public static <T> FunctionExpression<T> coalesce(T... props) {
         return new FunctionExpression<>(BuiltinSqlFunction.COALESCE, toExpressions((Object[]) props));
+    }
+
+    public static <T> FunctionExpression<T> coalesce(SqlExpression<T> expr, Object defVal) {
+        return new FunctionExpression<>(BuiltinSqlFunction.COALESCE, toExpressions(expr, defVal));
+    }
+
+    public static <T> FunctionExpression<T> coalesce(SqlExpression<T> expr, SqlExpression<? extends T> defExpr) {
+        return new FunctionExpression<>(BuiltinSqlFunction.COALESCE, toExpressions(expr, defExpr));
+    }
+
+    public static <T> FunctionExpression<T> coalesce(SqlExpression<T> expr, Object defVal, Object... more) {
+        List<Object> all = new ArrayList<>();
+        all.add(expr);
+        all.add(defVal);
+        if (more != null && more.length > 0) {
+            Collections.addAll(all, more);
+        }
+        return new FunctionExpression<>(BuiltinSqlFunction.COALESCE, toExpressions(all.toArray()));
     }
 
     public static <T> FunctionExpression<T> nullIf(T expr1, T expr2) {

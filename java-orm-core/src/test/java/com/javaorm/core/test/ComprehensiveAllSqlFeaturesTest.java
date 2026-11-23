@@ -316,6 +316,36 @@ public class ComprehensiveAllSqlFeaturesTest {
         assertNull(caseList.get(0).get("null_if_18"));            // 18 == 18 -> NULL
     }
 
+    @Test
+    public void testCoalesceAdvancedOverloads() {
+        Student s = orm.proxy(Student.class);
+
+        // 1. coalesce 包装聚合表达式与不同类型默认值 (如 sum + 0)
+        String sql1 = orm.select(coalesce(sum(s.getAge()), 0).as("total_age"))
+                .from(Student.class)
+                .where().eq(s.getId(), 999999L)
+                .toSql();
+        assertTrue(sql1.contains("COALESCE(SUM("));
+
+        Map<String, Object> res1 = orm.select(coalesce(sum(s.getAge()), 0).as("total_age"))
+                .from(Student.class)
+                .where().eq(s.getId(), 999999L)
+                .toMap();
+        assertNotNull(res1);
+        assertEquals(0, ((Number) (res1.get("total_age") != null ? res1.get("total_age") : res1.get("TOTAL_AGE"))).intValue());
+
+        // 2. orm.sql 模式下使用 e.coalesce 和 e.sum
+        List<Map<String, Object>> res2 = orm.sql(e -> {
+            Student st = e.table(Student.class, "st");
+            e.select(e.coalesce(e.sum(st.getAge()), 0).as("total_age"))
+                    .from(st)
+                    .where().eq(st.getId(), 999999L);
+        }).listMaps();
+        assertNotNull(res2);
+        assertFalse(res2.isEmpty());
+        assertEquals(0, ((Number) (res2.get(0).get("total_age") != null ? res2.get(0).get("total_age") : res2.get(0).get("TOTAL_AGE"))).intValue());
+    }
+
     // =========================================================================
     // 3. 所有子查询测试 (SELECT, WHERE IN, EXISTS, 比较符>, UPDATE SET, 多层关联子查询)
     // =========================================================================

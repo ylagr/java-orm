@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.*;
 
+import static com.javaorm.core.SQL.coalesce;
 import static com.javaorm.core.SQL.count;
 import static com.javaorm.core.SQL.sum;
 
@@ -29,10 +30,10 @@ public class DashboardService {
         long totalUsers = orm.select(MallUser.class).count();
         long totalOrders = orm.select(MallOrder.class).count();
 
-        // 2. 统计已付款订单的总销售额（通过 JavaORM 流式聚合）
+        // 2. 统计已付款订单的总销售额（通过 JavaORM 流式 coalesce + sum 聚合）
         List<Map<String, Object>> salesRows = orm.sql(e -> {
             MallOrder o = e.table(MallOrder.class, "o");
-            e.select(sum(o.getPayAmount()).as("total_sales"))
+            e.select(coalesce(sum(o.getPayAmount()), BigDecimal.ZERO).as("total_sales"))
                     .from(o)
                     .where()
                     .ge(o.getStatus(), 20)

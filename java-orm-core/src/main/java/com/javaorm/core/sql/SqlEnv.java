@@ -845,4 +845,51 @@ public class SqlEnv {
         }
         return config != null ? config.getNameConversion().convert(path.getTerminalProperty()) : path.getTerminalProperty();
     }
+
+    // ==================== SQL 常用内置函数便捷委托 ====================
+
+    @SafeVarargs
+    public final <T> com.javaorm.core.ast.FunctionExpression<T> coalesce(T... props) {
+        return com.javaorm.core.SQL.coalesce(props);
+    }
+
+    public <T> com.javaorm.core.ast.FunctionExpression<T> coalesce(com.javaorm.core.ast.SqlExpression<T> expr, Object defVal) {
+        return com.javaorm.core.SQL.coalesce(expr, defVal);
+    }
+
+    public <T> com.javaorm.core.ast.FunctionExpression<T> coalesce(com.javaorm.core.ast.SqlExpression<T> expr, com.javaorm.core.ast.SqlExpression<? extends T> defExpr) {
+        return com.javaorm.core.SQL.coalesce(expr, defExpr);
+    }
+
+    public <T> com.javaorm.core.ast.FunctionExpression<T> coalesce(com.javaorm.core.ast.SqlExpression<T> expr, Object defVal, Object... more) {
+        return com.javaorm.core.SQL.coalesce(expr, defVal, more);
+    }
+
+    public <T> com.javaorm.core.ast.FunctionExpression<T> ifNull(T prop, T def) {
+        return com.javaorm.core.SQL.ifNull(prop, def);
+    }
+
+    public <T> com.javaorm.core.ast.FunctionExpression<T> ifNull(com.javaorm.core.ast.SqlExpression<T> expr, Object defVal) {
+        return com.javaorm.core.SQL.ifNull(expr, defVal);
+    }
+
+    public <T extends Number> com.javaorm.core.ast.FunctionExpression<T> sum(T prop) {
+        return com.javaorm.core.SQL.sum(prop);
+    }
+
+    public <T extends Number> com.javaorm.core.ast.FunctionExpression<T> sum(com.javaorm.core.ast.SqlExpression<T> expr) {
+        return com.javaorm.core.SQL.sum(expr);
+    }
+
+    public <T> com.javaorm.core.ast.FunctionExpression<Long> count(T prop) {
+        return com.javaorm.core.SQL.count(prop);
+    }
+
+    public <T> com.javaorm.core.ast.FunctionExpression<Long> count(com.javaorm.core.ast.SqlExpression<T> expr) {
+        return com.javaorm.core.SQL.count(expr);
+    }
+
+    public com.javaorm.core.ast.FunctionExpression<Long> count() {
+        return com.javaorm.core.SQL.count();
+    }
 }

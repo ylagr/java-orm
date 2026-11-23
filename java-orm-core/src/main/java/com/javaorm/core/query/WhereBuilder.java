@@ -3019,6 +3019,14 @@ public class WhereBuilder<T> implements Query<T> {
         return listMaps();
     }
 
+    public Map<String, Object> toMap() {
+        if (rootQuery != null) {
+            return rootQuery.toMap();
+        }
+        List<Map<String, Object>> list = listMaps();
+        return (list != null && !list.isEmpty()) ? list.get(0) : null;
+    }
+
     public <V> V fetchOne(Class<V> targetType) {
         if (rootQuery != null) {
             return rootQuery.fetchOne(targetType);
