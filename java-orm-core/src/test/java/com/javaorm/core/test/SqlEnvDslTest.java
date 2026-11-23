@@ -179,6 +179,70 @@ public class SqlEnvDslTest {
         assertEquals("Prof. Wang", tName);
     }
 
+    @Test
+    public void testLeftJoinMultipleColumnOnConditions() {
+        String sql = orm.sql(e -> {
+            Student s = e.table(Student.class, "s");
+            Teacher t = e.table(Teacher.class, "t");
+
+            return e.select(s.getStudentName(), t.getTeacherName())
+                    .from(s)
+                    .leftjoin(t).on(on -> on.eq(s.getTeacherId(), t.getId()).eq(s.getTeacherId(), t.getId()))
+                    .where().eq(s.getAge(), 25);
+        }).toSql();
+        assertTrue(sql.contains("\"s\".\"teacher_id\" = \"t\".\"id\" AND \"s\".\"teacher_id\" = \"t\".\"id\""));
+
+        List<Map<String, Object>> rows = orm.sql(e -> {
+            Student s = e.table(Student.class, "s");
+            Teacher t = e.table(Teacher.class, "t");
+
+            e.select(s.getStudentName(), t.getTeacherName())
+                    .from(s)
+                    .leftjoin(t).on(on -> on.eq(s.getTeacherId(), t.getId()).eq(s.getTeacherId(), t.getId()))
+                    .where().eq(s.getAge(), 25);
+        }).listMaps();
+
+        assertEquals(1, rows.size());
+        Map<String, Object> row = rows.get(0);
+        Object sName = row.get("student_name") != null ? row.get("student_name") : row.get("STUDENT_NAME");
+        assertEquals("David", sName);
+    }
+
+    @Test
+    public void testLeftJoinChainedOnMethods() {
+        // 测试连续链式调用 .on(c1, c2).on(c3, c4)
+        String sql = orm.sql(e -> {
+            Student s = e.table(Student.class, "s");
+            Teacher t = e.table(Teacher.class, "t");
+
+            return e.select(s.getStudentName(), t.getTeacherName())
+                    .from(s)
+                    .leftjoin(t).on(s.getTeacherId(), t.getId())
+                                .on(s.getTeacherId(), t.getId())
+                    .where().eq(s.getAge(), 25);
+        }).toSql();
+        assertTrue(sql.contains("\"s\".\"teacher_id\" = \"t\".\"id\" AND \"s\".\"teacher_id\" = \"t\".\"id\""));
+    }
+
+    @Test
+    public void testJoinBuilderOnOverloads() {
+        // 测试 SelectBuilder / JoinBuilder 上的 on(c1, c2) 与 on(on -> on.eq().eq())
+        Student s = com.javaorm.core.proxy.ProxyFactory.createProxy(Student.class, "t0");
+        Teacher t = com.javaorm.core.proxy.ProxyFactory.createProxy(Teacher.class, "t1");
+
+        String sql1 = orm.select(Student.class)
+                .leftjoin(Teacher.class)
+                .on(s.getTeacherId(), t.getId())
+                .toSql();
+        assertTrue(sql1.contains("t0.\"teacher_id\" = t1.\"id\""));
+
+        String sql2 = orm.select(Student.class)
+                .leftjoin(Teacher.class)
+                .on(on -> on.eq(s.getTeacherId(), t.getId()).eq(s.getTeacherId(), t.getId()))
+                .toSql();
+        assertTrue(sql2.contains("t0.\"teacher_id\" = t1.\"id\" AND t0.\"teacher_id\" = t1.\"id\""));
+    }
+
     /**
      * 3. 测试用户给出的经典自连接案例（Self Join）：
      * orm.sql(e -> {

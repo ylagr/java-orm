@@ -113,4 +113,36 @@ public class EasyQueryJoinTest extends EasyQueryBaseTest {
         assertEquals(1, list.size());
         assertEquals("b3", list.get(0).getId());
     }
+
+    @Test
+    public void testSqlModeLeftJoinMultipleOnConditions() {
+        // 使用 leftjoin().on(on -> on.eq(col1, col2).eq(col3, col4)) 进行链式多条件 ON 关联
+        List<BlogEntity> list = orm.sql(e -> {
+            BlogEntity b = e.table(BlogEntity.class, "b");
+            Topic t = e.table(Topic.class, "t");
+            e.select(b)
+                    .from(b)
+                    .leftjoin(t).on(on -> on.eq(b.getTopicId(), t.getId()).eq(t.getId(), "2"))
+                    .where(w -> w.isNotNull(t.getId()));
+        }).toList();
+
+        assertEquals(1, list.size());
+        assertEquals("b3", list.get(0).getId());
+    }
+
+    @Test
+    public void testQueryableLeftJoinMultipleOnConditions() {
+        // 使用 queryable 的 leftjoin().on(on -> on.eq(col1, col2).eq(col3, col4))
+        BlogEntity b = com.javaorm.core.proxy.ProxyFactory.createProxy(BlogEntity.class, "t0");
+        Topic t = com.javaorm.core.proxy.ProxyFactory.createProxy(Topic.class, "t1");
+
+        List<BlogEntity> list = orm.queryable(BlogEntity.class)
+                .leftjoin(Topic.class)
+                .on(on -> on.eq(b.getTopicId(), t.getId()).eq(t.getId(), "2"))
+                .where(w -> w.isNotNull(t.getId()))
+                .toList();
+
+        assertEquals(1, list.size());
+        assertEquals("b3", list.get(0).getId());
+    }
 }

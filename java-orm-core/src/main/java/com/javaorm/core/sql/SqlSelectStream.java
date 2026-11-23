@@ -39,6 +39,8 @@ public class SqlSelectStream<T> implements Query<T> {
 
     private SelectBuilder<?> query;
     private WhereBuilder<T> activeWhereBuilder;
+    private TableJoin lastJoin;
+    private SqlTableInfo<?> lastJoinTargetInfo;
 
     public SqlSelectStream(SqlEnv env, Class<T> targetClass, Object[] expressions) {
         this.env = env;
@@ -367,7 +369,29 @@ public class SqlSelectStream<T> implements Query<T> {
             }
         }
         query.getStatement().addJoin(join);
+        this.lastJoin = join;
+        this.lastJoinTargetInfo = targetInfo;
         return new SqlJoinClause<>(this, join, targetInfo);
+    }
+
+    /**
+     * 追加等值关联条件：.leftjoin(t).on(c1, c2).on(c3, c4)
+     */
+    public SqlSelectStream<T> on(Object leftProp, Object rightProp) {
+        if (lastJoin != null && lastJoinTargetInfo != null) {
+            new SqlJoinClause<>(this, lastJoin, lastJoinTargetInfo).on(leftProp, rightProp);
+        }
+        return this;
+    }
+
+    /**
+     * 追加多条件关联配置：.leftjoin(t).on(on -> on.eq(c1, c2).eq(c3, c4))
+     */
+    public SqlSelectStream<T> on(Consumer<WhereBuilder<?>> onConsumer) {
+        if (lastJoin != null && lastJoinTargetInfo != null) {
+            new SqlJoinClause<>(this, lastJoin, lastJoinTargetInfo).on(onConsumer);
+        }
+        return this;
     }
 
     private SqlJoinClause<T> createJoin(TableJoin.JoinType joinType, Object targetTable) {

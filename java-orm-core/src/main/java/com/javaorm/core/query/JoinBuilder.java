@@ -1,9 +1,11 @@
 package com.javaorm.core.query;
 
 import com.javaorm.core.ast.TableJoin;
+import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.ProxyFactory;
 import com.javaorm.core.proxy.RecordingContext;
 
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -40,8 +42,7 @@ public class JoinBuilder<TRoot, TJoin> {
         this.onComplete = onComplete;
     }
 
-    @SuppressWarnings("unchecked")
-    public SelectBuilder<TRoot> on(TriConsumer<WhereBuilder<TJoin>, TRoot, TJoin> onConsumer) {
+    private TableJoin createJoinAndApplyFilters() {
         TableJoin join = new TableJoin(joinType, tableName, joinAlias);
         rootQuery.getStatement().addJoin(join);
 
@@ -64,6 +65,49 @@ public class JoinBuilder<TRoot, TJoin> {
                 }
             }
         }
+        return join;
+    }
+
+    /**
+     * 声明等值关联条件：.on(child.getParentId(), parent.getId())
+     */
+    public SelectBuilder<TRoot> on(Object leftProp, Object rightProp) {
+        TableJoin join = createJoinAndApplyFilters();
+        List<PropertyPath> paths = RecordingContext.finishAll();
+        if (paths.size() >= 2) {
+            PropertyPath p1 = paths.get(paths.size() - 2);
+            PropertyPath p2 = paths.get(paths.size() - 1);
+            com.javaorm.core.ast.ColumnExpression col1 = pathToColumnExpression(p1);
+            com.javaorm.core.ast.ColumnExpression col2 = pathToColumnExpression(p2);
+            join.addOnCondition(new com.javaorm.core.ast.ColumnEqualityCondition(
+                    col1.getTableAlias(), col1.getColumnName(),
+                    col2.getTableAlias(), col2.getColumnName()
+            ));
+        } else if (!paths.isEmpty()) {
+            PropertyPath p = paths.get(0);
+            com.javaorm.core.ast.ColumnExpression col1 = pathToColumnExpression(p);
+            join.addOnCondition(new com.javaorm.core.ast.BinaryCondition(col1.getTableAlias(), col1.getColumnName(), com.javaorm.core.operator.SqlOperator.EQ, rightProp));
+        }
+        if (cte != null) {
+            rootQuery.ensureCteAdded(cte);
+        }
+        if (onComplete != null) {
+            onComplete.run();
+        }
+        return rootQuery;
+    }
+
+    private com.javaorm.core.ast.ColumnExpression pathToColumnExpression(PropertyPath path) {
+        String alias = path.getExplicitAlias() != null ? path.getExplicitAlias() : rootQuery.resolveTableAlias(path);
+        String colName = rootQuery.resolveColumnName(path);
+        com.javaorm.core.ast.ColumnExpression ce = new com.javaorm.core.ast.ColumnExpression(alias, colName);
+        ce.setPath(path);
+        return ce;
+    }
+
+    @SuppressWarnings("unchecked")
+    public SelectBuilder<TRoot> on(TriConsumer<WhereBuilder<TJoin>, TRoot, TJoin> onConsumer) {
+        TableJoin join = createJoinAndApplyFilters();
         WhereBuilder<TJoin> onBuilder = new WhereBuilder<>(joinClass, rootQuery, joinAlias,
                 join::addOnCondition, null, null, null, null);
 

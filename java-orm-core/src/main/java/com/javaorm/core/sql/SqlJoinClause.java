@@ -60,13 +60,26 @@ public class SqlJoinClause<T> implements Query<T> {
     }
 
     /**
-     * 作用域 Lambda 关联条件配置
+     * 声明多条件链式关联配置：.on(on -> on.eq(column1, column2).eq(column3, column4))
      */
     public SqlSelectStream<T> on(Consumer<WhereBuilder<?>> onConsumer) {
         if (onConsumer != null) {
-            WhereBuilder<?> wb = new WhereBuilder<>(targetInfo.getEntityClass(), selectStream.getQuery(),
-                    targetInfo.getAlias(), tableJoin::addOnCondition);
-            onConsumer.accept(wb);
+            SelectBuilder<?> query = selectStream.getQuery();
+            if (targetInfo != null && targetInfo.getEntityClass() != null && targetInfo.getAlias() != null) {
+                RecordingContext.registerAlias(targetInfo.getEntityClass(), targetInfo.getAlias());
+            }
+            if (query != null && query.getRootEntityClass() != null && query.getStatement() != null && query.getStatement().getRootTableAlias() != null) {
+                RecordingContext.registerAlias(query.getRootEntityClass(), query.getStatement().getRootTableAlias());
+            }
+            try {
+                WhereBuilder<?> wb = new WhereBuilder<>(targetInfo != null ? targetInfo.getEntityClass() : null,
+                        query,
+                        targetInfo != null ? targetInfo.getAlias() : null,
+                        tableJoin::addOnCondition);
+                onConsumer.accept(wb);
+            } finally {
+                RecordingContext.clearRecording();
+            }
         }
         this.onConfigured = true;
         return selectStream;
