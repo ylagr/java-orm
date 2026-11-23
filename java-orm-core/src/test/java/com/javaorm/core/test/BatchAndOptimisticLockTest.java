@@ -79,6 +79,7 @@ public class BatchAndOptimisticLockTest {
 
         try (Connection c = dataSource.getConnection(); Statement s = c.createStatement()) {
             s.execute("CREATE TABLE t_product (id INTEGER PRIMARY KEY, name TEXT, price REAL, version INTEGER)");
+            s.execute("CREATE TABLE t_item (id INTEGER PRIMARY KEY, title TEXT, price REAL DEFAULT 88.8, status INTEGER DEFAULT 1)");
         }
 
         orm = JavaOrm.create(dataSource, new SQLiteDialect());
@@ -207,5 +208,179 @@ public class BatchAndOptimisticLockTest {
         int delCount2 = orm.deleteBatch(remain).batchSize(3).execute();
         assertEquals(10, delCount2);
         assertEquals(0L, orm.select(Product.class).count());
+    }
+
+    @JoTable(name = "t_item")
+    public static class Item {
+        @JoId
+        private Long id;
+        private String title;
+        private Double price;
+        private Integer status;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getTitle() { return title; }
+        public void setTitle(String title) { this.title = title; }
+        public Double getPrice() { return price; }
+        public void setPrice(Double price) { this.price = price; }
+        public Integer getStatus() { return status; }
+        public void setStatus(Integer status) { this.status = status; }
+    }
+
+    @Test
+    public void testEasyQuerySmartBatchInsertWithDefaults() {
+        Item item1 = new Item();
+        item1.setId(1L);
+        item1.setTitle("Item1"); // price 和 status 为 null
+
+        Item item2 = new Item();
+        item2.setId(2L);
+        item2.setPrice(99.9); // title 和 status 为 null
+
+        Item item3 = new Item();
+        item3.setId(3L);
+        item3.setTitle("Item3"); // price 和 status 为 null
+
+        // 默认 EasyQuery 模式 (selective=true, keepOrder=false)：按非空列指纹聚类合并
+        int rows = orm.insertBatch(Arrays.asList(item1, item2, item3)).execute();
+        assertEquals(3, rows);
+
+        Item db1 = orm.select(Item.class).where().eq(Item::getId, 1L).firstOrNull();
+        assertNotNull(db1);
+        assertEquals("Item1", db1.getTitle());
+        // 关键验证：由于剔除了 null 字段，数据库的 DEFAULT 88.8 与 DEFAULT 1 正常生效！
+        assertEquals(Double.valueOf(88.8), db1.getPrice());
+        assertEquals(Integer.valueOf(1), db1.getStatus());
+
+        Item db2 = orm.select(Item.class).where().eq(Item::getId, 2L).firstOrNull();
+        assertNotNull(db2);
+        assertNull(db2.getTitle());
+        assertEquals(Double.valueOf(99.9), db2.getPrice());
+        assertEquals(Integer.valueOf(1), db2.getStatus());
+
+        Item db3 = orm.select(Item.class).where().eq(Item::getId, 3L).firstOrNull();
+        assertNotNull(db3);
+        assertEquals("Item3", db3.getTitle());
+        assertEquals(Double.valueOf(88.8), db3.getPrice());
+        assertEquals(Integer.valueOf(1), db3.getStatus());
+    }
+
+    @Test
+    public void testStrictKeepOrderBatchInsertWithDefaults() {
+        Item item10 = new Item();
+        item10.setId(10L);
+        item10.setTitle("Order10");
+
+        Item item11 = new Item();
+        item11.setId(11L);
+        item11.setPrice(101.5);
+
+        Item item12 = new Item();
+        item12.setId(12L);
+        item12.setTitle("Order12");
+
+        // 严格保持顺序插入 (keepOrder=true)：严格遵从原始入参顺序，同时剔除 null 字段
+        int rows = orm.insertBatch(Arrays.asList(item10, item11, item12))
+                .keepOrder(true)
+                .execute();
+        assertEquals(3, rows);
+
+        Item db10 = orm.select(Item.class).where().eq(Item::getId, 10L).firstOrNull();
+        assertNotNull(db10);
+        assertEquals("Order10", db10.getTitle());
+        assertEquals(Double.valueOf(88.8), db10.getPrice()); // 默认值生效
+        assertEquals(Integer.valueOf(1), db10.getStatus());  // 默认值生效
+
+        Item db11 = orm.select(Item.class).where().eq(Item::getId, 11L).firstOrNull();
+        assertNotNull(db11);
+        assertEquals(Double.valueOf(101.5), db11.getPrice());
+        assertEquals(Integer.valueOf(1), db11.getStatus());
+
+        Item db12 = orm.select(Item.class).where().eq(Item::getId, 12L).firstOrNull();
+        assertNotNull(db12);
+        assertEquals("Order12", db12.getTitle());
+        assertEquals(Double.valueOf(88.8), db12.getPrice());
+    }
+
+    @Test
+    public void testEasyQuerySmartBatchUpdateSelective() {
+        // 先插入两条基准数据
+        Item item20 = new Item();
+        item20.setId(20L);
+        item20.setTitle("OldTitle20");
+        item20.setPrice(200.0);
+        item20.setStatus(10);
+
+        Item item21 = new Item();
+        item21.setId(21L);
+        item21.setTitle("OldTitle21");
+        item21.setPrice(210.0);
+        item21.setStatus(10);
+
+        orm.insertBatch(Arrays.asList(item20, item21)).execute();
+
+        // 准备更新：item20 仅更新 title；item21 仅更新 price
+        Item update20 = new Item();
+        update20.setId(20L);
+        update20.setTitle("NewTitle20"); // price 和 status 为 null，不能覆盖数据库已有值
+
+        Item update21 = new Item();
+        update21.setId(21L);
+        update21.setPrice(999.0); // title 和 status 为 null，不能覆盖数据库已有值
+
+        // EasyQuery 智能批处理更新 (selective=true)
+        int updated = orm.updateBatch(Arrays.asList(update20, update21)).execute();
+        assertEquals(2, updated);
+
+        Item after20 = orm.select(Item.class).where().eq(Item::getId, 20L).firstOrNull();
+        assertNotNull(after20);
+        assertEquals("NewTitle20", after20.getTitle());
+        assertEquals(Double.valueOf(200.0), after20.getPrice()); // 原值未被覆盖！
+        assertEquals(Integer.valueOf(10), after20.getStatus());  // 原值未被覆盖！
+
+        Item after21 = orm.select(Item.class).where().eq(Item::getId, 21L).firstOrNull();
+        assertNotNull(after21);
+        assertEquals("OldTitle21", after21.getTitle());         // 原值未被覆盖！
+        assertEquals(Double.valueOf(999.0), after21.getPrice()); // 成功更新
+        assertEquals(Integer.valueOf(10), after21.getStatus());
+    }
+
+    @Test
+    public void testStrictKeepOrderBatchUpdateSelective() {
+        Item item30 = new Item();
+        item30.setId(30L);
+        item30.setTitle("Old30");
+        item30.setPrice(300.0);
+
+        Item item31 = new Item();
+        item31.setId(31L);
+        item31.setTitle("Old31");
+        item31.setPrice(310.0);
+
+        orm.insertBatch(Arrays.asList(item30, item31)).execute();
+
+        Item u30 = new Item();
+        u30.setId(30L);
+        u30.setPrice(666.0);
+
+        Item u31 = new Item();
+        u31.setId(31L);
+        u31.setTitle("New31");
+
+        int updated = orm.updateBatch(Arrays.asList(u30, u31))
+                .keepOrder(true)
+                .execute();
+        assertEquals(2, updated);
+
+        Item after30 = orm.select(Item.class).where().eq(Item::getId, 30L).firstOrNull();
+        assertNotNull(after30);
+        assertEquals("Old30", after30.getTitle());
+        assertEquals(Double.valueOf(666.0), after30.getPrice());
+
+        Item after31 = orm.select(Item.class).where().eq(Item::getId, 31L).firstOrNull();
+        assertNotNull(after31);
+        assertEquals("New31", after31.getTitle());
+        assertEquals(Double.valueOf(310.0), after31.getPrice());
     }
 }

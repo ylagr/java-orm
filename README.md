@@ -504,18 +504,22 @@ public class Product {
     private Integer version;
 }
 
-// 1. 批量插入（自动按 batchSize 分批分块，支持多库多分表自动分组分发，主键安全回填）
+// 1. 批量插入（参考 EasyQuery 智能批处理：自动按非空列指纹聚类合并，剔除 null 字段，确保数据库 DEFAULT 默认值正常生效）
 List<Product> products = ...;
 orm.insertBatch(products)
     .batchSize(500)
+    .selective(true)  // 默认 true：剔除 null 字段，让数据库 DEFAULT 默认值生效，避免显式插入 NULL 覆盖默认值
+    .keepOrder(false) // 默认 false：EasyQuery 智能分桶聚类，性能最高；若设为 true，严格遵从原始列表顺序
     .execute();
 
-// 2. 批量更新（自动递增版本号 version = version + 1，并发冲突校验）
+// 2. 批量更新（智能按修改/非空列分桶，自动递增版本号 version = version + 1，并发冲突校验）
 for (Product p : products) {
     p.setPrice(p.getPrice() * 1.1);
 }
 orm.updateBatch(products)
     .batchSize(200)
+    .selective(true)  // 默认 true：仅更新非空/变脏字段，不会将 null 覆盖回数据库已有字段
+    .keepOrder(false) // 默认 false：智能聚类；若设为 true / strictOrder(true)，严格保持原始顺序更新
     .execute(); // 若版本号不匹配，自动抛出强类型 OptimisticLockException
 
 // 3. 批量删除与根据 ID 列表批量删除

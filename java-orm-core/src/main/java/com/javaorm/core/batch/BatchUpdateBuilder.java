@@ -20,11 +20,15 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * 实体列表批处理更新构建器。
+ * 实体列表批处理更新构建器（参考 EasyQuery 设计哲学）。
+ * 支持：
  * 1. 采用 JDBC PreparedStatement executeBatch() 执行不同实体的批量更新。
- * 2. 支持批大小控制（batchSize，默认 500）。
- * 3. 严格支持乐观锁：如果实体含有 @JoVersion 字段，自动追加 WHERE version = ?，更新成功自动将实体对象的版本递增；若某行受影响数为 0，抛出 OptimisticLockException。
- * 4. 自动分库分表感知分组。
+ * 2. 批大小控制（batchSize，默认 500）。
+ * 3. 乐观锁集成：如果实体含有 @JoVersion 字段，自动追加 WHERE version = ?，更新成功自动将实体对象的版本递增；若某行受影响数为 0，抛出 OptimisticLockException。
+ * 4. EasyQuery 智能批处理模式：按待更新有效字段指纹（Column Fingerprint）聚类分桶，自动合并相同更新结构的实体走同一个批次，剔除 null/未修改字段。
+ * 5. 严格保持顺序更新选项（keepOrder / strictOrder）：在按原始顺序处理的同时剔除 null 字段，相邻相同字段结构的记录自动批处理。
+ * 6. 实体快照变脏检测（Dirty Checking）联动：若实体被 TrackManager 追踪，仅更新脏字段。
+ * 7. 分库分表感知分组。
  */
 public class BatchUpdateBuilder<T> {
 
@@ -34,6 +38,7 @@ public class BatchUpdateBuilder<T> {
     private final Collection<T> entities;
     private int batchSize = 500;
     private boolean selective = true;
+    private boolean keepOrder = false;
 
     public BatchUpdateBuilder(SqlEnv env, Collection<T> entities) {
         this.env = env != null ? env : new SqlEnv(null, null, null);
@@ -48,9 +53,29 @@ public class BatchUpdateBuilder<T> {
         return this;
     }
 
+    /**
+     * 是否剔除 null / 未修改字段进行更新（默认为 true）。
+     * 若为 false，将无差别全量更新实体定义的所有字段（除主键和版本号）。
+     */
     public BatchUpdateBuilder<T> selective(boolean selective) {
         this.selective = selective;
         return this;
+    }
+
+    /**
+     * 是否严格保持集合原始顺序更新（默认为 false，即默认使用 EasyQuery 智能聚类合并模式）。
+     * 若开启 keepOrder(true)，将严格遵从原始入参顺序，连续相同字段结构的实体自动批量合并，不同字段结构自动分批切断。
+     */
+    public BatchUpdateBuilder<T> keepOrder(boolean keepOrder) {
+        this.keepOrder = keepOrder;
+        return this;
+    }
+
+    /**
+     * 严格保持顺序更新选项的同义别名方法。
+     */
+    public BatchUpdateBuilder<T> strictOrder(boolean strictOrder) {
+        return keepOrder(strictOrder);
     }
 
     public int execute() {
@@ -76,31 +101,135 @@ public class BatchUpdateBuilder<T> {
             PhysicalTarget target = entry.getKey();
             List<T> targetEntities = entry.getValue();
             DataSource ds = resolveDataSource(target.dataSourceName);
+            totalAffected += executeTargetEntities(targetEntities, metadata, target.tableName, ds);
+        }
 
-            for (int i = 0; i < targetEntities.size(); i += batchSize) {
-                int end = Math.min(i + batchSize, targetEntities.size());
-                List<T> chunk = targetEntities.subList(i, end);
-                totalAffected += executeChunk(chunk, metadata, target.tableName, ds);
+        return totalAffected;
+    }
+
+    private int executeTargetEntities(List<T> targetEntities, EntityMetadata metadata, String tableName, DataSource ds) {
+        if (targetEntities.isEmpty()) return 0;
+        OrmConfig config = env.getConfig();
+
+        // 1. 触发审计更新填充
+        for (T entity : targetEntities) {
+            if (config != null && config.getAutoFillHandler() != null) {
+                config.getAutoFillHandler().updateFill(entity, metadata);
+            }
+        }
+
+        int totalAffected = 0;
+
+        if (!keepOrder) {
+            // ==================== Mode A: EasyQuery 智能批处理模式 ====================
+            // 根据每个实体的有效更新列特征指纹（Fingerprint）聚类分组，合并相同结构的 SQL，最大化发挥批处理性能
+            Map<String, List<T>> fingerprintGroups = new LinkedHashMap<>();
+            Map<String, List<ColumnMetadata>> fingerprintCols = new HashMap<>();
+
+            for (T entity : targetEntities) {
+                List<ColumnMetadata> cols = getUpdateColumns(entity, metadata, selective);
+                if (cols.isEmpty() && metadata.getVersionColumn() == null) {
+                    // 无任何待更新字段且无乐观锁版本号，跳过
+                    continue;
+                }
+                String fp = computeFingerprint(cols);
+                fingerprintGroups.computeIfAbsent(fp, k -> new ArrayList<>()).add(entity);
+                fingerprintCols.putIfAbsent(fp, cols);
+            }
+
+            for (Map.Entry<String, List<T>> entry : fingerprintGroups.entrySet()) {
+                List<T> groupList = entry.getValue();
+                List<ColumnMetadata> cols = fingerprintCols.get(entry.getKey());
+                for (int i = 0; i < groupList.size(); i += batchSize) {
+                    int end = Math.min(i + batchSize, groupList.size());
+                    List<T> chunk = groupList.subList(i, end);
+                    totalAffected += executeChunk(chunk, metadata, tableName, ds, cols);
+                }
+            }
+        } else {
+            // ==================== Mode B: 严格保持顺序更新模式 ====================
+            // 严格遵从原始顺序，连续相同字段结构的实体合并为一个批次，字段结构变化时自动切批执行
+            List<T> currentBatch = new ArrayList<>();
+            String currentFp = null;
+            List<ColumnMetadata> currentCols = null;
+
+            for (T entity : targetEntities) {
+                List<ColumnMetadata> cols = getUpdateColumns(entity, metadata, selective);
+                if (cols.isEmpty() && metadata.getVersionColumn() == null) {
+                    continue;
+                }
+                String fp = computeFingerprint(cols);
+
+                if (currentBatch.isEmpty()) {
+                    currentBatch.add(entity);
+                    currentFp = fp;
+                    currentCols = cols;
+                } else if (currentFp.equals(fp) && currentBatch.size() < batchSize) {
+                    currentBatch.add(entity);
+                } else {
+                    totalAffected += executeChunk(currentBatch, metadata, tableName, ds, currentCols);
+                    currentBatch = new ArrayList<>();
+                    currentBatch.add(entity);
+                    currentFp = fp;
+                    currentCols = cols;
+                }
+            }
+            if (!currentBatch.isEmpty()) {
+                totalAffected += executeChunk(currentBatch, metadata, tableName, ds, currentCols);
             }
         }
 
         return totalAffected;
     }
 
-    private int executeChunk(List<T> chunk, EntityMetadata metadata, String tableName, DataSource ds) {
+    private List<ColumnMetadata> getUpdateColumns(T entity, EntityMetadata metadata, boolean selective) {
+        com.javaorm.core.track.TrackManager trackManager = env.getConfig() != null ? env.getConfig().getTrackManager() : null;
+        com.javaorm.core.track.EntitySnapshot snapshot = trackManager != null ? trackManager.getSnapshot(entity) : null;
+        java.util.Set<String> dirtyColumns = snapshot != null ? snapshot.getDirtyColumnNames() : null;
+
+        List<ColumnMetadata> cols = new ArrayList<>();
+        for (ColumnMetadata col : metadata.getColumns()) {
+            if (col.isPrimaryKey() || col.isIgnored() || col.isVersion()) {
+                continue;
+            }
+            // 实体快照变脏检测联动
+            if (snapshot != null) {
+                if (dirtyColumns != null && dirtyColumns.contains(col.getColumnName())) {
+                    cols.add(col);
+                }
+                continue;
+            }
+            // 剔除 null 字段
+            if (selective) {
+                if (col.getValue(entity) != null) {
+                    cols.add(col);
+                }
+            } else {
+                cols.add(col);
+            }
+        }
+        return cols;
+    }
+
+    private String computeFingerprint(List<ColumnMetadata> cols) {
+        if (cols == null || cols.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < cols.size(); i++) {
+            if (i > 0) sb.append(',');
+            sb.append(cols.get(i).getColumnName());
+        }
+        return sb.toString();
+    }
+
+    private int executeChunk(List<T> chunk, EntityMetadata metadata, String tableName, DataSource ds, List<ColumnMetadata> updateCols) {
         if (chunk.isEmpty()) return 0;
         Dialect dialect = env.getDialect();
         OrmConfig config = env.getConfig();
         ColumnMetadata idCol = metadata.getIdColumn();
         ColumnMetadata versionCol = metadata.getVersionColumn();
 
-        // 收集更新列（排除主键和版本号，版本号单独处理）
-        List<ColumnMetadata> updateCols = new ArrayList<>();
-        for (ColumnMetadata col : metadata.getColumns()) {
-            if (col.isPrimaryKey() || col.isIgnored() || col.isVersion()) {
-                continue;
-            }
-            updateCols.add(col);
+        if (updateCols.isEmpty() && versionCol == null) {
+            return 0;
         }
 
         StringBuilder sql = new StringBuilder();

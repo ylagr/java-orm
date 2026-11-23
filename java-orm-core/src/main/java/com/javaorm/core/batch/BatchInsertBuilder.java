@@ -24,8 +24,10 @@ import java.util.*;
  * 支持：
  * 1. 分批执行（batchSize，默认 500），防止参数超量或打爆连接池。
  * 2. 多值批量 INSERT（INSERT INTO t VALUES (...), (...)）与 JDBC addBatch() 双模式支持。
- * 3. 自动填充租户、逻辑删除正常值、乐观锁版本号（1）、创建时间。
- * 4. 分库分表感知：自动按照计算出的物理数据源与物理表进行分组（Grouping），并在各物理节点上独立批量执行。
+ * 3. 自动填充租户、逻辑删除正常值、乐观锁版本号（1）、审计填充。
+ * 4. EasyQuery 智能批处理模式：自动按非空字段指纹（Column Fingerprint）归类合并，剔除 null 字段，确保数据库 DEFAULT 默认值生效。
+ * 5. 严格保持顺序插入选项（keepOrder / strictOrder）：在按原始顺序处理的同时剔除 null 字段，相邻相同字段结构的记录自动批处理。
+ * 6. 分库分表感知：自动按照计算出的物理数据源与物理表进行分组（Grouping），并在各物理节点上独立批量执行。
  */
 public class BatchInsertBuilder<T> {
 
@@ -35,6 +37,8 @@ public class BatchInsertBuilder<T> {
     private final Collection<T> entities;
     private int batchSize = 500;
     private boolean useJdbcBatch = false;
+    private boolean selective = true;
+    private boolean keepOrder = false;
 
     public BatchInsertBuilder(SqlEnv env, Collection<T> entities) {
         this.env = env != null ? env : new SqlEnv(null, null, null);
@@ -52,6 +56,31 @@ public class BatchInsertBuilder<T> {
     public BatchInsertBuilder<T> useJdbcBatch(boolean useJdbcBatch) {
         this.useJdbcBatch = useJdbcBatch;
         return this;
+    }
+
+    /**
+     * 是否剔除 null 字段（默认为 true）。
+     * 剔除 null 字段可确保数据库定义的 DEFAULT 默认值正常生效，避免显式插入 NULL 覆盖默认值。
+     */
+    public BatchInsertBuilder<T> selective(boolean selective) {
+        this.selective = selective;
+        return this;
+    }
+
+    /**
+     * 是否严格保持集合原始顺序插入（默认为 false，即默认使用 EasyQuery 智能聚类合并模式）。
+     * 若开启 keepOrder(true)，将严格遵从原始入参顺序，连续相同字段结构的实体自动批量合并，不同字段结构自动分批切断。
+     */
+    public BatchInsertBuilder<T> keepOrder(boolean keepOrder) {
+        this.keepOrder = keepOrder;
+        return this;
+    }
+
+    /**
+     * 严格保持顺序插入选项的同义别名方法。
+     */
+    public BatchInsertBuilder<T> strictOrder(boolean strictOrder) {
+        return keepOrder(strictOrder);
     }
 
     public int execute() {
@@ -74,40 +103,118 @@ public class BatchInsertBuilder<T> {
             List<T> targetEntities = entry.getValue();
 
             DataSource ds = resolveDataSource(target.dataSourceName);
-            // 分批执行
-            for (int i = 0; i < targetEntities.size(); i += batchSize) {
-                int end = Math.min(i + batchSize, targetEntities.size());
-                List<T> chunk = targetEntities.subList(i, end);
-                totalAffected += executeChunk(chunk, metadata, target.tableName, ds);
+            totalAffected += executeTargetEntities(targetEntities, metadata, target.tableName, ds);
+        }
+
+        return totalAffected;
+    }
+
+    private int executeTargetEntities(List<T> targetEntities, EntityMetadata metadata, String tableName, DataSource ds) {
+        if (targetEntities.isEmpty()) return 0;
+        OrmConfig config = env.getConfig();
+
+        // 1. 预处理默认属性与自动填充（租户、版本号、逻辑删除、AutoFillHandler 等）
+        for (T entity : targetEntities) {
+            if (config != null && config.getAutoFillHandler() != null) {
+                config.getAutoFillHandler().insertFill(entity, metadata);
+            }
+            prepareEntityDefaults(entity, metadata, config);
+        }
+
+        int totalAffected = 0;
+
+        if (!keepOrder) {
+            // ==================== Mode A: EasyQuery 智能批处理模式 ====================
+            // 根据每个实体的有效非空列特征指纹（Fingerprint）聚类分组，合并相同结构的 SQL，最大化发挥批处理性能
+            Map<String, List<T>> fingerprintGroups = new LinkedHashMap<>();
+            Map<String, List<ColumnMetadata>> fingerprintCols = new HashMap<>();
+
+            for (T entity : targetEntities) {
+                List<ColumnMetadata> cols = getInsertColumns(entity, metadata, selective);
+                String fp = computeFingerprint(cols);
+                fingerprintGroups.computeIfAbsent(fp, k -> new ArrayList<>()).add(entity);
+                fingerprintCols.putIfAbsent(fp, cols);
+            }
+
+            for (Map.Entry<String, List<T>> entry : fingerprintGroups.entrySet()) {
+                List<T> groupList = entry.getValue();
+                List<ColumnMetadata> cols = fingerprintCols.get(entry.getKey());
+                for (int i = 0; i < groupList.size(); i += batchSize) {
+                    int end = Math.min(i + batchSize, groupList.size());
+                    List<T> chunk = groupList.subList(i, end);
+                    totalAffected += executeChunk(chunk, metadata, tableName, ds, cols);
+                }
+            }
+        } else {
+            // ==================== Mode B: 严格保持顺序插入模式 ====================
+            // 严格遵从原始顺序，连续相同字段结构的实体合并为一个批次，字段结构变化时自动切批执行
+            List<T> currentBatch = new ArrayList<>();
+            String currentFp = null;
+            List<ColumnMetadata> currentCols = null;
+
+            for (T entity : targetEntities) {
+                List<ColumnMetadata> cols = getInsertColumns(entity, metadata, selective);
+                String fp = computeFingerprint(cols);
+
+                if (currentBatch.isEmpty()) {
+                    currentBatch.add(entity);
+                    currentFp = fp;
+                    currentCols = cols;
+                } else if (currentFp.equals(fp) && currentBatch.size() < batchSize) {
+                    currentBatch.add(entity);
+                } else {
+                    totalAffected += executeChunk(currentBatch, metadata, tableName, ds, currentCols);
+                    currentBatch = new ArrayList<>();
+                    currentBatch.add(entity);
+                    currentFp = fp;
+                    currentCols = cols;
+                }
+            }
+            if (!currentBatch.isEmpty()) {
+                totalAffected += executeChunk(currentBatch, metadata, tableName, ds, currentCols);
             }
         }
 
         return totalAffected;
     }
 
-    private int executeChunk(List<T> chunk, EntityMetadata metadata, String tableName, DataSource ds) {
-        if (chunk.isEmpty()) return 0;
-        Dialect dialect = env.getDialect();
-        OrmConfig config = env.getConfig();
-
-        // 收集待插入的列列表
-        List<ColumnMetadata> insertCols = new ArrayList<>();
+    private List<ColumnMetadata> getInsertColumns(T entity, EntityMetadata metadata, boolean selective) {
+        List<ColumnMetadata> cols = new ArrayList<>();
         for (ColumnMetadata col : metadata.getColumns()) {
             if (col.isIgnored()) continue;
-            // 如果是自增主键且第一条记录为 null/0，则跳过主键由数据库生成
-            if (col.isPrimaryKey()) {
-                Object val = col.getValue(chunk.get(0));
+            // 如果是自增主键且未显式指定值，跳过由数据库生成
+            if (col.isPrimaryKey() && col.isGenerated()) {
+                Object val = col.getValue(entity);
                 if (val == null || (val instanceof Number && ((Number) val).longValue() == 0)) {
                     continue;
                 }
             }
-            insertCols.add(col);
+            // 剔除 null 字段，确保数据库默认值生效
+            if (selective) {
+                Object val = col.getValue(entity);
+                if (val == null) {
+                    continue;
+                }
+            }
+            cols.add(col);
         }
+        return cols;
+    }
 
-        // 填充每个实体的默认属性（租户、版本号、逻辑删除、时间戳等）
-        for (T entity : chunk) {
-            prepareEntityDefaults(entity, metadata, config);
+    private String computeFingerprint(List<ColumnMetadata> cols) {
+        if (cols == null || cols.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < cols.size(); i++) {
+            if (i > 0) sb.append(',');
+            sb.append(cols.get(i).getColumnName());
         }
+        return sb.toString();
+    }
+
+    private int executeChunk(List<T> chunk, EntityMetadata metadata, String tableName, DataSource ds, List<ColumnMetadata> insertCols) {
+        if (chunk.isEmpty()) return 0;
+        Dialect dialect = env.getDialect();
+        OrmConfig config = env.getConfig();
 
         if (useJdbcBatch) {
             return executeWithJdbcBatch(chunk, metadata, tableName, insertCols, ds, dialect, config);
@@ -119,26 +226,40 @@ public class BatchInsertBuilder<T> {
     private int executeWithMultiValues(List<T> chunk, EntityMetadata metadata, String tableName,
                                        List<ColumnMetadata> insertCols, DataSource ds, Dialect dialect, OrmConfig config) {
         StringBuilder sql = new StringBuilder();
-        sql.append("INSERT INTO ").append(dialect.quote(tableName)).append(" (");
-        for (int i = 0; i < insertCols.size(); i++) {
-            if (i > 0) sql.append(", ");
-            sql.append(dialect.quote(insertCols.get(i).getColumnName()));
-        }
-        sql.append(") VALUES ");
+        sql.append("INSERT INTO ").append(dialect.quote(tableName));
 
         List<Object> params = new ArrayList<>();
-        for (int row = 0; row < chunk.size(); row++) {
-            if (row > 0) sql.append(", ");
-            sql.append("(");
-            T entity = chunk.get(row);
-            for (int colIdx = 0; colIdx < insertCols.size(); colIdx++) {
-                if (colIdx > 0) sql.append(", ");
-                sql.append("?");
-                ColumnMetadata col = insertCols.get(colIdx);
-                Object val = col.getValue(entity);
-                params.add(val);
+        if (insertCols.isEmpty()) {
+            // 全空或全由数据库默认值/自增主键填充
+            if (dialect instanceof com.javaorm.core.dialect.PostgreSQLDialect
+                    || dialect instanceof com.javaorm.core.dialect.SQLiteDialect
+                    || dialect instanceof com.javaorm.core.dialect.OracleDialect
+                    || dialect instanceof com.javaorm.core.dialect.Oracle11Dialect) {
+                sql.append(" DEFAULT VALUES");
+            } else {
+                sql.append(" () VALUES ()");
             }
-            sql.append(")");
+        } else {
+            sql.append(" (");
+            for (int i = 0; i < insertCols.size(); i++) {
+                if (i > 0) sql.append(", ");
+                sql.append(dialect.quote(insertCols.get(i).getColumnName()));
+            }
+            sql.append(") VALUES ");
+
+            for (int row = 0; row < chunk.size(); row++) {
+                if (row > 0) sql.append(", ");
+                sql.append("(");
+                T entity = chunk.get(row);
+                for (int colIdx = 0; colIdx < insertCols.size(); colIdx++) {
+                    if (colIdx > 0) sql.append(", ");
+                    sql.append("?");
+                    ColumnMetadata col = insertCols.get(colIdx);
+                    Object val = col.getValue(entity);
+                    params.add(val);
+                }
+                sql.append(")");
+            }
         }
 
         String finalSql = sql.toString();
@@ -201,17 +322,30 @@ public class BatchInsertBuilder<T> {
     private int executeWithJdbcBatch(List<T> chunk, EntityMetadata metadata, String tableName,
                                      List<ColumnMetadata> insertCols, DataSource ds, Dialect dialect, OrmConfig config) {
         StringBuilder sql = new StringBuilder();
-        sql.append("INSERT INTO ").append(dialect.quote(tableName)).append(" (");
-        for (int i = 0; i < insertCols.size(); i++) {
-            if (i > 0) sql.append(", ");
-            sql.append(dialect.quote(insertCols.get(i).getColumnName()));
+        sql.append("INSERT INTO ").append(dialect.quote(tableName));
+
+        if (insertCols.isEmpty()) {
+            if (dialect instanceof com.javaorm.core.dialect.PostgreSQLDialect
+                    || dialect instanceof com.javaorm.core.dialect.SQLiteDialect
+                    || dialect instanceof com.javaorm.core.dialect.OracleDialect
+                    || dialect instanceof com.javaorm.core.dialect.Oracle11Dialect) {
+                sql.append(" DEFAULT VALUES");
+            } else {
+                sql.append(" () VALUES ()");
+            }
+        } else {
+            sql.append(" (");
+            for (int i = 0; i < insertCols.size(); i++) {
+                if (i > 0) sql.append(", ");
+                sql.append(dialect.quote(insertCols.get(i).getColumnName()));
+            }
+            sql.append(") VALUES (");
+            for (int i = 0; i < insertCols.size(); i++) {
+                if (i > 0) sql.append(", ");
+                sql.append("?");
+            }
+            sql.append(")");
         }
-        sql.append(") VALUES (");
-        for (int i = 0; i < insertCols.size(); i++) {
-            if (i > 0) sql.append(", ");
-            sql.append("?");
-        }
-        sql.append(")");
 
         String finalSql = sql.toString();
         logSql(finalSql, Collections.singletonList("batch size: " + chunk.size()));
@@ -220,12 +354,20 @@ public class BatchInsertBuilder<T> {
         PreparedStatement ps = null;
         try {
             conn = ConnectionUtils.getConnection(ds, config);
-            ps = conn.prepareStatement(finalSql);
+            boolean returnKeys = metadata.getIdColumn() != null && metadata.getIdColumn().isGenerated();
+            if (returnKeys) {
+                ps = conn.prepareStatement(finalSql, java.sql.Statement.RETURN_GENERATED_KEYS);
+            } else {
+                ps = conn.prepareStatement(finalSql);
+            }
+
             for (T entity : chunk) {
-                for (int colIdx = 0; colIdx < insertCols.size(); colIdx++) {
-                    ColumnMetadata col = insertCols.get(colIdx);
-                    Object val = col.getValue(entity);
-                    ps.setObject(colIdx + 1, val);
+                if (!insertCols.isEmpty()) {
+                    for (int colIdx = 0; colIdx < insertCols.size(); colIdx++) {
+                        ColumnMetadata col = insertCols.get(colIdx);
+                        Object val = col.getValue(entity);
+                        ps.setObject(colIdx + 1, val);
+                    }
                 }
                 ps.addBatch();
             }
@@ -235,6 +377,19 @@ public class BatchInsertBuilder<T> {
                 if (r >= 0) sum += r;
                 else if (r == PreparedStatement.SUCCESS_NO_INFO) sum += 1;
             }
+
+            if (returnKeys) {
+                try (java.sql.ResultSet rs = ps.getGeneratedKeys()) {
+                    int idx = 0;
+                    while (rs != null && rs.next() && idx < chunk.size()) {
+                        T entity = chunk.get(idx++);
+                        if (metadata.getIdColumn().getValue(entity) == null) {
+                            metadata.getIdColumn().setValue(entity, rs.getObject(1));
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+
             return sum;
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute JDBC batch insert into " + tableName, e);
@@ -276,15 +431,6 @@ public class BatchInsertBuilder<T> {
                     col.setValue(entity, new Date());
                 } else {
                     col.setValue(entity, 1);
-                }
-            }
-
-            // 日期/时间戳自动填充
-            if (col.getValue(entity) == null) {
-                if (col.getPropertyType() == LocalDateTime.class) {
-                    col.setValue(entity, LocalDateTime.now());
-                } else if (col.getPropertyType() == Date.class) {
-                    col.setValue(entity, new Date());
                 }
             }
         }
