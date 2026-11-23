@@ -36,7 +36,7 @@ public class BatchInsertBuilder<T> {
     private final SqlEnv env;
     private final Collection<T> entities;
     private int batchSize = 500;
-    private boolean useJdbcBatch = false;
+    private boolean useJdbcBatch = true;
     private boolean selective = true;
     private boolean keepOrder = false;
 
@@ -53,8 +53,20 @@ public class BatchInsertBuilder<T> {
         return this;
     }
 
+    /**
+     * 是否使用 JDBC Batch 模式（默认为 true）。
+     * 采用原生 PreparedStatement.addBatch() 与 executeBatch()，与 updateBatch/deleteBatch 保持一致的标准批处理。
+     */
     public BatchInsertBuilder<T> useJdbcBatch(boolean useJdbcBatch) {
         this.useJdbcBatch = useJdbcBatch;
+        return this;
+    }
+
+    /**
+     * 是否使用单语句多值模式（INSERT INTO t VALUES (...), (...)，默认为 false）。
+     */
+    public BatchInsertBuilder<T> useMultiValues(boolean useMultiValues) {
+        this.useJdbcBatch = !useMultiValues;
         return this;
     }
 
@@ -356,7 +368,12 @@ public class BatchInsertBuilder<T> {
             conn = ConnectionUtils.getConnection(ds, config);
             boolean returnKeys = metadata.getIdColumn() != null && metadata.getIdColumn().isGenerated();
             if (returnKeys) {
-                ps = conn.prepareStatement(finalSql, java.sql.Statement.RETURN_GENERATED_KEYS);
+                try {
+                    ps = conn.prepareStatement(finalSql, java.sql.Statement.RETURN_GENERATED_KEYS);
+                } catch (Exception ex) {
+                    returnKeys = false;
+                    ps = conn.prepareStatement(finalSql);
+                }
             } else {
                 ps = conn.prepareStatement(finalSql);
             }

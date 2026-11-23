@@ -504,13 +504,14 @@ public class Product {
     private Integer version;
 }
 
-// 1. 批量插入（参考 EasyQuery 智能批处理：自动按非空列指纹聚类合并，剔除 null 字段，确保数据库 DEFAULT 默认值正常生效）
+// 1. 批量插入（参考 EasyQuery 智能批处理：默认原生 JDBC Batch，自动按非空列指纹聚类合并，剔除 null 字段）
 List<Product> products = ...;
 orm.insertBatch(products)
     .batchSize(500)
-    .selective(true)  // 默认 true：剔除 null 字段，让数据库 DEFAULT 默认值生效，避免显式插入 NULL 覆盖默认值
-    .keepOrder(false) // 默认 false：EasyQuery 智能分桶聚类，性能最高；若设为 true，严格遵从原始列表顺序
-    .execute();
+    .useJdbcBatch(true) // 默认 true：原生 PreparedStatement.addBatch() 与 executeBatch()，标准高效批处理
+    .selective(true)    // 默认 true：剔除 null 字段，让数据库 DEFAULT 默认值生效，避免显式插入 NULL 覆盖默认值
+    .keepOrder(false)   // 默认 false：EasyQuery 智能分桶聚类，性能最高；若设为 true，严格遵从原始列表顺序
+    .execute();         // 注：若特定场景需使用单语句多值插入，可显式调用 .useMultiValues(true)
 
 // 2. 批量更新（智能按修改/非空列分桶，自动递增版本号 version = version + 1，并发冲突校验）
 for (Product p : products) {
