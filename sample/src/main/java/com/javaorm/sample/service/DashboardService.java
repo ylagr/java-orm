@@ -7,20 +7,19 @@ import com.javaorm.sample.entity.MallOrder;
 import com.javaorm.sample.entity.MallProduct;
 import com.javaorm.sample.entity.MallUser;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.*;
+
+import static com.javaorm.core.SQL.count;
+import static com.javaorm.core.SQL.sum;
 
 @Service
 public class DashboardService {
 
     @Autowired
     private JavaOrm orm;
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
 
     public DashboardStatsDto getDashboardStats() {
         DashboardStatsDto stats = new DashboardStatsDto();
@@ -30,28 +29,44 @@ public class DashboardService {
         long totalUsers = orm.select(MallUser.class).count();
         long totalOrders = orm.select(MallOrder.class).count();
 
-        // 2. 统计已付款订单的总销售额（通过 JdbcTemplate 原生聚合，展示与 Spring 生态完美契合）
-        BigDecimal totalSales = jdbcTemplate.queryForObject(
-                "SELECT COALESCE(SUM(pay_amount), 0) FROM mall_order WHERE status >= 20 AND status <= 40 AND deleted = 0",
-                BigDecimal.class
-        );
-        if (totalSales == null) {
-            totalSales = BigDecimal.ZERO;
+        // 2. 统计已付款订单的总销售额（通过 JavaORM 流式聚合）
+        List<Map<String, Object>> salesRows = orm.sql(e -> {
+            MallOrder o = e.table(MallOrder.class, "o");
+            e.select(sum(o.getPayAmount()).as("total_sales"))
+                    .from(o)
+                    .where()
+                    .ge(o.getStatus(), 20)
+                    .le(o.getStatus(), 40)
+                    .eq(o.getDeleted(), 0);
+        }).listMaps();
+        BigDecimal totalSales = BigDecimal.ZERO;
+        if (!salesRows.isEmpty()) {
+            Map<String, Object> row = salesRows.get(0);
+            Object val = row.get("total_sales") != null ? row.get("total_sales") : row.get("TOTAL_SALES");
+            if (val != null) {
+                totalSales = new BigDecimal(val.toString());
+            }
         }
 
-        // 3. 分类商品分布统计（分组统计，注意 H2 中 value 为关键字，使用 cnt 作为别名并映射为 value）
-        List<Map<String, Object>> categoryRaw = jdbcTemplate.queryForList(
-                "SELECT c.name AS name, COUNT(p.id) AS cnt " +
-                        "FROM mall_category c " +
-                        "LEFT JOIN mall_product p ON c.id = p.category_id AND p.deleted = 0 " +
-                        "WHERE c.deleted = 0 " +
-                        "GROUP BY c.id, c.name"
-        );
+        // 3. 分类商品分布统计（通过 JavaORM 流式连表、聚合与分组统计）
+        List<Map<String, Object>> categoryRaw = orm.sql(e -> {
+            MallCategory c = e.table(MallCategory.class, "c");
+            MallProduct p = e.table(MallProduct.class, "p");
+
+            e.select(c.getName(), count(p.getId()).as("cnt"))
+                    .from(c)
+                    .leftjoin(p).on(on -> on.eq(c.getId(), p.getCategoryId()).eq(p.getDeleted(), 0))
+                    .where().eq(c.getDeleted(), 0)
+                    .groupBy(c.getId(), c.getName());
+        }).listMaps();
+
         List<Map<String, Object>> categoryDist = new ArrayList<>();
         for (Map<String, Object> row : categoryRaw) {
             Map<String, Object> map = new HashMap<>();
-            map.put("name", row.get("name"));
-            map.put("value", row.get("cnt"));
+            Object nameVal = row.get("name") != null ? row.get("name") : row.get("NAME");
+            Object cntVal = row.get("cnt") != null ? row.get("cnt") : row.get("CNT");
+            map.put("name", nameVal);
+            map.put("value", cntVal);
             categoryDist.add(map);
         }
 
