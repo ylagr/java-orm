@@ -1155,7 +1155,96 @@ public class TenantOrderService {
 }
 ```
 
+---
 
+### 17. 跨数据库方言函数与语法兼容体系（SQL 标准 vs 方言自适应 & AS / IS 兼容机制）
+
+在 SQL 发展史与各商业/开源数据库演进中，存在大量的 **ANSI/ISO SQL 国际标准** 与 **厂商特有方言（Dialect-specific）** 差异。Java-ORM 坚持 **“DSL 语法树与底层物理渲染完全解耦”** 的架构原则，让开发者能够编写一次业务代码，平滑兼容 MySQL、PostgreSQL、Oracle、SQLite、H2、SQL Server 等不同数据库。
+
+---
+
+#### 1. SQL 标准函数 vs 数据库方言特化函数
+
+##### ① ANSI/ISO SQL 标准方法（跨库无差别通用）
+所有遵循 SQL 标准的关系型数据库均原生支持，语义与语法高度一致：
+
+| 分类 | JavaORM `SQL.*` 方法 | 标准与说明 |
+| :--- | :--- | :--- |
+| **基础聚合函数** | `count()`, `sum()`, `avg()`, `min()`, `max()` | **SQL-92 标准**，所有关系型数据库完全一致。 |
+| **标准空值处理** | `coalesce(...)` | **SQL-92 标准**，从左到右返回首个非 NULL 表达式，是跨数据库空值兜底的最标准方案。 |
+| **标准空值比较** | `nullIf(expr1, expr2)` | **SQL-92 标准**，两入参相等时返回 NULL，否则返回第一个参数。 |
+| **标准条件分支** | `caseWhen(...)` | **ANSI SQL 标准**，输出 `CASE WHEN ... THEN ... ELSE ... END`。 |
+| **开窗分析函数** | `rowNumber()`, `rank()`, `denseRank()`, `percentRank()`, `cumeDist()`, `ntile()`, `lead()`, `lag()`, `firstValue()`, `lastValue()`, `nthValue()` | **SQL:2003 标准**，语法均为 `FUNC() OVER (PARTITION BY ... ORDER BY ...)`。 |
+| **基础数学数值** | `abs()`, `round()`, `ceil()`, `floor()`, `mod()`, `sqrt()`, `power()`, `sign()`, `exp()`, `ln()` | 大多数关系型数据库均完全一致。 |
+| **标准字符串** | `upper()`, `lower()`, `trim()`, `length()`, `substring()` | 基础文本处理函数。 |
+
+##### ② 数据库差异显著的方法（方言特化矩阵）
+此类函数在各数据库中名称、参数顺序或实现差异巨大，属于跨库迁移报错的“高发区”。Java-ORM 方言层通过内置渲染器自适应抹平：
+
+| 功能需求 | JavaORM 统一 API | MySQL / H2 | Oracle | PostgreSQL | SQLite | 方言兼容处理策略 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **空值兜底** | `ifNull(a, b)` / `nvl(a, b)` | `IFNULL(a, b)` | `NVL(a, b)` | `COALESCE(a, b)` | `IFNULL(a, b)` | 自动路由至方言原生函数或标准 `COALESCE` |
+| **多行聚合** | `groupConcat(col, sep)` | `GROUP_CONCAT(col SEPARATOR sep)` | `LISTAGG(col, sep) WITHIN GROUP (ORDER BY ...)` | `STRING_AGG(CAST(col AS TEXT), sep)` | `GROUP_CONCAT(col, sep)` | 动态重写聚合函数与子句语法结构 |
+| **字符串拼接** | `concat(a, b, ...)` | `CONCAT(a, b)` | `a \|\| b`（Oracle 的 CONCAT 仅限 2 个参数） | `CONCAT(a, b)` 或 `a \|\| b` | `a \|\| b` | 自动根据参数量与方言改写为 `\|\|` 拼接管道 |
+| **三元条件** | `if_(cond, trueVal, falseVal)` | `IF(cond, t, f)` | 不支持 `IF` 函数 | 不支持 `IF` 函数 | `IIF(cond, t, f)` | **语法降级**：统一降级重写为 ANSI `CASE WHEN` |
+| **日期时间格式化** | `dateFormat(d, fmt)` | `DATE_FORMAT(d, '%Y-%m-%d')` | `TO_CHAR(d, 'YYYY-MM-DD')` | `TO_CHAR(d, 'YYYY-MM-DD')` | `STRFTIME('%Y-%m-%d', d)` | **模式串动态转换**：通过 `DateFormatPatternConverter` 自适应目标库格式 |
+| **字符串转日期** | `strToDate(str, fmt)` | `STR_TO_DATE(str, '%Y-%m-%d')` | `TO_DATE(str, 'YYYY-MM-DD')` | `TO_TIMESTAMP(str, 'YYYY-MM-DD')` | 复合日期函数转换 | 模式串转换 + 方言专属解析函数 |
+| **当前时间戳** | `now()` | `NOW()` | `SYSDATE` / `CURRENT_TIMESTAMP` | `CURRENT_TIMESTAMP` / `NOW()` | `DATETIME('now', 'localtime')` | 映射至数据库物理当前时间戳指令 |
+| **日期加减** | `dateAdd(d, num, unit)` | `DATE_ADD(d, INTERVAL 1 DAY)` | `d + 1` 或 `d + INTERVAL '1' DAY` | `d + INTERVAL '1 day'` | `DATE(d, '+1 day')` | 重写为符合方言特性的时间运算表达式 |
+| **子串位置查找** | `locate(sub, str)` / `instr` | `LOCATE(sub, str)` | `INSTR(str, sub)`（参数顺序与 LOCATE 相反） | `STRPOS(str, sub)` | `INSTR(str, sub)` | 自动颠倒参数顺序，精确对接底层驱动 |
+| **左右截取** | `left(str, len)` / `right` | `LEFT(str, len)` | 无原生函数，转 `SUBSTR` | `LEFT(str, len)` | 无原生函数，转 `SUBSTR` | 降级为各库通用的 `SUBSTR` 索引计算 |
+
+---
+
+#### 2. JavaORM 如何实现“一处编写，多端兼容”？
+
+```mermaid
+flowchart TD
+    UserCode["用户代码: SQL.ifNull(...) / SQL.dateFormat(...)"] --> ASTNode["第一层: 构造 AST 抽象语法树节点 (FunctionExpression + BuiltinSqlFunction)"]
+    ASTNode --> DialectRouter["第二层: 方言路由 (Dialect.renderFunction)"]
+    DialectRouter --> CheckRenderer{"是否存在该方言特化的 FunctionRenderer?"}
+    CheckRenderer -- 是 --> CustomRender["执行方言特化渲染器 (如 Oracle LISTAGG / SQLite STRFTIME)"]
+    CheckRenderer -- 否 --> StandardRender["默认兜底: ANSI 标准通用渲染 NAME(arg1, arg2...)"]
+    CustomRender --> PhysicalSQL["输出最终适配的物理 SQL 与绑定参数"]
+    StandardRender --> PhysicalSQL
+```
+
+1. **逻辑 AST 与物理 SQL 严格解耦**：用户调用 `SQL.*` 方法时绝不直接拼接 SQL，而是创建逻辑语义节点 `FunctionExpression<>(BuiltinSqlFunction.XXX, args)`。
+2. **多态渲染与函数注册机制（`Dialect + FunctionRenderer`）**：`AbstractDialect` 提供标准的兜底渲染逻辑，当目标数据库有差异时，只需在具体方言（如 `OracleDialect`）中注册特化渲染回调。
+3. **安全降级机制**：遇到目标数据库缺失的函数（如 Oracle 缺失 `IF`），方言层会自动将语义降级编译为通用的标准结构（如 `CASE WHEN ... THEN ... ELSE ... END`），实现 100% 可用性。
+
+---
+
+#### 3. 跨数据库关于 `AS` 与 `IS` 的兼容性问题深度剖析
+
+在不同数据库中，`AS` 与 `IS` 的语法语义存在严格的边界差异与厂商历史包袱。Java-ORM 在底层对此进行了细致的兼容设计：
+
+##### ① 表别名与列别名：`AS` 的致命差异与 Java-ORM 的安全策略
+* **列别名（Column Alias）**：
+  * 标准语法为 `SELECT col AS alias`，主流数据库均支持。同时绝大多数数据库也允许省略 `AS` 直接写空格（`SELECT col alias`）。
+  * ⚠️ **严禁使用 `IS`**：`SELECT col IS alias` 会被数据库语法解析器误判为布尔比较谓词，直接抛出语法错误。
+* **表别名（Table Alias）—— 经典 Oracle 陷阱**：
+  * MySQL、PostgreSQL、SQLite、SQL Server 允许 `FROM table AS t`，同时也允许 `FROM table t`；
+  * ❌ **Oracle 严格禁止在 FROM / JOIN 的表别名中使用 `AS`**！
+    若在 Oracle 中执行 `SELECT * FROM t_student AS s`，会立即触发 **`ORA-00933: SQL command not properly ended`** 致命错误。
+  * 🛡️ **Java-ORM 兼容策略**：
+    在 `AbstractDialect` 的 `renderAliasDeclaration` 机制中，表与关联表的别名声明**统一省略 `AS`**，渲染为标准空间隔 `FROM "t_student" "s"`。这种写法在 MySQL、PostgreSQL、Oracle、SQLite 等所有数据库中均 100% 完美支持，彻底根除了 Oracle ORA-00933 的兼容隐患。
+
+##### ② 存储过程 / 游标 / 视图 / CTE 中的 `AS` 与 `IS` 边界
+* **Oracle / PL-SQL 的同义与特例**：
+  * **存储过程 / 函数 / 包体（`PROCEDURE / FUNCTION / PACKAGE`）**：Oracle 允许 `AS` 与 `IS` 完全互换（例如 `CREATE PROCEDURE p IS ...` 与 `CREATE PROCEDURE p AS ...` 具有相同作用）。
+  * **显式游标（`CURSOR`）**：**必须使用 `IS`**（如 `CURSOR c IS SELECT ...`），写成 `AS` 会报错（ORA-00905）。
+  * **视图定义（`CREATE VIEW`）**：**必须使用 `AS`**（`CREATE VIEW v AS SELECT ...`），写成 `IS` 会报错。
+  * **公用表表达式（CTE）**：所有支持 CTE 的数据库（包括 Oracle 9iR2+、MySQL 8+、PG、SQLite）均采用标准 `WITH cte_name AS (SELECT ...)`，不可使用 `IS`。
+* **非 Oracle 数据库（MySQL, PostgreSQL, SQLite 等）**：
+  * **完全不支持在定义体中使用 `IS` 代替 `AS`**。若编写过程化代码，必须严格使用 `AS`，否则在非 Oracle 库中会直接报错。
+
+##### ③ 条件判断谓词中的 `IS` 兼容性
+* **NULL 判断（`IS NULL` / `IS NOT NULL`）**：
+  * 所有 SQL 数据库必须使用 `IS NULL` / `IS NOT NULL`。使用 `= NULL` 是不符合 ANSI 标准的，通常永远返回假（三值逻辑 Unknown）。Java-ORM 的 `isNull()` 与 `isNotNull()` 严格生成标准 `IS NULL` 语法。
+* **布尔判断（`IS TRUE` / `IS FALSE`）**：
+  * PostgreSQL、SQLite 支持 `col IS TRUE`。
+  * MySQL、Oracle 没有独立的布尔物理列类型（常用 `TINYINT(1)` 或 `NUMBER(1)` 代替），Oracle 不支持 `IS TRUE` 谓词。Java-ORM 在条件渲染时，将布尔判断统一翻译为标准等值逻辑 `col = 1` / `col = 0`，确保全数据库通用。
 
 ---
 
