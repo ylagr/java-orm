@@ -62,7 +62,18 @@ public class MyBatisPlusAdapter {
      * @return 完整适配后的 JavaOrm 客户端实例
      */
     public static JavaOrm create(SqlSessionFactory sqlSessionFactory) {
-        return JavaOrmMyBatisSupport.from(sqlSessionFactory);
+        return create(sqlSessionFactory, null);
+    }
+
+    /**
+     * 根据 MyBatis-Plus / MyBatis 的 SqlSessionFactory 与用户自定义的 OrmConfig 创建 JavaOrm 实例。
+     *
+     * @param sqlSessionFactory MyBatis-Plus / MyBatis 的 SqlSessionFactory
+     * @param config            用户自定义的 OrmConfig 配置（可配置方言、命名策略、拦截器等）
+     * @return 完整适配后的 JavaOrm 客户端实例
+     */
+    public static JavaOrm create(SqlSessionFactory sqlSessionFactory, OrmConfig config) {
+        return JavaOrmMyBatisSupport.from(sqlSessionFactory, config);
     }
 
     /**
@@ -72,7 +83,18 @@ public class MyBatisPlusAdapter {
      * @return 绑定当前会话的 JavaOrm 实例
      */
     public static JavaOrm create(SqlSession sqlSession) {
-        return JavaOrmMyBatisSupport.from(sqlSession);
+        return create(sqlSession, null);
+    }
+
+    /**
+     * 根据当前 SqlSession 与用户自定义的 OrmConfig 创建专属 JavaOrm 实例
+     *
+     * @param sqlSession 当前激活的 SqlSession
+     * @param config     用户自定义的 OrmConfig 配置
+     * @return 绑定当前会话的 JavaOrm 实例
+     */
+    public static JavaOrm create(SqlSession sqlSession, OrmConfig config) {
+        return JavaOrmMyBatisSupport.from(sqlSession, config);
     }
 
     /**
@@ -85,13 +107,33 @@ public class MyBatisPlusAdapter {
         if (config == null || sqlSessionFactory == null) {
             return;
         }
-        config.setSqlExecutor(new MyBatisSqlExecutor(sqlSessionFactory));
+        if (config.getSqlExecutor() == null) {
+            config.setSqlExecutor(new MyBatisSqlExecutor(sqlSessionFactory));
+        }
         // 自动探测并注册所有 MP 拦截器插件
         JavaOrmMyBatisSupport.autoRegisterInterceptors(config, sqlSessionFactory.getConfiguration());
         // 自动桥接 MP MetaObjectHandler 自动填充处理器
         JavaOrmMyBatisSupport.autoRegisterMetaObjectHandler(config, sqlSessionFactory.getConfiguration());
         // 自动桥接 MyBatis / MP 全局注册的 TypeHandler
         JavaOrmMyBatisSupport.autoRegisterTypeHandlers(config, sqlSessionFactory.getConfiguration());
+    }
+
+    /**
+     * 将 MyBatis-Plus 的全套能力直接适配注入到已有的 OrmConfig 配置中（针对单一 SqlSession）。
+     *
+     * @param config     现有 JavaORM 配置对象
+     * @param sqlSession 当前激活的 SqlSession
+     */
+    public static void adapt(OrmConfig config, SqlSession sqlSession) {
+        if (config == null || sqlSession == null) {
+            return;
+        }
+        if (config.getSqlExecutor() == null) {
+            config.setSqlExecutor(new MyBatisSqlExecutor(sqlSession));
+        }
+        JavaOrmMyBatisSupport.autoRegisterInterceptors(config, sqlSession.getConfiguration());
+        JavaOrmMyBatisSupport.autoRegisterMetaObjectHandler(config, sqlSession.getConfiguration());
+        JavaOrmMyBatisSupport.autoRegisterTypeHandlers(config, sqlSession.getConfiguration());
     }
 
     /**

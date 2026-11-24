@@ -25,14 +25,20 @@ public class JavaOrmMyBatisSupport {
     }
 
     public static JavaOrm from(SqlSession sqlSession) {
+        return from(sqlSession, null);
+    }
+
+    public static JavaOrm from(SqlSession sqlSession, OrmConfig userConfig) {
         if (sqlSession == null) {
             throw new IllegalArgumentException("SqlSession must not be null");
         }
         Configuration configuration = sqlSession.getConfiguration();
         DataSource dataSource = resolveDataSource(configuration);
 
-        OrmConfig config = new OrmConfig();
-        config.setSqlExecutor(new MyBatisSqlExecutor(sqlSession));
+        OrmConfig config = userConfig != null ? userConfig : new OrmConfig();
+        if (config.getSqlExecutor() == null) {
+            config.setSqlExecutor(new MyBatisSqlExecutor(sqlSession));
+        }
 
         autoRegisterInterceptors(config, configuration);
         autoRegisterMetaObjectHandler(config, configuration);
@@ -42,14 +48,20 @@ public class JavaOrmMyBatisSupport {
     }
 
     public static JavaOrm from(SqlSessionFactory sqlSessionFactory) {
+        return from(sqlSessionFactory, null);
+    }
+
+    public static JavaOrm from(SqlSessionFactory sqlSessionFactory, OrmConfig userConfig) {
         if (sqlSessionFactory == null) {
             throw new IllegalArgumentException("SqlSessionFactory must not be null");
         }
         Configuration configuration = sqlSessionFactory.getConfiguration();
         DataSource dataSource = resolveDataSource(configuration);
 
-        OrmConfig config = new OrmConfig();
-        config.setSqlExecutor(new MyBatisSqlExecutor(sqlSessionFactory));
+        OrmConfig config = userConfig != null ? userConfig : new OrmConfig();
+        if (config.getSqlExecutor() == null) {
+            config.setSqlExecutor(new MyBatisSqlExecutor(sqlSessionFactory));
+        }
 
         autoRegisterInterceptors(config, configuration);
         autoRegisterMetaObjectHandler(config, configuration);
@@ -59,7 +71,7 @@ public class JavaOrmMyBatisSupport {
     }
 
     public static void autoRegisterMetaObjectHandler(OrmConfig config, Configuration configuration) {
-        if (config == null || configuration == null) return;
+        if (config == null || configuration == null || config.getAutoFillHandler() != null) return;
         try {
             Class<?> utilsClass = Class.forName("com.baomidou.mybatisplus.core.toolkit.GlobalConfigUtils");
             Method method = utilsClass.getMethod("getMetaObjectHandler", Configuration.class);

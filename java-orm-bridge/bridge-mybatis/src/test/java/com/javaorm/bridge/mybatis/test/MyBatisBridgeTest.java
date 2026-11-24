@@ -171,4 +171,40 @@ public class MyBatisBridgeTest {
             Assert.assertEquals(2, list.size());
         }
     }
+
+    @Test
+    public void testMyBatisWithCustomOrmConfig() {
+        try (SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            com.javaorm.core.config.OrmConfig customConfig = new com.javaorm.core.config.OrmConfig();
+            customConfig.setBatchKeepOrder(true);
+            java.util.concurrent.atomic.AtomicBoolean interceptorCalled = new java.util.concurrent.atomic.AtomicBoolean(false);
+            customConfig.addInterceptor(new com.javaorm.core.interceptor.SqlInterceptor() {
+                @Override
+                public com.javaorm.core.dialect.SqlAndParams beforeQuery(com.javaorm.core.dialect.SqlAndParams sqlAndParams,
+                                                                         com.javaorm.core.metadata.EntityMetadata metadata,
+                                                                         com.javaorm.core.dialect.Dialect dialect) {
+                    interceptorCalled.set(true);
+                    return sqlAndParams;
+                }
+            });
+
+            JavaOrm customOrm = JavaOrmMyBatisSupport.from(sqlSession, customConfig);
+            Assert.assertSame(customConfig, customOrm.getConfig());
+            Assert.assertTrue(customOrm.getConfig().isBatchKeepOrder());
+            Assert.assertNotNull(customOrm.getConfig().getSqlExecutor());
+
+            MyUser user = new MyUser();
+            user.setName("CustomConfigUser");
+            user.setAge(28);
+            user.setAddress(new Address("Shanghai", "Pudong"));
+            user.setGender(Gender.FEMALE);
+            customOrm.insert(user);
+
+            MyUser found = customOrm.select(MyUser.class).where().eq(MyUser::getId, user.getId()).first();
+            Assert.assertNotNull(found);
+            Assert.assertTrue("自定义的拦截器必须被正常触发", interceptorCalled.get());
+            Assert.assertEquals("Shanghai", found.getAddress().getCity());
+            Assert.assertEquals(Gender.FEMALE, found.getGender());
+        }
+    }
 }
