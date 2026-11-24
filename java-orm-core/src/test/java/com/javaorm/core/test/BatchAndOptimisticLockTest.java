@@ -383,4 +383,51 @@ public class BatchAndOptimisticLockTest {
         assertEquals("New31", after31.getTitle());
         assertEquals(Double.valueOf(310.0), after31.getPrice());
     }
+
+    @Test
+    public void testForceOrderFluentSwitch() {
+        Item item40 = new Item();
+        item40.setId(40L);
+        item40.setTitle("Item40");
+
+        Item item41 = new Item();
+        item41.setId(41L);
+        item41.setPrice(444.0);
+
+        // 使用 .forceOrder() 链式调用
+        int rows = orm.insertBatch(Arrays.asList(item40, item41))
+                .forceOrder()
+                .execute();
+        assertEquals(2, rows);
+
+        Item db40 = orm.select(Item.class).where().eq(Item::getId, 40L).firstOrNull();
+        assertNotNull(db40);
+        assertEquals("Item40", db40.getTitle());
+        assertEquals(Double.valueOf(88.8), db40.getPrice()); // 默认值生效
+    }
+
+    @Test
+    public void testGlobalConfigBatchForceOrder() {
+        com.javaorm.core.config.OrmConfig cfg = new com.javaorm.core.config.OrmConfig();
+        cfg.setBatchForceOrder(true); // 全局开启强制顺序
+
+        JavaOrm orderedOrm = JavaOrm.create(dataSource, new SQLiteDialect(), cfg);
+
+        Item item50 = new Item();
+        item50.setId(50L);
+        item50.setTitle("Item50");
+
+        Item item51 = new Item();
+        item51.setId(51L);
+        item51.setPrice(555.0);
+
+        // 验证即使直接调用 orm.insert(list)，也会继承全局的 batchForceOrder = true
+        int rows = orderedOrm.insert(Arrays.asList(item50, item51));
+        assertEquals(2, rows);
+
+        Item db50 = orderedOrm.select(Item.class).where().eq(Item::getId, 50L).firstOrNull();
+        assertNotNull(db50);
+        assertEquals("Item50", db50.getTitle());
+        assertEquals(Double.valueOf(88.8), db50.getPrice());
+    }
 }

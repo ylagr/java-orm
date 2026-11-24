@@ -43,6 +43,9 @@ public class BatchUpdateBuilder<T> {
     public BatchUpdateBuilder(SqlEnv env, Collection<T> entities) {
         this.env = env != null ? env : new SqlEnv(null, null, null);
         this.entities = entities;
+        if (this.env.getConfig() != null) {
+            this.keepOrder = this.env.getConfig().isBatchForceOrder();
+        }
     }
 
     public BatchUpdateBuilder<T> batchSize(int batchSize) {
@@ -63,9 +66,28 @@ public class BatchUpdateBuilder<T> {
     }
 
     /**
+     * 强制保持顺序更新开关（默认为 false，即默认使用 EasyQuery 智能聚类合并模式）。
+     * 调用 forceOrder() 将强制遵从原始入参顺序，连续相同字段结构的实体自动批量合并，不同字段结构自动分批切断。
+     */
+    public BatchUpdateBuilder<T> forceOrder() {
+        this.keepOrder = true;
+        return this;
+    }
+
+    public BatchUpdateBuilder<T> forceOrder(boolean forceOrder) {
+        this.keepOrder = forceOrder;
+        return this;
+    }
+
+    /**
      * 是否严格保持集合原始顺序更新（默认为 false，即默认使用 EasyQuery 智能聚类合并模式）。
      * 若开启 keepOrder(true)，将严格遵从原始入参顺序，连续相同字段结构的实体自动批量合并，不同字段结构自动分批切断。
      */
+    public BatchUpdateBuilder<T> keepOrder() {
+        this.keepOrder = true;
+        return this;
+    }
+
     public BatchUpdateBuilder<T> keepOrder(boolean keepOrder) {
         this.keepOrder = keepOrder;
         return this;
@@ -74,6 +96,11 @@ public class BatchUpdateBuilder<T> {
     /**
      * 严格保持顺序更新选项的同义别名方法。
      */
+    public BatchUpdateBuilder<T> strictOrder() {
+        this.keepOrder = true;
+        return this;
+    }
+
     public BatchUpdateBuilder<T> strictOrder(boolean strictOrder) {
         return keepOrder(strictOrder);
     }
