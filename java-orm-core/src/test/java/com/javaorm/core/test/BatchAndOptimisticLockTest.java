@@ -394,9 +394,9 @@ public class BatchAndOptimisticLockTest {
         item41.setId(41L);
         item41.setPrice(444.0);
 
-        // 使用 .forceOrder() 链式调用
+        // 使用 .keepOrder() 链式调用
         int rows = orm.insertBatch(Arrays.asList(item40, item41))
-                .forceOrder()
+                .keepOrder()
                 .execute();
         assertEquals(2, rows);
 
@@ -407,9 +407,9 @@ public class BatchAndOptimisticLockTest {
     }
 
     @Test
-    public void testGlobalConfigBatchForceOrder() {
+    public void testGlobalConfigBatchKeepOrder() {
         com.javaorm.core.config.OrmConfig cfg = new com.javaorm.core.config.OrmConfig();
-        cfg.setBatchForceOrder(true); // 全局开启强制顺序
+        cfg.setBatchKeepOrder(true); // 全局开启严格保序
 
         JavaOrm orderedOrm = JavaOrm.create(dataSource, new SQLiteDialect(), cfg);
 
@@ -421,7 +421,7 @@ public class BatchAndOptimisticLockTest {
         item51.setId(51L);
         item51.setPrice(555.0);
 
-        // 验证即使直接调用 orm.insert(list)，也会继承全局的 batchForceOrder = true
+        // 验证即使直接调用 orm.insert(list)，也会继承全局的 batchKeepOrder = true
         int rows = orderedOrm.insert(Arrays.asList(item50, item51));
         assertEquals(2, rows);
 

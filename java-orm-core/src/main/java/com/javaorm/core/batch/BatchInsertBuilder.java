@@ -26,7 +26,7 @@ import java.util.*;
  * 2. 多值批量 INSERT（INSERT INTO t VALUES (...), (...)）与 JDBC addBatch() 双模式支持。
  * 3. 自动填充租户、逻辑删除正常值、乐观锁版本号（1）、审计填充。
  * 4. EasyQuery 智能批处理模式：自动按非空字段指纹（Column Fingerprint）归类合并，剔除 null 字段，确保数据库 DEFAULT 默认值生效。
- * 5. 严格保持顺序插入选项（keepOrder / strictOrder）：在按原始顺序处理的同时剔除 null 字段，相邻相同字段结构的记录自动批处理。
+ * 5. 严格保持顺序插入选项（keepOrder）：在按原始顺序处理的同时剔除 null 字段，相邻相同字段结构的记录自动批处理。
  * 6. 分库分表感知：自动按照计算出的物理数据源与物理表进行分组（Grouping），并在各物理节点上独立批量执行。
  */
 public class BatchInsertBuilder<T> {
@@ -44,7 +44,7 @@ public class BatchInsertBuilder<T> {
         this.env = env != null ? env : new SqlEnv(null, null, null);
         this.entities = entities;
         if (this.env.getConfig() != null) {
-            this.keepOrder = this.env.getConfig().isBatchForceOrder();
+            this.keepOrder = this.env.getConfig().isBatchKeepOrder();
         }
     }
 
@@ -83,22 +83,8 @@ public class BatchInsertBuilder<T> {
     }
 
     /**
-     * 强制保持顺序插入开关（默认为 false，即默认使用 EasyQuery 智能聚类合并模式）。
-     * 调用 forceOrder() 将强制遵从原始入参顺序，连续相同字段结构的实体自动批量合并，不同字段结构自动分批切断。
-     */
-    public BatchInsertBuilder<T> forceOrder() {
-        this.keepOrder = true;
-        return this;
-    }
-
-    public BatchInsertBuilder<T> forceOrder(boolean forceOrder) {
-        this.keepOrder = forceOrder;
-        return this;
-    }
-
-    /**
-     * 是否严格保持集合原始顺序插入（默认为 false，即默认使用 EasyQuery 智能聚类合并模式）。
-     * 若开启 keepOrder(true)，将严格遵从原始入参顺序，连续相同字段结构的实体自动批量合并，不同字段结构自动分批切断。
+     * 开启严格保持集合原始顺序插入（默认为 false，即默认使用 EasyQuery 智能聚类合并模式）。
+     * 开启后将严格遵从原始入参顺序，连续相同字段结构的实体自动批量合并，不同字段结构自动分批切断。
      */
     public BatchInsertBuilder<T> keepOrder() {
         this.keepOrder = true;
@@ -108,18 +94,6 @@ public class BatchInsertBuilder<T> {
     public BatchInsertBuilder<T> keepOrder(boolean keepOrder) {
         this.keepOrder = keepOrder;
         return this;
-    }
-
-    /**
-     * 严格保持顺序插入选项的同义别名方法。
-     */
-    public BatchInsertBuilder<T> strictOrder() {
-        this.keepOrder = true;
-        return this;
-    }
-
-    public BatchInsertBuilder<T> strictOrder(boolean strictOrder) {
-        return keepOrder(strictOrder);
     }
 
     public int execute() {

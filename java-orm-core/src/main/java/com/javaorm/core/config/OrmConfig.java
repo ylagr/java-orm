@@ -316,33 +316,21 @@ public class OrmConfig {
     }
 
     /**
-     * 批量操作是否强制严格保持原始顺序（默认为 false，即默认开启 EasyQuery 智能聚类分桶合并以获得最佳批量性能）。
+     * 批量操作是否严格保持原始顺序（默认为 false，即默认开启 EasyQuery 智能聚类分桶合并以获得最佳批量性能）。
      * 若配置为 true，全局的所有 batchInsert / batchUpdate 均会严格遵照输入实体的原始物理顺序执行。
      */
-    private boolean batchForceOrder = false;
-
-    public boolean isBatchForceOrder() {
-        return batchForceOrder;
-    }
-
-    public OrmConfig setBatchForceOrder(boolean batchForceOrder) {
-        this.batchForceOrder = batchForceOrder;
-        return this;
-    }
-
-    public OrmConfig batchForceOrder(boolean batchForceOrder) {
-        return setBatchForceOrder(batchForceOrder);
-    }
+    private boolean batchKeepOrder = false;
 
     public boolean isBatchKeepOrder() {
-        return batchForceOrder;
+        return batchKeepOrder;
     }
 
     public OrmConfig setBatchKeepOrder(boolean batchKeepOrder) {
-        return setBatchForceOrder(batchKeepOrder);
+        this.batchKeepOrder = batchKeepOrder;
+        return this;
     }
 
     public OrmConfig batchKeepOrder(boolean batchKeepOrder) {
-        return setBatchForceOrder(batchKeepOrder);
+        return setBatchKeepOrder(batchKeepOrder);
     }
 }

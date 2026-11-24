@@ -520,7 +520,7 @@ for (Product p : products) {
 orm.updateBatch(products)
     .batchSize(200)
     .selective(true)  // 默认 true：仅更新非空/变脏字段，不会将 null 覆盖回数据库已有字段
-    .keepOrder(false) // 默认 false：智能聚类；若设为 true / strictOrder(true)，严格保持原始顺序更新
+    .keepOrder(false) // 默认 false：智能聚类；若设为 true 或调用 .keepOrder()，严格保持原始顺序更新
     .execute(); // 若版本号不匹配，自动抛出强类型 OptimisticLockException
 
 // 3. 批量删除与根据 ID 列表批量删除

@@ -26,7 +26,7 @@ import java.util.*;
  * 2. 批大小控制（batchSize，默认 500）。
  * 3. 乐观锁集成：如果实体含有 @JoVersion 字段，自动追加 WHERE version = ?，更新成功自动将实体对象的版本递增；若某行受影响数为 0，抛出 OptimisticLockException。
  * 4. EasyQuery 智能批处理模式：按待更新有效字段指纹（Column Fingerprint）聚类分桶，自动合并相同更新结构的实体走同一个批次，剔除 null/未修改字段。
- * 5. 严格保持顺序更新选项（keepOrder / strictOrder）：在按原始顺序处理的同时剔除 null 字段，相邻相同字段结构的记录自动批处理。
+ * 5. 严格保持顺序更新选项（keepOrder）：在按原始顺序处理的同时剔除 null 字段，相邻相同字段结构的记录自动批处理。
  * 6. 实体快照变脏检测（Dirty Checking）联动：若实体被 TrackManager 追踪，仅更新脏字段。
  * 7. 分库分表感知分组。
  */
@@ -44,7 +44,7 @@ public class BatchUpdateBuilder<T> {
         this.env = env != null ? env : new SqlEnv(null, null, null);
         this.entities = entities;
         if (this.env.getConfig() != null) {
-            this.keepOrder = this.env.getConfig().isBatchForceOrder();
+            this.keepOrder = this.env.getConfig().isBatchKeepOrder();
         }
     }
 
@@ -66,22 +66,8 @@ public class BatchUpdateBuilder<T> {
     }
 
     /**
-     * 强制保持顺序更新开关（默认为 false，即默认使用 EasyQuery 智能聚类合并模式）。
-     * 调用 forceOrder() 将强制遵从原始入参顺序，连续相同字段结构的实体自动批量合并，不同字段结构自动分批切断。
-     */
-    public BatchUpdateBuilder<T> forceOrder() {
-        this.keepOrder = true;
-        return this;
-    }
-
-    public BatchUpdateBuilder<T> forceOrder(boolean forceOrder) {
-        this.keepOrder = forceOrder;
-        return this;
-    }
-
-    /**
-     * 是否严格保持集合原始顺序更新（默认为 false，即默认使用 EasyQuery 智能聚类合并模式）。
-     * 若开启 keepOrder(true)，将严格遵从原始入参顺序，连续相同字段结构的实体自动批量合并，不同字段结构自动分批切断。
+     * 开启严格保持集合原始顺序更新（默认为 false，即默认使用 EasyQuery 智能聚类合并模式）。
+     * 开启后将严格遵从原始入参顺序，连续相同字段结构的实体自动批量合并，不同字段结构自动分批切断。
      */
     public BatchUpdateBuilder<T> keepOrder() {
         this.keepOrder = true;
@@ -91,18 +77,6 @@ public class BatchUpdateBuilder<T> {
     public BatchUpdateBuilder<T> keepOrder(boolean keepOrder) {
         this.keepOrder = keepOrder;
         return this;
-    }
-
-    /**
-     * 严格保持顺序更新选项的同义别名方法。
-     */
-    public BatchUpdateBuilder<T> strictOrder() {
-        this.keepOrder = true;
-        return this;
-    }
-
-    public BatchUpdateBuilder<T> strictOrder(boolean strictOrder) {
-        return keepOrder(strictOrder);
     }
 
     public int execute() {
