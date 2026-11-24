@@ -90,6 +90,8 @@ public class MyBatisPlusAdapter {
         JavaOrmMyBatisSupport.autoRegisterInterceptors(config, sqlSessionFactory.getConfiguration());
         // 自动桥接 MP MetaObjectHandler 自动填充处理器
         JavaOrmMyBatisSupport.autoRegisterMetaObjectHandler(config, sqlSessionFactory.getConfiguration());
+        // 自动桥接 MyBatis / MP 全局注册的 TypeHandler
+        JavaOrmMyBatisSupport.autoRegisterTypeHandlers(config, sqlSessionFactory.getConfiguration());
     }
 
     /**

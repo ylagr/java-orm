@@ -236,6 +236,14 @@ public class MyBatisPlusBridgeTest {
                     "order_id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
                     "order_no VARCHAR(50), " +
                     "version INT DEFAULT 1)");
+
+            stmt.execute("DROP TABLE IF EXISTS t_mp_complex");
+            stmt.execute("CREATE TABLE t_mp_complex (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "tags VARCHAR(255), " +
+                    "simple_status INT, " +
+                    "pure_enum VARCHAR(50), " +
+                    "deleted INT DEFAULT 0)");
         }
 
         Environment environment = new Environment("test", new JdbcTransactionFactory(), dataSource);
@@ -542,5 +550,116 @@ public class MyBatisPlusBridgeTest {
         fillOrm.update(user);
         Assert.assertEquals("admin_update", user.getUpdateBy());
         Assert.assertEquals("admin_insert", user.getCreateBy());
+    }
+
+    public enum SimpleStatus {
+        OFF(0), ON(1);
+        private final int code;
+        SimpleStatus(int code) { this.code = code; }
+        public int getCode() { return code; }
+    }
+
+    public enum PureEnum {
+        FOO("foo"), BAR("bar");
+
+        @com.baomidou.mybatisplus.annotation.EnumValue
+        private final String val;
+
+        PureEnum(String val) { this.val = val; }
+        public String getVal() { return val; }
+    }
+
+    public static class ListStringTypeHandler extends org.apache.ibatis.type.BaseTypeHandler<List<String>> {
+        @Override
+        public void setNonNullParameter(java.sql.PreparedStatement ps, int i, List<String> parameter, org.apache.ibatis.type.JdbcType jdbcType) throws java.sql.SQLException {
+            StringBuilder sb = new StringBuilder();
+            for (int k = 0; k < parameter.size(); k++) {
+                if (k > 0) sb.append(",");
+                sb.append(parameter.get(k));
+            }
+            ps.setString(i, sb.toString());
+        }
+
+        @Override
+        public List<String> getNullableResult(java.sql.ResultSet rs, String columnName) throws java.sql.SQLException {
+            return parse(rs.getString(columnName));
+        }
+
+        @Override
+        public List<String> getNullableResult(java.sql.ResultSet rs, int columnIndex) throws java.sql.SQLException {
+            return parse(rs.getString(columnIndex));
+        }
+
+        @Override
+        public List<String> getNullableResult(java.sql.CallableStatement cs, int columnIndex) throws java.sql.SQLException {
+            return parse(cs.getString(columnIndex));
+        }
+
+        private List<String> parse(String val) {
+            if (val == null || val.trim().isEmpty()) return new ArrayList<>();
+            return Arrays.asList(val.split(","));
+        }
+    }
+
+    @TableName("t_mp_complex")
+    public static class MpComplexEntity {
+        @TableId(type = IdType.AUTO)
+        private Long id;
+
+        @TableField(value = "tags", typeHandler = ListStringTypeHandler.class)
+        private List<String> tags;
+
+        @TableField("simple_status")
+        private SimpleStatus simpleStatus;
+
+        @TableField(value = "pure_enum", typeHandler = com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler.class)
+        private PureEnum pureEnum;
+
+        @TableLogic
+        private Integer deleted;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public List<String> getTags() { return tags; }
+        public void setTags(List<String> tags) { this.tags = tags; }
+        public SimpleStatus getSimpleStatus() { return simpleStatus; }
+        public void setSimpleStatus(SimpleStatus simpleStatus) { this.simpleStatus = simpleStatus; }
+        public PureEnum getPureEnum() { return pureEnum; }
+        public void setPureEnum(PureEnum pureEnum) { this.pureEnum = pureEnum; }
+        public Integer getDeleted() { return deleted; }
+        public void setDeleted(Integer deleted) { this.deleted = deleted; }
+    }
+
+    @Test
+    public void testTableFieldTypeHandlerAndEnumSupport() {
+        MpComplexEntity entity = new MpComplexEntity();
+        entity.setTags(Arrays.asList("java", "orm", "mybatis-plus"));
+        entity.setSimpleStatus(SimpleStatus.ON);
+        entity.setPureEnum(PureEnum.BAR);
+
+        int rows = orm.insert(entity);
+        Assert.assertEquals(1, rows);
+        Assert.assertNotNull(entity.getId());
+
+        MpComplexEntity found = orm.select(MpComplexEntity.class)
+                .where()
+                .eq(MpComplexEntity::getId, entity.getId())
+                .first();
+
+        Assert.assertNotNull(found);
+        Assert.assertEquals(3, found.getTags().size());
+        Assert.assertEquals("java", found.getTags().get(0));
+        Assert.assertEquals("orm", found.getTags().get(1));
+        Assert.assertEquals("mybatis-plus", found.getTags().get(2));
+        Assert.assertEquals(SimpleStatus.ON, found.getSimpleStatus());
+        Assert.assertEquals(PureEnum.BAR, found.getPureEnum());
+
+        // 测试逻辑删除（默认 0 未删，1 已删）
+        orm.delete(found);
+        MpComplexEntity afterDelete = orm.select(MpComplexEntity.class)
+                .where()
+                .eq(MpComplexEntity::getId, entity.getId())
+                .first();
+        Assert.assertNull(afterDelete);
     }
 }

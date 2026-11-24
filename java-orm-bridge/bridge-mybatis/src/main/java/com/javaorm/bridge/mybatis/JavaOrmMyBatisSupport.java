@@ -36,6 +36,7 @@ public class JavaOrmMyBatisSupport {
 
         autoRegisterInterceptors(config, configuration);
         autoRegisterMetaObjectHandler(config, configuration);
+        autoRegisterTypeHandlers(config, configuration);
 
         return JavaOrm.create(dataSource, config);
     }
@@ -52,6 +53,7 @@ public class JavaOrmMyBatisSupport {
 
         autoRegisterInterceptors(config, configuration);
         autoRegisterMetaObjectHandler(config, configuration);
+        autoRegisterTypeHandlers(config, configuration);
 
         return JavaOrm.create(dataSource, config);
     }
@@ -97,6 +99,71 @@ public class JavaOrmMyBatisSupport {
                 }
             }
         }
+    }
+
+    public static void autoRegisterTypeHandlers(OrmConfig config, Configuration configuration) {
+        if (config == null || configuration == null) return;
+        org.apache.ibatis.type.TypeHandlerRegistry registry = configuration.getTypeHandlerRegistry();
+        if (registry == null) return;
+
+        java.util.Set<Class<?>> processedTypes = new java.util.HashSet<>();
+
+        // 1. 尝试通过反射读取 typeHandlerMap 映射，获取所有显式注册了 TypeHandler 的自定义类 / 枚举类
+        try {
+            java.lang.reflect.Field mapField = org.apache.ibatis.type.TypeHandlerRegistry.class.getDeclaredField("typeHandlerMap");
+            mapField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            java.util.Map<java.lang.reflect.Type, ?> map = (java.util.Map<java.lang.reflect.Type, ?>) mapField.get(registry);
+            if (map != null) {
+                for (java.lang.reflect.Type t : map.keySet()) {
+                    if (t instanceof Class<?>) {
+                        Class<?> clazz = (Class<?>) t;
+                        if (!isJdkBasicType(clazz)) {
+                            org.apache.ibatis.type.TypeHandler<?> handler = registry.getTypeHandler(clazz);
+                            if (handler != null && !(handler instanceof org.apache.ibatis.type.UnknownTypeHandler)) {
+                                config.addAutoConverter(new MyBatisAutoTypeHandlerConverter<>(handler, clazz));
+                                processedTypes.add(clazz);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+
+        // 2. 备用兜底：遍历 getTypeHandlers()，根据 TypeReference 获取绑定的泛型 rawType
+        try {
+            java.util.Collection<org.apache.ibatis.type.TypeHandler<?>> handlers = registry.getTypeHandlers();
+            if (handlers != null) {
+                for (org.apache.ibatis.type.TypeHandler<?> handler : handlers) {
+                    if (handler instanceof org.apache.ibatis.type.TypeReference<?>) {
+                        java.lang.reflect.Type raw = ((org.apache.ibatis.type.TypeReference<?>) handler).getRawType();
+                        if (raw instanceof Class<?>) {
+                            Class<?> clazz = (Class<?>) raw;
+                            if (!isJdkBasicType(clazz) && processedTypes.add(clazz)) {
+                                config.addAutoConverter(new MyBatisAutoTypeHandlerConverter<>(handler, clazz));
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static boolean isJdkBasicType(Class<?> clazz) {
+        if (clazz == null || clazz.isPrimitive()) return true;
+        String name = clazz.getName();
+        if (name.startsWith("java.lang.") || name.startsWith("java.math.") || name.startsWith("java.sql.")) {
+            return true;
+        }
+        if (name.startsWith("java.time.") || name.startsWith("java.io.")) {
+            return true;
+        }
+        if (clazz.isArray() && (clazz.getComponentType().isPrimitive() || clazz.getComponentType().getName().startsWith("java.lang."))) {
+            return true;
+        }
+        return clazz == java.util.Date.class;
     }
 
     private static DataSource resolveDataSource(Configuration configuration) {
