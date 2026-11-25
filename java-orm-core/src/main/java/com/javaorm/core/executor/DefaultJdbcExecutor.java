@@ -2,6 +2,7 @@ package com.javaorm.core.executor;
 
 import com.javaorm.core.ast.InsertStatement;
 import com.javaorm.core.ast.SelectStatement;
+import com.javaorm.core.ast.UpsertStatement;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.connection.ConnectionUtils;
 import com.javaorm.core.dialect.Dialect;
@@ -16,117 +17,80 @@ import com.javaorm.core.query.SelectBuilder;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 原生 JDBC 执行引擎实现（默认实现）。
- * 负责底层的连接获取与释放、PreparedStatement 参数设置、结果集水合与批量操作。
+ * 默认直连 JDBC SQL 执行器。
  */
 public class DefaultJdbcExecutor implements SqlExecutor {
 
-    @Override
-    public <R> List<R> executeQuery(Connection conn, SelectStatement statement, EntityMetadata metadata,
-                                    List<IncludeSpec> includes, Dialect dialect, OrmConfig config, DataSource dataSource) {
+    @FunctionalInterface
+    private interface SqlAction<R> {
+        R run(Connection conn) throws Exception;
+    }
+
+    private <R> R withConnection(Connection conn, DataSource dataSource, OrmConfig config,
+                                 SelectStatement statement, boolean isWrite, String errorMessage,
+                                 SqlAction<R> action) {
         boolean closeConn = false;
         Connection effectiveConn = conn;
         try {
             if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, false);
+                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, isWrite);
                 closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
             }
+            return action.run(effectiveConn);
+        } catch (Exception e) {
+            throw new RuntimeException(errorMessage, e);
+        } finally {
+            if (closeConn && effectiveConn != null) {
+                ConnectionUtils.closeConnection(effectiveConn);
+            }
+        }
+    }
+
+    @Override
+    public <R> List<R> executeQuery(Connection conn, SelectStatement statement, EntityMetadata metadata,
+                                    List<IncludeSpec> includes, Dialect dialect, OrmConfig config, DataSource dataSource) {
+        return withConnection(conn, dataSource, config, statement, false, "Failed to execute query list", effectiveConn -> {
             List<R> result = EntityHydrator.queryList(effectiveConn, statement, metadata, dialect, config);
             if (includes != null && !includes.isEmpty() && result != null && !result.isEmpty()) {
                 IncludeProcessor.processIncludes(effectiveConn, result, metadata, includes, dialect, config, dataSource);
             }
             return result;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute query list", e);
-        } finally {
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
-        }
+        });
     }
 
     @Override
     public <DTO> List<DTO> executeDtoQuery(Connection conn, SelectStatement statement, Class<DTO> dtoClass,
                                            Dialect dialect, OrmConfig config, DataSource dataSource) {
-        boolean closeConn = false;
-        Connection effectiveConn = conn;
-        try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, false);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            return EntityHydrator.queryDtoList(effectiveConn, statement, dtoClass, dialect, config);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to query list for " + (dtoClass != null ? dtoClass.getName() : "DTO"), e);
-        } finally {
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
-        }
+        String errMsg = "Failed to query list for " + (dtoClass != null ? dtoClass.getName() : "DTO");
+        return withConnection(conn, dataSource, config, statement, false, errMsg,
+                effectiveConn -> EntityHydrator.queryDtoList(effectiveConn, statement, dtoClass, dialect, config));
     }
 
     @Override
     public List<Map<String, Object>> executeMaps(Connection conn, SelectStatement statement,
                                                  Dialect dialect, OrmConfig config, DataSource dataSource) {
-        boolean closeConn = false;
-        Connection effectiveConn = conn;
-        try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, false);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            return EntityHydrator.queryMaps(effectiveConn, statement, dialect, config);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute listMaps query", e);
-        } finally {
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
-        }
+        return withConnection(conn, dataSource, config, statement, false, "Failed to execute listMaps query",
+                effectiveConn -> EntityHydrator.queryMaps(effectiveConn, statement, dialect, config));
     }
 
     @Override
     public <V> V executeScalar(Connection conn, SelectStatement statement, Class<V> targetType,
                                Dialect dialect, OrmConfig config, DataSource dataSource) {
-        boolean closeConn = false;
-        Connection effectiveConn = conn;
-        try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, false);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            return EntityHydrator.queryScalar(effectiveConn, statement, targetType, dialect, config);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch one scalar", e);
-        } finally {
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
-        }
+        return withConnection(conn, dataSource, config, statement, false, "Failed to fetch one scalar",
+                effectiveConn -> EntityHydrator.queryScalar(effectiveConn, statement, targetType, dialect, config));
     }
 
     @Override
     public <V> List<V> executeScalarList(Connection conn, SelectStatement statement, Class<V> targetType,
                                          Dialect dialect, OrmConfig config, DataSource dataSource) {
-        boolean closeConn = false;
-        Connection effectiveConn = conn;
-        try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, false);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            return EntityHydrator.queryScalarList(effectiveConn, statement, targetType, dialect, config);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch scalar list", e);
-        } finally {
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
-        }
+        return withConnection(conn, dataSource, config, statement, false, "Failed to fetch scalar list",
+                effectiveConn -> EntityHydrator.queryScalarList(effectiveConn, statement, targetType, dialect, config));
     }
 
     @Override
@@ -136,36 +100,25 @@ public class DefaultJdbcExecutor implements SqlExecutor {
         if (config != null && config.getInterceptorChain() != null && !config.getInterceptorChain().isEmpty()) {
             effective = config.getInterceptorChain().pluginUpdate(sqlAndParams, null, dialect);
         }
-        Connection effectiveConn = conn;
-        boolean closeConn = false;
+        final SqlAndParams finalSql = effective;
         long start = System.currentTimeMillis();
         Throwable err = null;
         try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config, null, true);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            try (PreparedStatement ps = effectiveConn.prepareStatement(effective.getSql())) {
-                List<Object> params = effective.getParams();
-                if (params != null) {
-                    for (int i = 0; i < params.size(); i++) {
-                        ps.setObject(i + 1, params.get(i));
-                    }
-                }
-                int affected = ps.executeUpdate();
-                com.javaorm.core.datasource.ReadWriteContext.recordWrite();
-                return affected;
-            }
-        } catch (Exception e) {
-            err = e;
-            throw new RuntimeException("Failed to execute " + (prefix != null ? prefix : "SQL") + " statement", e);
+            return withConnection(conn, dataSource, config, null, true,
+                    "Failed to execute " + (prefix != null ? prefix : "SQL") + " statement",
+                    effectiveConn -> {
+                        try (PreparedStatement ps = effectiveConn.prepareStatement(finalSql.getSql())) {
+                            bindParams(ps, finalSql.getParams());
+                            int rows = ps.executeUpdate();
+                            com.javaorm.core.datasource.ReadWriteContext.recordWrite();
+                            return rows;
+                        }
+                    });
+        } catch (RuntimeException e) {
+            err = e.getCause() != null ? e.getCause() : e;
+            throw e;
         } finally {
-            if (config != null && config.getInterceptorChain() != null && !config.getInterceptorChain().isEmpty()) {
-                config.getInterceptorChain().triggerAfterExecution(effective.getSql(), effective.getParams(), System.currentTimeMillis() - start, err);
-            }
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
+            triggerAfterExecution(config, finalSql.getSql(), finalSql.getParams(), start, err);
             RecordingContext.clearRecording();
             SelectBuilder.resetAliasSeq();
         }
@@ -178,14 +131,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
                 || !statement.getHavingConditions().isEmpty()
                 || !statement.getUnions().isEmpty();
 
-        boolean closeConn = false;
-        Connection effectiveConn = conn;
-        try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config, statement, false);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-
+        return withConnection(conn, dataSource, config, statement, false, "Failed to execute count query", effectiveConn -> {
             if (!isComplex) {
                 SelectStatement countStmt = new SelectStatement(statement.getRootEntityClass(), statement.getRootTableName(), statement.getRootTableAlias());
                 for (com.javaorm.core.ast.CteClause cte : statement.getCtes()) {
@@ -202,208 +148,151 @@ public class DefaultJdbcExecutor implements SqlExecutor {
                     countStmt.addWhereCondition(cond);
                 }
                 return EntityHydrator.queryCount(effectiveConn, countStmt, dialect, config);
-            } else {
-                SelectStatement innerStmt = new SelectStatement(statement.getRootEntityClass(), statement.getRootTableName(), statement.getRootTableAlias());
-                for (com.javaorm.core.ast.CteClause cte : statement.getCtes()) {
-                    innerStmt.addCte(cte);
-                }
-                innerStmt.setDistinct(statement.isDistinct());
-                for (com.javaorm.core.ast.SqlExpression expr : statement.getProjectExpressions()) {
+            }
+
+            SelectStatement innerStmt = new SelectStatement(statement.getRootEntityClass(), statement.getRootTableName(), statement.getRootTableAlias());
+            for (com.javaorm.core.ast.CteClause cte : statement.getCtes()) {
+                innerStmt.addCte(cte);
+            }
+            innerStmt.setDistinct(statement.isDistinct());
+            for (com.javaorm.core.ast.SqlExpression expr : statement.getProjectExpressions()) {
+                innerStmt.addProjectExpression(expr);
+            }
+            for (String col : statement.getSelectColumns()) {
+                innerStmt.addSelectColumn(col);
+            }
+            if (!statement.getGroupByExpressions().isEmpty() && innerStmt.getProjectExpressions().isEmpty() && innerStmt.getSelectColumns().isEmpty()) {
+                for (com.javaorm.core.ast.SqlExpression expr : statement.getGroupByExpressions()) {
                     innerStmt.addProjectExpression(expr);
                 }
-                for (String col : statement.getSelectColumns()) {
-                    innerStmt.addSelectColumn(col);
-                }
-                if (!statement.getGroupByExpressions().isEmpty() && innerStmt.getProjectExpressions().isEmpty() && innerStmt.getSelectColumns().isEmpty()) {
-                    for (com.javaorm.core.ast.SqlExpression expr : statement.getGroupByExpressions()) {
-                        innerStmt.addProjectExpression(expr);
-                    }
-                }
-                for (com.javaorm.core.ast.TableJoin join : statement.getJoins()) {
-                    innerStmt.addJoin(join);
-                }
-                for (com.javaorm.core.ast.Condition cond : statement.getSystemConditions()) {
-                    innerStmt.addSystemCondition(cond);
-                }
-                for (com.javaorm.core.ast.Condition cond : statement.getWhereConditions()) {
-                    innerStmt.addWhereCondition(cond);
-                }
-                for (com.javaorm.core.ast.SqlExpression expr : statement.getGroupByExpressions()) {
-                    innerStmt.addGroupByExpression(expr);
-                }
-                for (com.javaorm.core.ast.Condition cond : statement.getHavingConditions()) {
-                    innerStmt.addHavingCondition(cond);
-                }
-                for (com.javaorm.core.ast.UnionClause u : statement.getUnions()) {
-                    innerStmt.addUnion(u);
-                }
+            }
+            for (com.javaorm.core.ast.TableJoin join : statement.getJoins()) {
+                innerStmt.addJoin(join);
+            }
+            for (com.javaorm.core.ast.Condition cond : statement.getSystemConditions()) {
+                innerStmt.addSystemCondition(cond);
+            }
+            for (com.javaorm.core.ast.Condition cond : statement.getWhereConditions()) {
+                innerStmt.addWhereCondition(cond);
+            }
+            for (com.javaorm.core.ast.SqlExpression expr : statement.getGroupByExpressions()) {
+                innerStmt.addGroupByExpression(expr);
+            }
+            for (com.javaorm.core.ast.Condition cond : statement.getHavingConditions()) {
+                innerStmt.addHavingCondition(cond);
+            }
+            for (com.javaorm.core.ast.UnionClause u : statement.getUnions()) {
+                innerStmt.addUnion(u);
+            }
 
-                SqlAndParams countSqlAndParams;
-                if (!innerStmt.getCtes().isEmpty()) {
-                    SqlAndParams withSql = dialect.buildSelect(innerStmt, true);
-                    SqlAndParams innerWithoutCte = dialect.buildSelect(innerStmt, false);
-                    String sqlStr = withSql.getSql();
-                    int selectIdx = sqlStr.indexOf("SELECT ");
-                    String withPrefix = selectIdx > 0 ? sqlStr.substring(0, selectIdx) : "";
-                    String countSql = withPrefix + "SELECT COUNT(1) FROM (" + innerWithoutCte.getSql() + ") count_sub";
-                    countSqlAndParams = new SqlAndParams(countSql, withSql.getParams());
-                } else {
-                    SqlAndParams innerSql = dialect.buildSelect(innerStmt);
-                    String countSql = "SELECT COUNT(1) FROM (" + innerSql.getSql() + ") count_sub";
-                    countSqlAndParams = new SqlAndParams(countSql, innerSql.getParams());
-                }
-                return EntityHydrator.queryCount(effectiveConn, countSqlAndParams, config, !innerStmt.getCtes().isEmpty(), dialect);
+            SqlAndParams countSqlAndParams;
+            if (!innerStmt.getCtes().isEmpty()) {
+                SqlAndParams withSql = dialect.buildSelect(innerStmt, true);
+                SqlAndParams innerWithoutCte = dialect.buildSelect(innerStmt, false);
+                String sqlStr = withSql.getSql();
+                int selectIdx = sqlStr.indexOf("SELECT ");
+                String withPrefix = selectIdx > 0 ? sqlStr.substring(0, selectIdx) : "";
+                String countSql = withPrefix + "SELECT COUNT(1) FROM (" + innerWithoutCte.getSql() + ") count_sub";
+                countSqlAndParams = new SqlAndParams(countSql, withSql.getParams());
+            } else {
+                SqlAndParams innerSql = dialect.buildSelect(innerStmt);
+                String countSql = "SELECT COUNT(1) FROM (" + innerSql.getSql() + ") count_sub";
+                countSqlAndParams = new SqlAndParams(countSql, innerSql.getParams());
             }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute count query", e);
-        } finally {
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
-        }
+            return EntityHydrator.queryCount(effectiveConn, countSqlAndParams, config, !innerStmt.getCtes().isEmpty(), dialect);
+        });
     }
 
     @Override
-    public int executeInsert(Connection conn, com.javaorm.core.ast.InsertStatement statement, EntityMetadata metadata,
+    public int executeInsert(Connection conn, InsertStatement statement, EntityMetadata metadata,
                              boolean returnKeys, Object entity, Dialect dialect, OrmConfig config, DataSource dataSource) {
-        Connection effectiveConn = conn;
-        boolean closeConn = false;
-        long start = System.currentTimeMillis();
-        Throwable err = null;
-        SqlAndParams effective = null;
-        try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config, null, true);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            SqlAndParams sqlAndParams = dialect.buildInsert(statement);
-            effective = sqlAndParams;
-            if (config != null && config.getInterceptorChain() != null && !config.getInterceptorChain().isEmpty()) {
-                effective = config.getInterceptorChain().pluginUpdate(sqlAndParams, metadata, dialect);
-            }
-            int autoGeneratedKeys = returnKeys ? java.sql.Statement.RETURN_GENERATED_KEYS : java.sql.Statement.NO_GENERATED_KEYS;
-            try (PreparedStatement ps = effectiveConn.prepareStatement(effective.getSql(), autoGeneratedKeys)) {
-                List<Object> params = effective.getParams();
-                if (params != null) {
-                    for (int i = 0; i < params.size(); i++) {
-                        ps.setObject(i + 1, params.get(i));
-                    }
-                }
-                int affected = ps.executeUpdate();
-                com.javaorm.core.datasource.ReadWriteContext.recordWrite();
-                if (returnKeys && entity != null && metadata != null && metadata.getIdColumn() != null) {
-                    try (java.sql.ResultSet rs = ps.getGeneratedKeys()) {
-                        if (rs != null && rs.next()) {
-                            Object key = rs.getObject(1);
-                            metadata.getIdColumn().setValue(entity, key);
-                        }
-                    }
-                }
-                return affected;
-            }
-        } catch (Exception e) {
-            err = e;
-            throw new RuntimeException("Failed to execute insert statement", e);
-        } finally {
-            if (config != null && config.getInterceptorChain() != null && !config.getInterceptorChain().isEmpty() && effective != null) {
-                config.getInterceptorChain().triggerAfterExecution(effective.getSql(), effective.getParams(), System.currentTimeMillis() - start, err);
-            }
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
-        }
+        return executeInsertOrUpsert(conn, dialect.buildInsert(statement), metadata, returnKeys, entity,
+                dialect, config, dataSource, "Failed to execute insert statement");
     }
 
     @Override
-    public int executeUpsert(Connection conn, com.javaorm.core.ast.UpsertStatement statement, EntityMetadata metadata,
+    public int executeUpsert(Connection conn, UpsertStatement statement, EntityMetadata metadata,
                              boolean returnKeys, Object entity, Dialect dialect, OrmConfig config, DataSource dataSource) {
-        Connection effectiveConn = conn;
-        boolean closeConn = false;
+        return executeInsertOrUpsert(conn, dialect.buildUpsert(statement), metadata, returnKeys, entity,
+                dialect, config, dataSource, "Failed to execute upsert statement");
+    }
+
+    private int executeInsertOrUpsert(Connection conn, SqlAndParams sqlAndParams, EntityMetadata metadata,
+                                      boolean returnKeys, Object entity, Dialect dialect, OrmConfig config,
+                                      DataSource dataSource, String errorMessage) {
+        SqlAndParams effective = sqlAndParams;
+        if (config != null && config.getInterceptorChain() != null && !config.getInterceptorChain().isEmpty()) {
+            effective = config.getInterceptorChain().pluginUpdate(sqlAndParams, metadata, dialect);
+        }
+        final SqlAndParams finalSql = effective;
         long start = System.currentTimeMillis();
         Throwable err = null;
-        SqlAndParams effective = null;
         try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config, null, true);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            SqlAndParams sqlAndParams = dialect.buildUpsert(statement);
-            effective = sqlAndParams;
-            if (config != null && config.getInterceptorChain() != null && !config.getInterceptorChain().isEmpty()) {
-                effective = config.getInterceptorChain().pluginUpdate(sqlAndParams, metadata, dialect);
-            }
-            int autoGeneratedKeys = returnKeys ? java.sql.Statement.RETURN_GENERATED_KEYS : java.sql.Statement.NO_GENERATED_KEYS;
-            try (PreparedStatement ps = effectiveConn.prepareStatement(effective.getSql(), autoGeneratedKeys)) {
-                List<Object> params = effective.getParams();
-                if (params != null) {
-                    for (int i = 0; i < params.size(); i++) {
-                        ps.setObject(i + 1, params.get(i));
-                    }
-                }
-                int affected = ps.executeUpdate();
-                com.javaorm.core.datasource.ReadWriteContext.recordWrite();
-                if (returnKeys && entity != null && metadata != null && metadata.getIdColumn() != null) {
-                    try (java.sql.ResultSet rs = ps.getGeneratedKeys()) {
-                        if (rs != null && rs.next()) {
-                            Object key = rs.getObject(1);
-                            metadata.getIdColumn().setValue(entity, key);
+            return withConnection(conn, dataSource, config, null, true, errorMessage, effectiveConn -> {
+                int autoGeneratedKeys = returnKeys ? Statement.RETURN_GENERATED_KEYS : Statement.NO_GENERATED_KEYS;
+                try (PreparedStatement ps = effectiveConn.prepareStatement(finalSql.getSql(), autoGeneratedKeys)) {
+                    bindParams(ps, finalSql.getParams());
+                    int affected = ps.executeUpdate();
+                    com.javaorm.core.datasource.ReadWriteContext.recordWrite();
+                    if (returnKeys && entity != null && metadata != null && metadata.getIdColumn() != null) {
+                        try (ResultSet rs = ps.getGeneratedKeys()) {
+                            if (rs != null && rs.next()) {
+                                Object key = rs.getObject(1);
+                                metadata.getIdColumn().setValue(entity, key);
+                            }
                         }
                     }
+                    return affected;
                 }
-                return affected;
-            }
-        } catch (Exception e) {
-            err = e;
-            throw new RuntimeException("Failed to execute upsert statement", e);
+            });
+        } catch (RuntimeException e) {
+            err = e.getCause() != null ? e.getCause() : e;
+            throw e;
         } finally {
-            if (config != null && config.getInterceptorChain() != null && !config.getInterceptorChain().isEmpty() && effective != null) {
-                config.getInterceptorChain().triggerAfterExecution(effective.getSql(), effective.getParams(), System.currentTimeMillis() - start, err);
-            }
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
+            triggerAfterExecution(config, finalSql.getSql(), finalSql.getParams(), start, err);
         }
     }
 
     @Override
     public int[] executeBatchUpdate(Connection conn, String sql, List<List<Object>> batchParams,
                                     Dialect dialect, OrmConfig config, DataSource dataSource) {
-        Connection effectiveConn = conn;
-        boolean closeConn = false;
         long start = System.currentTimeMillis();
         Throwable err = null;
         try {
-            if (effectiveConn == null) {
-                effectiveConn = ConnectionUtils.getConnection(dataSource, config, null, true);
-                closeConn = !ConnectionUtils.isTransactionConnection(effectiveConn);
-            }
-            try (PreparedStatement ps = effectiveConn.prepareStatement(sql)) {
-                if (batchParams != null) {
-                    for (List<Object> params : batchParams) {
-                        if (params != null) {
-                            for (int i = 0; i < params.size(); i++) {
-                                ps.setObject(i + 1, params.get(i));
-                            }
+            return withConnection(conn, dataSource, config, null, true, "Failed to execute batch SQL statement", effectiveConn -> {
+                try (PreparedStatement ps = effectiveConn.prepareStatement(sql)) {
+                    if (batchParams != null) {
+                        for (List<Object> params : batchParams) {
+                            bindParams(ps, params);
+                            ps.addBatch();
                         }
-                        ps.addBatch();
                     }
+                    int[] affected = ps.executeBatch();
+                    com.javaorm.core.datasource.ReadWriteContext.recordWrite();
+                    return affected;
                 }
-                int[] affected = ps.executeBatch();
-                com.javaorm.core.datasource.ReadWriteContext.recordWrite();
-                return affected;
-            }
-        } catch (Exception e) {
-            err = e;
-            throw new RuntimeException("Failed to execute batch SQL statement", e);
+            });
+        } catch (RuntimeException e) {
+            err = e.getCause() != null ? e.getCause() : e;
+            throw e;
         } finally {
-            if (config != null && config.getInterceptorChain() != null && !config.getInterceptorChain().isEmpty()) {
-                config.getInterceptorChain().triggerAfterExecution(sql, null, System.currentTimeMillis() - start, err);
-            }
-            if (closeConn && effectiveConn != null) {
-                ConnectionUtils.closeConnection(effectiveConn);
-            }
+            triggerAfterExecution(config, sql, null, start, err);
             RecordingContext.clearRecording();
             SelectBuilder.resetAliasSeq();
+        }
+    }
+
+    private static void bindParams(PreparedStatement ps, List<Object> params) throws Exception {
+        if (params != null) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+        }
+    }
+
+    private static void triggerAfterExecution(OrmConfig config, String sql, List<Object> params, long startMillis, Throwable err) {
+        if (config != null && config.getInterceptorChain() != null && !config.getInterceptorChain().isEmpty() && sql != null) {
+            config.getInterceptorChain().triggerAfterExecution(sql, params, System.currentTimeMillis() - startMillis, err);
         }
     }
 }

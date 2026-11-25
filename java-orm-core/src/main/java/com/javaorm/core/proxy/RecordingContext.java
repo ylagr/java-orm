@@ -8,11 +8,20 @@ import java.util.*;
  */
 public class RecordingContext {
 
-    private static final ThreadLocal<LinkedList<PropertyPath>> RECORDED_QUEUE = ThreadLocal.withInitial(LinkedList::new);
+    private static final ThreadLocal<LinkedList<PropertyPath>> RECORDED_QUEUE = new ThreadLocal<>();
     private static final ThreadLocal<PropertyPath> CURRENT_PATH = new ThreadLocal<>();
-    private static final ThreadLocal<Map<Class<?>, String>> ACTIVE_ALIASES = ThreadLocal.withInitial(HashMap::new);
-    private static final ThreadLocal<Map<Object, String>> PROXY_ALIASES = ThreadLocal.withInitial(IdentityHashMap::new);
+    private static final ThreadLocal<Map<Class<?>, String>> ACTIVE_ALIASES = new ThreadLocal<>();
+    private static final ThreadLocal<Map<Object, String>> PROXY_ALIASES = new ThreadLocal<>();
     private static final Map<Object, String> GLOBAL_PROXY_ALIASES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static LinkedList<PropertyPath> getOrCreateQueue() {
+        LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
+        if (queue == null) {
+            queue = new LinkedList<>();
+            RECORDED_QUEUE.set(queue);
+        }
+        return queue;
+    }
 
     public static void start(Class<?> rootEntityClass) {
         clearRecording(rootEntityClass);
@@ -28,7 +37,7 @@ public class RecordingContext {
             return;
         } else if (cur.getTerminalProperty() != null) {
             // 前一个属性已完成录制，推入队列，开启新实体的录制
-            RECORDED_QUEUE.get().offer(cur);
+            getOrCreateQueue().offer(cur);
             CURRENT_PATH.set(new PropertyPath(rootEntityClass));
         }
     }
@@ -39,26 +48,40 @@ public class RecordingContext {
 
     public static void registerAlias(Class<?> entityClass, String alias) {
         if (entityClass != null && alias != null) {
-            ACTIVE_ALIASES.get().put(entityClass, alias);
+            Map<Class<?>, String> map = ACTIVE_ALIASES.get();
+            if (map == null) {
+                map = new HashMap<>();
+                ACTIVE_ALIASES.set(map);
+            }
+            map.put(entityClass, alias);
         }
     }
 
     public static String getAlias(Class<?> entityClass) {
-        return entityClass != null ? ACTIVE_ALIASES.get().get(entityClass) : null;
+        if (entityClass == null) return null;
+        Map<Class<?>, String> map = ACTIVE_ALIASES.get();
+        return map != null ? map.get(entityClass) : null;
     }
 
     public static boolean hasAlias(String alias) {
         if (alias == null) return false;
-        return ACTIVE_ALIASES.get().containsValue(alias);
+        Map<Class<?>, String> map = ACTIVE_ALIASES.get();
+        return map != null && map.containsValue(alias);
     }
 
     public static int getActiveAliasCount() {
-        return ACTIVE_ALIASES.get().size();
+        Map<Class<?>, String> map = ACTIVE_ALIASES.get();
+        return map != null ? map.size() : 0;
     }
 
     public static void registerProxyAlias(Object proxy, String alias) {
         if (proxy != null && alias != null) {
-            PROXY_ALIASES.get().put(proxy, alias);
+            Map<Object, String> map = PROXY_ALIASES.get();
+            if (map == null) {
+                map = new IdentityHashMap<>();
+                PROXY_ALIASES.set(map);
+            }
+            map.put(proxy, alias);
         }
     }
 
@@ -74,7 +97,8 @@ public class RecordingContext {
         if (global != null) {
             return global;
         }
-        return PROXY_ALIASES.get().get(proxy);
+        Map<Object, String> local = PROXY_ALIASES.get();
+        return local != null ? local.get(proxy) : null;
     }
 
     public static void clearAliases() {
@@ -93,7 +117,12 @@ public class RecordingContext {
             return;
         }
         LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
-        queue.removeIf(p -> p.getRootEntityClass() == entityClass);
+        if (queue != null) {
+            queue.removeIf(p -> p.getRootEntityClass() == entityClass);
+            if (queue.isEmpty()) {
+                RECORDED_QUEUE.remove();
+            }
+        }
         PropertyPath cur = CURRENT_PATH.get();
         if (cur != null && cur.getRootEntityClass() == entityClass) {
             CURRENT_PATH.remove();
@@ -120,7 +149,7 @@ public class RecordingContext {
                 path.addValueObjectStep(path.getTerminalProperty());
             } else if (path.getTerminalProperty() != null) {
                 // 上一个普通属性已完成，推入队列
-                RECORDED_QUEUE.get().offer(path);
+                getOrCreateQueue().offer(path);
                 path = new PropertyPath(path.getRootEntityClass());
                 CURRENT_PATH.set(path);
             }
@@ -141,7 +170,7 @@ public class RecordingContext {
             }
             if (path.getTerminalProperty() != null) {
                 // 前一个属性已完成录制，推入队列，开启新属性
-                RECORDED_QUEUE.get().offer(path);
+                getOrCreateQueue().offer(path);
                 path = new PropertyPath(path.getRootEntityClass());
                 CURRENT_PATH.set(path);
             }
@@ -196,7 +225,7 @@ public class RecordingContext {
 
         LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
         if (entityClass == null) {
-            if (!queue.isEmpty()) {
+            if (queue != null && !queue.isEmpty()) {
                 PropertyPath polled = queue.poll();
                 if (queue.isEmpty() && CURRENT_PATH.get() == null) {
                     RECORDED_QUEUE.remove();
@@ -206,6 +235,9 @@ public class RecordingContext {
             return null;
         }
 
+        if (queue == null || queue.isEmpty()) {
+            return null;
+        }
         // 针对指定实体查找
         for (Iterator<PropertyPath> it = queue.iterator(); it.hasNext(); ) {
             PropertyPath p = it.next();
@@ -269,11 +301,16 @@ public class RecordingContext {
     public static List<PropertyPath> finishAll(Class<?> entityClass) {
         List<PropertyPath> result = new ArrayList<>();
         LinkedList<PropertyPath> queue = RECORDED_QUEUE.get();
-        for (Iterator<PropertyPath> it = queue.iterator(); it.hasNext(); ) {
-            PropertyPath p = it.next();
-            if (entityClass == null || p.getRootEntityClass() == entityClass) {
-                result.add(p);
-                it.remove();
+        if (queue != null) {
+            for (Iterator<PropertyPath> it = queue.iterator(); it.hasNext(); ) {
+                PropertyPath p = it.next();
+                if (entityClass == null || p.getRootEntityClass() == entityClass) {
+                    result.add(p);
+                    it.remove();
+                }
+            }
+            if (queue.isEmpty() && CURRENT_PATH.get() == null) {
+                RECORDED_QUEUE.remove();
             }
         }
         PropertyPath path = CURRENT_PATH.get();
@@ -281,7 +318,7 @@ public class RecordingContext {
             result.add(path);
             CURRENT_PATH.remove();
         }
-        if (queue.isEmpty() && CURRENT_PATH.get() == null) {
+        if ((queue == null || queue.isEmpty()) && CURRENT_PATH.get() == null) {
             RECORDED_QUEUE.remove();
         }
         return result;

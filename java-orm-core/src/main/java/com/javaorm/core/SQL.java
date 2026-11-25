@@ -664,52 +664,20 @@ public class SQL {
         return new FunctionExpression<>(BuiltinSqlFunction.CONCAT, toExpressions(parts.toArray()));
     }
 
-    public static <T extends CharSequence> FunctionExpression<String> subString(T prop, int start, int len) {
+    public static <T extends CharSequence> FunctionExpression<String> substring(T prop, int start, int len) {
         return new FunctionExpression<>(BuiltinSqlFunction.SUBSTRING, toExpression(prop), start, len);
     }
 
-    public static <T extends CharSequence> FunctionExpression<String> subString(SqlExpression<T> expr, int start, int len) {
+    public static <T extends CharSequence> FunctionExpression<String> substring(SqlExpression<T> expr, int start, int len) {
         return new FunctionExpression<>(BuiltinSqlFunction.SUBSTRING, expr, start, len);
     }
 
-    public static <T extends CharSequence> FunctionExpression<String> subString(T prop, int start) {
+    public static <T extends CharSequence> FunctionExpression<String> substring(T prop, int start) {
         return new FunctionExpression<>(BuiltinSqlFunction.SUBSTRING, toExpression(prop), start);
     }
 
-    public static <T extends CharSequence> FunctionExpression<String> subString(SqlExpression<T> expr, int start) {
-        return new FunctionExpression<>(BuiltinSqlFunction.SUBSTRING, expr, start);
-    }
-
-    public static <T extends CharSequence> FunctionExpression<String> substring(T prop, int start, int len) {
-        return subString(prop, start, len);
-    }
-
-    public static <T extends CharSequence> FunctionExpression<String> substring(SqlExpression<T> expr, int start, int len) {
-        return subString(expr, start, len);
-    }
-
-    public static <T extends CharSequence> FunctionExpression<String> substring(T prop, int start) {
-        return subString(prop, start);
-    }
-
     public static <T extends CharSequence> FunctionExpression<String> substring(SqlExpression<T> expr, int start) {
-        return subString(expr, start);
-    }
-
-    public static <T extends CharSequence> FunctionExpression<String> substr(T prop, int start, int len) {
-        return subString(prop, start, len);
-    }
-
-    public static <T extends CharSequence> FunctionExpression<String> substr(SqlExpression<T> expr, int start, int len) {
-        return subString(expr, start, len);
-    }
-
-    public static <T extends CharSequence> FunctionExpression<String> substr(T prop, int start) {
-        return subString(prop, start);
-    }
-
-    public static <T extends CharSequence> FunctionExpression<String> substr(SqlExpression<T> expr, int start) {
-        return subString(expr, start);
+        return new FunctionExpression<>(BuiltinSqlFunction.SUBSTRING, expr, start);
     }
 
     public static <T extends CharSequence> FunctionExpression<String> replace(T prop, Object target, Object replacement) {
