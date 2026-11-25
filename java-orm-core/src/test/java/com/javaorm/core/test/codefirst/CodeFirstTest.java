@@ -329,7 +329,7 @@ public class CodeFirstTest {
         order.setStatus(1);
         order.setPaid(true);
         order.setCreateTime(LocalDateTime.now());
-        orm.insert(order);
+        orm.insert(order).exec();
 
         Assert.assertNotNull(order.getId());
         OrderEntity loaded = orm.select(OrderEntity.class).where().eq(OrderEntity::getOrderNo, "ORD-2026-001").first();
@@ -562,7 +562,7 @@ public class CodeFirstTest {
         a1.setArticleCode("ART_001");
         a1.setStatus(1);
         a1.setCreateTime(LocalDateTime.now());
-        orm.insert(a1);
+        orm.insert(a1).exec();
 
         IndexedArticleEntity a2 = new IndexedArticleEntity();
         a2.setArticleCode("ART_001"); // 重复 code，应当触发唯一约束冲突
@@ -570,7 +570,7 @@ public class CodeFirstTest {
         a2.setCreateTime(LocalDateTime.now());
         boolean uniqueConflict = false;
         try {
-            orm.insert(a2);
+            orm.insert(a2).exec();
         } catch (Exception e) {
             uniqueConflict = true;
         }

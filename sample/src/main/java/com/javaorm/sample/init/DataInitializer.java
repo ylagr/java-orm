@@ -35,7 +35,7 @@ public class DataInitializer implements CommandLineRunner {
                 c.setIcon("folder");
                 c.setDeleted(0);
                 c.setCreateTime(new Date());
-                orm.insert(c);
+                orm.insert(c).exec();
             }
         }
 
@@ -109,7 +109,7 @@ public class DataInitializer implements CommandLineRunner {
         p.setDeleted(0);
         p.setCreateTime(new Date());
         p.setUpdateTime(new Date());
-        orm.insert(p);
+        orm.insert(p).exec();
     }
 
     private void insertUser(String username, String nickname, String phone, int points, BigDecimal balance) {
@@ -122,7 +122,7 @@ public class DataInitializer implements CommandLineRunner {
         u.setBalance(balance);
         u.setDeleted(0);
         u.setCreateTime(new Date());
-        orm.insert(u);
+        orm.insert(u).exec();
     }
 
     private MallOrderItem createItem(MallProduct p, int qty) {
@@ -159,10 +159,10 @@ public class DataInitializer implements CommandLineRunner {
         o.setTotalAmount(total);
         o.setPayAmount(total);
 
-        orm.insert(o);
+        orm.insert(o).exec();
         for (MallOrderItem item : items) {
             item.setOrderId(o.getId());
-            orm.insert(item);
+            orm.insert(item).exec();
         }
     }
 }

@@ -102,15 +102,7 @@ public class SqlEnv {
         if (printSqlOverride == null) {
             return config;
         }
-        OrmConfig effective = new OrmConfig();
-        if (config != null) {
-            effective.setNameConversion(config.getNameConversion());
-            effective.setDefaultLogicDeleteProperty(config.getDefaultLogicDeleteProperty());
-            effective.setDefaultLogicDeleteNormalValue(config.getDefaultLogicDeleteNormalValue());
-            effective.setDefaultLogicDeleteDeletedValue(config.getDefaultLogicDeleteDeletedValue());
-        }
-        effective.setPrintSql(printSqlOverride);
-        return effective;
+        return config != null ? config.withPrintSql(printSqlOverride) : new OrmConfig().setPrintSql(printSqlOverride);
     }
 
     public String nextAlias() {

@@ -22,14 +22,14 @@ public class EasyQueryJoinTest extends EasyQueryBaseTest {
         Topic t = orm.proxy(Topic.class);
 
         // BlogEntity left join Topic on b.topicId = t.id
-        List<BlogEntity> list = orm.queryable(BlogEntity.class)
+        List<BlogEntity> list = orm.select(BlogEntity.class)
                 .leftJoin(Topic.class, (w, blog, topic) -> w.eq(blog.getTopicId(), topic.getId()))
                 .where(w -> w.ge(b.getStar(), 10))
                 .toList();
 
         assertEquals(4, list.size()); // b2(15), b3(25), b4(35), b5(45)
 
-        String sql = orm.queryable(BlogEntity.class)
+        String sql = orm.select(BlogEntity.class)
                 .leftJoin(Topic.class, (w, blog, topic) -> w.eq(blog.getTopicId(), topic.getId()))
                 .where(w -> w.ge(b.getStar(), 10))
                 .toSQL();
@@ -43,13 +43,13 @@ public class EasyQueryJoinTest extends EasyQueryBaseTest {
         // BlogEntity inner join Topic on b.topicId = t.id
         // 注意：b5 的 topicId 是 '999'，在 t_topic 中不存在；t_topic 的 id='7' 已逻辑删除
         // 故 inner join 结果不包含 b5
-        List<BlogEntity> list = orm.queryable(BlogEntity.class)
+        List<BlogEntity> list = orm.select(BlogEntity.class)
                 .innerJoin(Topic.class, (w, blog, topic) -> w.eq(blog.getTopicId(), topic.getId()))
                 .toList();
 
         assertEquals(4, list.size()); // b1, b2, b3, b4
 
-        String sql = orm.queryable(BlogEntity.class)
+        String sql = orm.select(BlogEntity.class)
                 .innerJoin(Topic.class, (w, blog, topic) -> w.eq(blog.getTopicId(), topic.getId()))
                 .toSQL();
 
@@ -58,7 +58,7 @@ public class EasyQueryJoinTest extends EasyQueryBaseTest {
 
     @Test
     public void testRightJoin2Tables() {
-        String sql = orm.queryable(BlogEntity.class)
+        String sql = orm.select(BlogEntity.class)
                 .rightJoin(Topic.class, (w, blog, topic) -> w.eq(blog.getTopicId(), topic.getId()))
                 .toSQL();
 
@@ -70,7 +70,7 @@ public class EasyQueryJoinTest extends EasyQueryBaseTest {
         SysUser u = orm.proxy(SysUser.class);
 
         // SysUser left join Company left join UserExtra
-        List<SysUser> users = orm.queryable(SysUser.class)
+        List<SysUser> users = orm.select(SysUser.class)
                 .leftJoin(Company.class, (w, usr, comp) -> w.eq(usr.getCompanyId(), comp.getId()))
                 .leftJoin(UserExtra.class, (w, usr, ext) -> w.eq(usr.getId(), ext.getUserId()))
                 .where(w -> w.gt(u.getAge(), 26))
@@ -89,7 +89,7 @@ public class EasyQueryJoinTest extends EasyQueryBaseTest {
         Topic t = orm.proxy(Topic.class);
 
         // 连表附带两表各自的过滤条件
-        List<BlogEntity> list = orm.queryable(BlogEntity.class)
+        List<BlogEntity> list = orm.select(BlogEntity.class)
                 .leftJoin(Topic.class, (w, blog, topic) -> w.eq(blog.getTopicId(), topic.getId()))
                 .where(w -> w.gt(b.getStar(), 10).and(w2 -> w2.eq(t.getId(), "1")))
                 .toList();
@@ -122,7 +122,7 @@ public class EasyQueryJoinTest extends EasyQueryBaseTest {
             Topic t = e.table(Topic.class, "t");
             e.select(b)
                     .from(b)
-                    .leftjoin(t).on(on -> on.eq(b.getTopicId(), t.getId()).eq(t.getId(), "2"))
+                    .leftJoin(t).on(on -> on.eq(b.getTopicId(), t.getId()).eq(t.getId(), "2"))
                     .where(w -> w.isNotNull(t.getId()));
         }).toList();
 
@@ -136,8 +136,8 @@ public class EasyQueryJoinTest extends EasyQueryBaseTest {
         BlogEntity b = com.javaorm.core.proxy.ProxyFactory.createProxy(BlogEntity.class, "t0");
         Topic t = com.javaorm.core.proxy.ProxyFactory.createProxy(Topic.class, "t1");
 
-        List<BlogEntity> list = orm.queryable(BlogEntity.class)
-                .leftjoin(Topic.class)
+        List<BlogEntity> list = orm.select(BlogEntity.class)
+                .leftJoin(Topic.class)
                 .on(on -> on.eq(b.getTopicId(), t.getId()).eq(t.getId(), "2"))
                 .where(w -> w.isNotNull(t.getId()))
                 .toList();

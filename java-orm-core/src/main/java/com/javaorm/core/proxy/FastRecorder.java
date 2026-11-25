@@ -11,10 +11,7 @@ import java.util.Set;
  */
 public class FastRecorder {
 
-    /**
-     * 叶子属性录制（如 age, studentName）。
-     */
-    public static void recordTerminal(Object proxy, Class<?> entityClass, String propName, Class<?> returnType) {
+    private static void ensureStartedWithAlias(Object proxy, Class<?> entityClass) {
         RecordingContext.ensureStarted(entityClass);
         String explicitAlias = RecordingContext.getProxyAlias(proxy);
         if (explicitAlias != null) {
@@ -23,6 +20,13 @@ public class FastRecorder {
                 cur.setExplicitAlias(explicitAlias);
             }
         }
+    }
+
+    /**
+     * 叶子属性录制（如 age, studentName）。
+     */
+    public static void recordTerminal(Object proxy, Class<?> entityClass, String propName, Class<?> returnType) {
+        ensureStartedWithAlias(proxy, entityClass);
         RecordingContext.recordTerminal(propName, returnType);
     }
 
@@ -30,14 +34,7 @@ public class FastRecorder {
      * 关联导航属性录制（如 teacher, students）。
      */
     public static Object recordRelation(Object proxy, Class<?> entityClass, String propName, Class<?> targetClass, Class<?> returnType) {
-        RecordingContext.ensureStarted(entityClass);
-        String explicitAlias = RecordingContext.getProxyAlias(proxy);
-        if (explicitAlias != null) {
-            PropertyPath cur = RecordingContext.get();
-            if (cur != null) {
-                cur.setExplicitAlias(explicitAlias);
-            }
-        }
+        ensureStartedWithAlias(proxy, entityClass);
         RecordingContext.recordRelation(propName);
         Object targetProxy = ProxyFactory.getProxy(targetClass);
         if (List.class.isAssignableFrom(returnType)) {
@@ -56,14 +53,7 @@ public class FastRecorder {
      * ValueObject 属性录制（如 address, area）。
      */
     public static Object recordValueObject(Object proxy, Class<?> entityClass, String propName, Class<?> voClass) {
-        RecordingContext.ensureStarted(entityClass);
-        String explicitAlias = RecordingContext.getProxyAlias(proxy);
-        if (explicitAlias != null) {
-            PropertyPath cur = RecordingContext.get();
-            if (cur != null) {
-                cur.setExplicitAlias(explicitAlias);
-            }
-        }
+        ensureStartedWithAlias(proxy, entityClass);
         RecordingContext.recordValueObject(propName, voClass);
         return ProxyFactory.getProxy(voClass);
     }

@@ -122,7 +122,7 @@ public class JpaBridgeTest {
         article.setArticleCode("ART-001");
         article.setIgnoreField("transient_value");
 
-        int rows = orm.insert(article);
+        int rows = orm.insert(article).exec();
         Assert.assertEquals(1, rows);
 
         JpaArticle queried = orm.findById(JpaArticle.class, 1001L);

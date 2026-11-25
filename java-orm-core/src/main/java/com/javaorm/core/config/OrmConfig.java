@@ -10,6 +10,51 @@ import java.util.function.Supplier;
  */
 public class OrmConfig {
 
+    public OrmConfig() {
+    }
+
+    public OrmConfig(OrmConfig other) {
+        if (other == null) {
+            return;
+        }
+        this.nameConversion = other.nameConversion;
+        this.customNameConversion = other.customNameConversion;
+        this.printSql = other.printSql;
+        this.defaultLogicDeleteProperty = other.defaultLogicDeleteProperty;
+        this.defaultLogicDeleteNormalValue = other.defaultLogicDeleteNormalValue;
+        this.defaultLogicDeleteDeletedValue = other.defaultLogicDeleteDeletedValue;
+        this.connectionProvider = other.connectionProvider;
+        this.tenantIdProvider = other.tenantIdProvider;
+        this.tenantStrict = other.tenantStrict;
+        this.metadataCache.putAll(other.metadataCache);
+        this.autoConverters.addAll(other.autoConverters);
+        this.sqlExecutor = other.sqlExecutor;
+        this.dataSourceManager = other.dataSourceManager;
+        for (com.javaorm.core.interceptor.SqlInterceptor interceptor : other.interceptorChain.getInterceptors()) {
+            this.interceptorChain.addInterceptor(interceptor);
+        }
+        this.autoFillHandler = other.autoFillHandler;
+        this.codeFirstMode = other.codeFirstMode;
+        this.codeFirstPackageNames.addAll(other.codeFirstPackageNames);
+        this.codeFirstEntities.addAll(other.codeFirstEntities);
+        this.codeFirstDropUnusedColumns = other.codeFirstDropUnusedColumns;
+        this.codeFirstAlterModeMask = other.codeFirstAlterModeMask;
+        this.autoTrack = other.autoTrack;
+        this.trackManager = other.trackManager;
+        this.masterSlaveManager = other.masterSlaveManager;
+        this.batchKeepOrder = other.batchKeepOrder;
+    }
+
+    /**
+     * 返回一个仅覆盖 printSql 开关的配置视图（相同则直接复用当前实例）。
+     */
+    public OrmConfig withPrintSql(boolean printSql) {
+        if (this.printSql == printSql) {
+            return this;
+        }
+        return new OrmConfig(this).setPrintSql(printSql);
+    }
+
     private NameConversion nameConversion = new UnderlinedNameConversion();
     private boolean customNameConversion = false;
     private boolean printSql = false;

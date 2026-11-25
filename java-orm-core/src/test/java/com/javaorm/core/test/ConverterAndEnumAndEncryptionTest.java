@@ -274,7 +274,7 @@ public class ConverterAndEnumAndEncryptionTest {
         acc.setProfile(new UserProfile("Coder & Hacker", 25));
         acc.setHobbies(Arrays.asList(new Hobby("Basketball", 3), new Hobby("Guitar", 5)));
 
-        int rows = orm.insert(acc);
+        int rows = orm.insert(acc).exec();
         assertEquals(1, rows);
         assertNotNull(acc.getId());
 
@@ -320,7 +320,7 @@ public class ConverterAndEnumAndEncryptionTest {
         acc.setProfile(new UserProfile("Architect", 30));
         acc.setHobbies(Collections.singletonList(new Hobby("Reading", 4)));
 
-        orm.insert(acc);
+        orm.insert(acc).exec();
 
         // 实体查询
         Account selected = orm.select(Account.class).where().eq("id", acc.getId()).single();
@@ -352,7 +352,7 @@ public class ConverterAndEnumAndEncryptionTest {
         acc.setStatus(UserStatus.ACTIVE);
         acc.setRole(ThirdPartyRole.ADMIN);
         acc.setPhone("13700001111");
-        orm.insert(acc);
+        orm.insert(acc).exec();
 
         Account $ = orm.proxy(Account.class);
 
@@ -400,7 +400,7 @@ public class ConverterAndEnumAndEncryptionTest {
         acc.setEnabled(false);
         acc.setStatus(UserStatus.DISABLED);
         acc.setPhone("13600000000");
-        orm.insert(acc);
+        orm.insert(acc).exec();
 
         Account $ = orm.proxy(Account.class);
 

@@ -160,7 +160,7 @@ public class UpsertAndPessimisticLockTest {
         acc.setUserName("Alice");
         acc.setBalance(100.0);
         acc.setCreateTime("2026-11-19 12:00:00");
-        orm.insert(acc);
+        orm.insert(acc).exec();
         assertNotNull(acc.getId());
 
         // 使用 forUpdate() 在 H2 中查询
@@ -188,7 +188,7 @@ public class UpsertAndPessimisticLockTest {
 
         // MySQL
         Dialect mysql = new MySQLDialect();
-        String sqlMysql = orm.insertOrUpdateable(acc).toSql(mysql);
+        String sqlMysql = orm.insertOrUpdate(acc).toSql(mysql);
         assertTrue(sqlMysql.contains("INSERT INTO `test_upsert_account`"));
         assertTrue(sqlMysql.contains("ON DUPLICATE KEY UPDATE"));
         assertTrue(sqlMysql.contains("`user_name` = VALUES(`user_name`)"));
@@ -197,28 +197,28 @@ public class UpsertAndPessimisticLockTest {
 
         // PostgreSQL
         Dialect pg = new PostgreSQLDialect();
-        String sqlPg = orm.insertOrUpdateable(acc).toSql(pg);
+        String sqlPg = orm.insertOrUpdate(acc).toSql(pg);
         assertTrue(sqlPg.contains("INSERT INTO \"test_upsert_account\""));
         assertTrue(sqlPg.contains("ON CONFLICT (\"id\") DO UPDATE SET"));
         assertTrue(sqlPg.contains("\"user_name\" = EXCLUDED.\"user_name\""));
 
         // Oracle MERGE INTO
         Dialect oracle = new OracleDialect();
-        String sqlOracle = orm.insertOrUpdateable(acc).toSql(oracle);
+        String sqlOracle = orm.insertOrUpdate(acc).toSql(oracle);
         assertTrue(sqlOracle.startsWith("MERGE INTO"));
         assertTrue(sqlOracle.contains("USING (SELECT"));
         assertTrue(sqlOracle.contains("WHEN MATCHED THEN UPDATE SET"));
         assertTrue(sqlOracle.contains("WHEN NOT MATCHED THEN INSERT"));
 
         // DO NOTHING 模式测试
-        String sqlPgNothing = orm.insertOrUpdateable(acc).doNothing().toSql(pg);
+        String sqlPgNothing = orm.insertOrUpdate(acc).doNothing().toSql(pg);
         assertTrue(sqlPgNothing.contains("ON CONFLICT (\"id\") DO NOTHING"));
 
-        String sqlMyNothing = orm.insertOrUpdateable(acc).doNothing().toSql(mysql);
+        String sqlMyNothing = orm.insertOrUpdate(acc).doNothing().toSql(mysql);
         assertTrue(sqlMyNothing.contains("ON DUPLICATE KEY UPDATE `id` = `id`"));
 
         // 指定 onConflict 唯一列测试（如 user_code）
-        String sqlPgConflictCode = orm.insertOrUpdateable(acc)
+        String sqlPgConflictCode = orm.insertOrUpdate(acc)
                 .onConflict(a -> a.getUserCode())
                 .updateColumns(a -> a.getBalance())
                 .toSql(pg);
@@ -240,7 +240,7 @@ public class UpsertAndPessimisticLockTest {
         acc.setBalance(500.0);
         acc.setCreateTime("2026-11-19 15:00:00");
 
-        int rows1 = orm.insertOrUpdate(acc);
+        int rows1 = orm.insertOrUpdate(acc).exec();
         assertEquals(1, rows1);
 
         UpsertAccount dbAcc1 = orm.findById(UpsertAccount.class, 100L);
@@ -253,7 +253,7 @@ public class UpsertAndPessimisticLockTest {
         acc.setUserName("Charlie Modified");
         acc.setBalance(888.0);
 
-        int rows2 = orm.insertOrUpdate(acc);
+        int rows2 = orm.insertOrUpdate(acc).exec();
         assertEquals(1, rows2);
 
         UpsertAccount dbAcc2 = orm.findById(UpsertAccount.class, 100L);
@@ -269,12 +269,12 @@ public class UpsertAndPessimisticLockTest {
         acc.setUserCode("U200");
         acc.setUserName("David");
         acc.setBalance(300.0);
-        orm.insert(acc);
+        orm.insert(acc).exec();
 
         // 存在冲突时 DO NOTHING
         acc.setUserName("David Changed");
         acc.setBalance(999.0);
-        orm.insertOrUpdateable(acc).doNothing().execute();
+        orm.insertOrUpdate(acc).doNothing().execute();
 
         UpsertAccount dbAcc = orm.findById(UpsertAccount.class, 200L);
         assertEquals("David", dbAcc.getUserName());
@@ -289,7 +289,7 @@ public class UpsertAndPessimisticLockTest {
         acc1.setUserCode("U301");
         acc1.setUserName("Old 301");
         acc1.setBalance(10.0);
-        orm.insert(acc1);
+        orm.insert(acc1).exec();
 
         // 准备批处理列表：acc1 (需更新) + acc2 (需插入)
         UpsertAccount u1 = new UpsertAccount();
@@ -304,7 +304,7 @@ public class UpsertAndPessimisticLockTest {
         u2.setUserName("New 302");
         u2.setBalance(200.0);
 
-        int affected = orm.insertOrUpdate(Arrays.asList(u1, u2));
+        int affected = orm.insertOrUpdate(Arrays.asList(u1, u2)).exec();
         assertTrue(affected >= 2);
 
         UpsertAccount db1 = orm.findById(UpsertAccount.class, 301L);

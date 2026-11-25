@@ -83,17 +83,17 @@ public class EasyQueryBridgeTest {
 
         EqProduct prod = new EqProduct();
         prod.setName("Phone");
-        int rows = orm.insert(prod);
+        int rows = orm.insert(prod).exec();
         Assert.assertEquals(1, rows);
         Assert.assertNotNull(prod.getId());
         Assert.assertEquals(Integer.valueOf(1), prod.getVersion());
 
         prod.setName("SmartPhone");
-        int updated = orm.update(prod);
+        int updated = orm.update(prod).exec();
         Assert.assertEquals(1, updated);
         Assert.assertEquals(Integer.valueOf(2), prod.getVersion());
 
-        orm.delete(prod);
+        orm.delete(prod).exec();
         EqProduct found = orm.findById(EqProduct.class, prod.getId());
         Assert.assertNull(found);
     }

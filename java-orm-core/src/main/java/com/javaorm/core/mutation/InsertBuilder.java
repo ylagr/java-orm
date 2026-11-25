@@ -266,6 +266,10 @@ public class InsertBuilder<T> {
         return execute(returnKeys);
     }
 
+    public int exec() {
+        return execute();
+    }
+
     public int execute() {
         return execute(true);
     }

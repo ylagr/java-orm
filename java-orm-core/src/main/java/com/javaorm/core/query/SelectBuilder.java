@@ -918,123 +918,30 @@ public class SelectBuilder<T> implements Query<T> {
 
     // ========== 小写别名方法（兼容 leftjoin / innerjoin / rightjoin / fulljoin / crossjoin） ==========
 
-    public <TJoin> JoinBuilder<T, TJoin> leftjoin(Class<TJoin> entityClass) {
-        return leftJoin(entityClass);
-    }
-
-    public <TJoin> JoinBuilder<T, TJoin> leftjoin(Cte<TJoin> cte) {
-        return leftJoin(cte);
-    }
-
-    public <TJoin> SelectBuilder<T> leftjoin(Class<TJoin> entityClass, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
-        return leftJoin(entityClass, onConsumer);
-    }
-
-    public <TJoin> SelectBuilder<T> leftjoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
-        return leftJoin(cte, onConsumer);
-    }
-
-    public <TJoin> JoinBuilder<T, TJoin> innerjoin(Class<TJoin> entityClass) {
-        return innerJoin(entityClass);
-    }
-
-    public <TJoin> JoinBuilder<T, TJoin> innerjoin(Cte<TJoin> cte) {
-        return innerJoin(cte);
-    }
-
-    public <TJoin> SelectBuilder<T> innerjoin(Class<TJoin> entityClass, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
-        return innerJoin(entityClass, onConsumer);
-    }
-
-    public <TJoin> SelectBuilder<T> innerjoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
-        return innerJoin(cte, onConsumer);
-    }
-
-    public <TJoin> JoinBuilder<T, TJoin> rightjoin(Class<TJoin> entityClass) {
-        return rightJoin(entityClass);
-    }
-
-    public <TJoin> JoinBuilder<T, TJoin> rightjoin(Cte<TJoin> cte) {
-        return rightJoin(cte);
-    }
-
-    public <TJoin> SelectBuilder<T> rightjoin(Class<TJoin> entityClass, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
-        return rightJoin(entityClass, onConsumer);
-    }
-
-    public <TJoin> SelectBuilder<T> rightjoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
-        return rightJoin(cte, onConsumer);
-    }
-
-    public <TJoin> JoinBuilder<T, TJoin> fulljoin(Class<TJoin> entityClass) {
-        return fullJoin(entityClass);
-    }
-
-    public <TJoin> JoinBuilder<T, TJoin> fulljoin(Cte<TJoin> cte) {
-        return fullJoin(cte);
-    }
-
-    public <TJoin> SelectBuilder<T> fulljoin(Class<TJoin> entityClass, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
-        return fullJoin(entityClass, onConsumer);
-    }
-
-    public <TJoin> SelectBuilder<T> fulljoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
-        return fullJoin(cte, onConsumer);
-    }
-
-    public <TJoin> SelectBuilder<T> crossjoin(Class<TJoin> entityClass) {
-        return crossJoin(entityClass);
-    }
-
-    public <TJoin> SelectBuilder<T> crossjoin(Cte<TJoin> cte) {
-        return crossJoin(cte);
-    }
-
     /**
      * 声明显式装配关联对象（避免笛卡尔积，采用 Split IN 查询，支持各级独立筛选与多层级嵌套）
      */
     public SelectBuilder<T> include(Function<T, ?> relationGetter) {
-        RecordingContext.start(rootEntityClass);
-        try {
-            T proxy = ProxyFactory.getProxy(rootEntityClass);
-            relationGetter.apply(proxy);
-            PropertyPath path = RecordingContext.finish();
-            if (path != null) {
-                includes.add(new IncludeSpec(path));
-            }
-        } finally {
-            RecordingContext.clearRecording();
+        PropertyPath path = RecordingContext.recordPath(rootEntityClass, relationGetter);
+        if (path != null) {
+            includes.add(new IncludeSpec(path));
         }
         return this;
     }
 
     @SuppressWarnings("unchecked")
     public <R> SelectBuilder<T> include(Function<T, ?> relationGetter, Consumer<SelectBuilder<R>> config) {
-        RecordingContext.start(rootEntityClass);
-        try {
-            T proxy = ProxyFactory.getProxy(rootEntityClass);
-            relationGetter.apply(proxy);
-            PropertyPath path = RecordingContext.finish();
-            if (path != null) {
-                includes.add(new IncludeSpec(path, (Consumer<SelectBuilder<?>>) (Consumer<?>) config));
-            }
-        } finally {
-            RecordingContext.clearRecording();
+        PropertyPath path = RecordingContext.recordPath(rootEntityClass, relationGetter);
+        if (path != null) {
+            includes.add(new IncludeSpec(path, (Consumer<SelectBuilder<?>>) (Consumer<?>) config));
         }
         return this;
     }
 
     public <R> SelectBuilder<T> include(Function<T, ?> relationGetter, BiConsumer<SelectBuilder<R>, R> biConfig) {
-        RecordingContext.start(rootEntityClass);
-        try {
-            T proxy = ProxyFactory.getProxy(rootEntityClass);
-            relationGetter.apply(proxy);
-            PropertyPath path = RecordingContext.finish();
-            if (path != null) {
-                includes.add(IncludeSpec.ofBi(path, biConfig));
-            }
-        } finally {
-            RecordingContext.clearRecording();
+        PropertyPath path = RecordingContext.recordPath(rootEntityClass, relationGetter);
+        if (path != null) {
+            includes.add(IncludeSpec.ofBi(path, biConfig));
         }
         return this;
     }

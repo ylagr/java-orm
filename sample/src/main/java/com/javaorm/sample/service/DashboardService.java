@@ -56,7 +56,7 @@ public class DashboardService {
 
             e.select(c.getName(), count(p.getId()).as("cnt"))
                     .from(c)
-                    .leftjoin(p).on(on -> on.eq(c.getId(), p.getCategoryId()).eq(p.getDeleted(), 0))
+                    .leftJoin(p).on(on -> on.eq(c.getId(), p.getCategoryId()).eq(p.getDeleted(), 0))
                     .where().eq(c.getDeleted(), 0)
                     .groupBy(c.getId(), c.getName());
         }).listMaps();

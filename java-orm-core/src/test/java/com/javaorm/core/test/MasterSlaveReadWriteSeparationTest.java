@@ -128,7 +128,7 @@ public class MasterSlaveReadWriteSeparationTest {
 
         // 2. 写操作（INSERT）：必须强制路由到 MASTER
         TestOrder newOrder = new TestOrder(null, "ORD_NEW", 500.0, "INSERTED");
-        orm.insert(newOrder);
+        orm.insert(newOrder).exec();
         Long newId = newOrder.getId();
         assertNotNull(newId);
 
@@ -211,7 +211,7 @@ public class MasterSlaveReadWriteSeparationTest {
 
         // 2. 执行一次写操作（更新主库）
         TestOrder toUpdate = new TestOrder(1L, "ORD_MODIFIED", 999.0, "MASTER");
-        orm.update(toUpdate);
+        orm.update(toUpdate).exec();
 
         // 3. 紧随其后的读请求：因处于 300ms 粘性窗口期内，应自动智能 Pin 到 Master 主库！
         TestOrder immediateAfter = orm.select(TestOrder.class).where().eq(TestOrder::getId, 1L).first();

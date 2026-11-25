@@ -287,6 +287,34 @@ public class RecordingContext {
         return result;
     }
 
+    public static <T, R> PropertyPath recordPath(Class<T> entityClass, java.util.function.Function<T, R> getter) {
+        if (entityClass == null || getter == null) {
+            return null;
+        }
+        start(entityClass);
+        try {
+            T proxy = ProxyFactory.getProxy(entityClass);
+            getter.apply(proxy);
+            return finish();
+        } finally {
+            clearRecording();
+        }
+    }
+
+    public static <T> List<PropertyPath> recordPaths(Class<T> entityClass, java.util.function.Consumer<T> proxyAction) {
+        if (entityClass == null || proxyAction == null) {
+            return Collections.emptyList();
+        }
+        start(entityClass);
+        try {
+            T proxy = ProxyFactory.getProxy(entityClass);
+            proxyAction.accept(proxy);
+            return finishAll();
+        } finally {
+            clearRecording();
+        }
+    }
+
     public static void clear() {
         RECORDED_QUEUE.remove();
         CURRENT_PATH.remove();

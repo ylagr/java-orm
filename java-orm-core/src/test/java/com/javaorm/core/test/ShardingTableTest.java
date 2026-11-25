@@ -202,25 +202,25 @@ public class ShardingTableTest {
         o0.setOrderId(100L);
         o0.setOrderNo("ORD-100");
         o0.setAmount(100.0);
-        orm.insert(o0);
+        orm.insert(o0).exec();
 
         ShardedOrder o1 = new ShardedOrder();
         o1.setOrderId(101L);
         o1.setOrderNo("ORD-101");
         o1.setAmount(200.0);
-        orm.insert(o1);
+        orm.insert(o1).exec();
 
         ShardedOrder o2 = new ShardedOrder();
         o2.setOrderId(102L);
         o2.setOrderNo("ORD-102");
         o2.setAmount(300.0);
-        orm.insert(o2);
+        orm.insert(o2).exec();
 
         ShardedOrder o3 = new ShardedOrder();
         o3.setOrderId(103L);
         o3.setOrderNo("ORD-103");
         o3.setAmount(400.0);
-        orm.insert(o3);
+        orm.insert(o3).exec();
 
         // 精确单表点查：orderId = 101 -> 路由到 t_order_1
         List<ShardedOrder> list = orm.select(ShardedOrder.class)
@@ -258,13 +258,13 @@ public class ShardingTableTest {
         o0.setOrderId(100L);
         o0.setOrderNo("ORD-100");
         o0.setAmount(50.0);
-        orm.insert(o0);
+        orm.insert(o0).exec();
 
         ShardedOrder o1 = new ShardedOrder();
         o1.setOrderId(101L);
         o1.setOrderNo("ORD-101");
         o1.setAmount(150.0);
-        orm.insert(o1);
+        orm.insert(o1).exec();
 
         // 显式允许全表扫描：广播扫描 t_order_0 .. t_order_3 并归并
         List<ShardedOrder> all = orm.select(ShardedOrder.class)
@@ -286,19 +286,19 @@ public class ShardingTableTest {
         o0.setOrderId(100L);
         o0.setOrderNo("ORD-100");
         o0.setAmount(100.0);
-        orm.insert(o0);
+        orm.insert(o0).exec();
 
         ShardedOrder o1 = new ShardedOrder();
         o1.setOrderId(101L);
         o1.setOrderNo("ORD-101");
         o1.setAmount(200.0);
-        orm.insert(o1);
+        orm.insert(o1).exec();
 
         ShardedOrder o2 = new ShardedOrder();
         o2.setOrderId(102L);
         o2.setOrderNo("ORD-102");
         o2.setAmount(300.0);
-        orm.insert(o2);
+        orm.insert(o2).exec();
 
         // IN 查询跨越 t_order_0 和 t_order_1
         List<ShardedOrder> result = orm.select(ShardedOrder.class)
@@ -313,12 +313,12 @@ public class ShardingTableTest {
         ShardedAuditLog log1 = new ShardedAuditLog();
         log1.setLogDate("2026-11-18");
         log1.setContent("Login success");
-        orm.insert(log1);
+        orm.insert(log1).exec();
 
         ShardedAuditLog log2 = new ShardedAuditLog();
         log2.setLogDate("2026-12-05");
         log2.setContent("Password changed");
-        orm.insert(log2);
+        orm.insert(log2).exec();
 
         // 按日期单表查询 -> 路由到 t_audit_log_202611
         List<ShardedAuditLog> listNov = orm.select(ShardedAuditLog.class)
@@ -342,7 +342,7 @@ public class ShardingTableTest {
         o1.setOrderId(101L);
         o1.setOrderNo("ORD-101");
         o1.setAmount(200.0);
-        orm.insert(o1);
+        orm.insert(o1).exec();
 
         // 条件更新：只路由更新 t_order_1
         int updated = orm.update(ShardedOrder.class)

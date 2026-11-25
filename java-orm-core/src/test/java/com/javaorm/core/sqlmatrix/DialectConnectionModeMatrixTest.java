@@ -129,7 +129,7 @@ public class DialectConnectionModeMatrixTest {
         user.setUsername("mysql_tester");
         user.setAge(28);
         user.setScore(new BigDecimal("99.50"));
-        int rows = mysqlOrm.insert(user);
+        int rows = mysqlOrm.insert(user).exec();
         Assert.assertEquals(1, rows);
         Assert.assertNotNull(user.getId());
 
@@ -171,7 +171,7 @@ public class DialectConnectionModeMatrixTest {
         user.setUsername("pg_tester");
         user.setAge(26);
         user.setScore(new BigDecimal("91.00"));
-        int rows = pgOrm.insert(user);
+        int rows = pgOrm.insert(user).exec();
         Assert.assertEquals(1, rows);
         Assert.assertNotNull(user.getId());
 
@@ -217,7 +217,7 @@ public class DialectConnectionModeMatrixTest {
         user.setUsername("oracle_tester");
         user.setAge(35);
         user.setScore(new BigDecimal("88.88"));
-        int rows = oracleOrm.insert(user);
+        int rows = oracleOrm.insert(user).exec();
         Assert.assertEquals(1, rows);
         Assert.assertNotNull(user.getId());
 

@@ -72,7 +72,7 @@ public class Oracle11AndDynamicFeaturesTest {
         t1.setTeacherName("Prof. Smith");
         t1.setAge(45);
         t1.setTitle("Professor");
-        orm.insert(t1);
+        orm.insert(t1).exec();
 
         insertStudent("Alice", 20, t1.getId());
         insertStudent("Bob", 22, t1.getId());
@@ -88,7 +88,7 @@ public class Oracle11AndDynamicFeaturesTest {
         s.setTeacherId(teacherId);
         s.setIsDeleted(0);
         s.setCreateTime(LocalDateTime.now());
-        orm.insert(s);
+        orm.insert(s).exec();
     }
 
     @After
@@ -329,10 +329,18 @@ public class Oracle11AndDynamicFeaturesTest {
         SelectBuilder<Student> q3 = orm.select(Student.class).printSql();
         assertFalse(q3.getEffectiveConfig().isPrintSql());
 
-        // 4. 将全局配置改为 true
+        // 4. 将全局配置改为 true，并验证 printSql 覆盖视图不丢失其他全局配置
         config.setPrintSql(true);
+        config.setTenantStrict(true);
+        config.setBatchKeepOrder(true);
         SelectBuilder<Student> q4 = orm.select(Student.class).printSql();
         assertTrue(q4.getEffectiveConfig().isPrintSql());
+        SelectBuilder<Student> q5 = orm.select(Student.class).printSql(false);
+        assertFalse(q5.getEffectiveConfig().isPrintSql());
+        assertTrue(q5.getEffectiveConfig().isTenantStrict());
+        assertTrue(q5.getEffectiveConfig().isBatchKeepOrder());
+        config.setTenantStrict(false);
+        config.setBatchKeepOrder(false);
 
         // 5. 在 WhereBuilder 上链式调用 printSql(false)
         WhereBuilder<Student> w = orm.select(Student.class).where().gt("age", 18).printSql(false);

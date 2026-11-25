@@ -167,22 +167,22 @@ public class DirtyCheckingTest {
     public void testQueryTrackingAndSelectiveIncrementalUpdate() {
         // 插入初始数据
         DirtyUser initial = new DirtyUser(null, "Bob", "bob@example.com", 30, new BigDecimal("200.00"), 1);
-        orm.insert(initial);
+        orm.insert(initial).exec();
         Long id = initial.getId();
         assertNotNull(id);
 
         // 1. 使用 .tracking() 查询实体，自动挂载快照
-        DirtyUser queried = orm.query(DirtyUser.class).where().eq("id", id).tracking().firstOrNull();
+        DirtyUser queried = orm.select(DirtyUser.class).where().eq("id", id).tracking().firstOrNull();
         assertNotNull(queried);
         assertTrue("通过 .tracking() 查询的实体应被自动追踪", orm.isTracking(queried));
         assertFalse(orm.isDirty(queried));
 
         // 2. 未作任何修改直接 update：应直接跳过 SQL 执行并返回 0
-        int affectedZero = orm.update(queried);
+        int affectedZero = orm.update(queried).exec();
         assertEquals("无字段修改时，脏检查应直接跳过执行并返回 0", 0, affectedZero);
 
         // 验证数据库里的 version 仍然是 1（没有被乐观锁递增）
-        DirtyUser unchangedDb = orm.query(DirtyUser.class).where().eq("id", id).firstOrNull();
+        DirtyUser unchangedDb = orm.select(DirtyUser.class).where().eq("id", id).firstOrNull();
         assertEquals(Integer.valueOf(1), unchangedDb.getVersion());
 
         // 3. 仅修改 age
@@ -191,18 +191,18 @@ public class DirtyCheckingTest {
         assertEquals(1, orm.getDirtyProperties(queried).size());
         assertTrue(orm.getDirtyProperties(queried).contains("age"));
 
-        int affectedOne = orm.update(queried);
+        int affectedOne = orm.update(queried).exec();
         assertEquals(1, affectedOne);
         // 乐观锁版本号自动递增到 2
         assertEquals(Integer.valueOf(2), queried.getVersion());
 
         // 4. 更新完成后，快照已自动刷新为最新状态，再次更新应直接返回 0
         assertFalse("更新成功后快照应自动同步，不应变脏", orm.isDirty(queried));
-        int affectedSecond = orm.update(queried);
+        int affectedSecond = orm.update(queried).exec();
         assertEquals("再次更新未修改的实体，应返回 0", 0, affectedSecond);
 
         // 5. 校验数据库中的最新值
-        DirtyUser updatedDb = orm.query(DirtyUser.class).where().eq("id", id).firstOrNull();
+        DirtyUser updatedDb = orm.select(DirtyUser.class).where().eq("id", id).firstOrNull();
         assertEquals(Integer.valueOf(31), updatedDb.getAge());
         assertEquals("bob@example.com", updatedDb.getEmail());
         assertEquals("Bob", updatedDb.getUserName());
@@ -213,7 +213,7 @@ public class DirtyCheckingTest {
     public void testAutoTrackGlobalConfig() {
         // 插入初始数据
         DirtyUser u = new DirtyUser(null, "Charlie", "charlie@test.com", 22, new BigDecimal("50.00"), 1);
-        orm.insert(u);
+        orm.insert(u).exec();
         Long id = u.getId();
 
         // 开启全局自动追踪
@@ -221,7 +221,7 @@ public class DirtyCheckingTest {
 
         try {
             // 普通 query 不需要手动调用 .tracking()
-            DirtyUser fetched = orm.query(DirtyUser.class).where().eq("id", id).firstOrNull();
+            DirtyUser fetched = orm.select(DirtyUser.class).where().eq("id", id).firstOrNull();
             assertNotNull(fetched);
             assertTrue("开启全局 autoTrack 时，查询出来的实体应自动被追踪", orm.isTracking(fetched));
             assertFalse(orm.isDirty(fetched));
@@ -229,10 +229,10 @@ public class DirtyCheckingTest {
             fetched.setUserName("Charlie Brown");
             assertTrue(orm.isDirty(fetched));
 
-            int rows = orm.update(fetched);
+            int rows = orm.update(fetched).exec();
             assertEquals(1, rows);
 
-            DirtyUser dbUser = orm.query(DirtyUser.class).where().eq("id", id).firstOrNull();
+            DirtyUser dbUser = orm.select(DirtyUser.class).where().eq("id", id).firstOrNull();
             assertEquals("Charlie Brown", dbUser.getUserName());
         } finally {
             orm.getConfig().setAutoTrack(false);

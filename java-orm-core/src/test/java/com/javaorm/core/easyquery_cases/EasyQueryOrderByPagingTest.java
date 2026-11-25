@@ -18,7 +18,7 @@ public class EasyQueryOrderByPagingTest extends EasyQueryBaseTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // 1. 单列升序
-        List<Topic> ascList = orm.queryable(Topic.class)
+        List<Topic> ascList = orm.select(Topic.class)
                 .orderByAsc(proxy.getStars())
                 .toList();
         assertEquals(6, ascList.size());
@@ -26,7 +26,7 @@ public class EasyQueryOrderByPagingTest extends EasyQueryBaseTest {
         assertEquals("6", ascList.get(5).getId());
 
         // 2. 单列降序
-        List<Topic> descList = orm.queryable(Topic.class)
+        List<Topic> descList = orm.select(Topic.class)
                 .orderByDesc(proxy.getStars())
                 .toList();
         assertEquals(6, descList.size());
@@ -39,7 +39,7 @@ public class EasyQueryOrderByPagingTest extends EasyQueryBaseTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // limit(offset, rows)
-        List<Topic> list = orm.queryable(Topic.class)
+        List<Topic> list = orm.select(Topic.class)
                 .orderByAsc(proxy.getStars())
                 .limit(2, 2)
                 .toList();
@@ -54,7 +54,7 @@ public class EasyQueryOrderByPagingTest extends EasyQueryBaseTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // 第 1 页，每页 2 条
-        PageResult<Topic> page1 = orm.queryable(Topic.class)
+        PageResult<Topic> page1 = orm.select(Topic.class)
                 .orderByAsc(proxy.getStars())
                 .toPageResult(1, 2);
 
@@ -69,7 +69,7 @@ public class EasyQueryOrderByPagingTest extends EasyQueryBaseTest {
         assertEquals("2", page1.getData().get(1).getId());
 
         // 第 2 页，每页 2 条
-        PageResult<Topic> page2 = orm.queryable(Topic.class)
+        PageResult<Topic> page2 = orm.select(Topic.class)
                 .orderByAsc(proxy.getStars())
                 .toPageResult(2, 2);
 
@@ -82,7 +82,7 @@ public class EasyQueryOrderByPagingTest extends EasyQueryBaseTest {
         assertEquals("4", page2.getData().get(1).getId());
 
         // 第 3 页，每页 2 条（尾页）
-        PageResult<Topic> page3 = orm.queryable(Topic.class)
+        PageResult<Topic> page3 = orm.select(Topic.class)
                 .orderByAsc(proxy.getStars())
                 .toPageResult(3, 2);
 

@@ -339,10 +339,10 @@ public abstract class AbstractSqlMatrixTest {
         u4.setCreateTime(now);
         u4.setIsDeleted(0);
 
-        targetOrm.insert(u1);
-        targetOrm.insert(u2);
-        targetOrm.insert(u3);
-        targetOrm.insert(u4);
+        targetOrm.insert(u1).exec();
+        targetOrm.insert(u2).exec();
+        targetOrm.insert(u3).exec();
+        targetOrm.insert(u4).exec();
 
         MatrixOrder o1 = new MatrixOrder();
         o1.setUserId(u1.getId());
@@ -373,10 +373,10 @@ public abstract class AbstractSqlMatrixTest {
         o4.setStatus(1);
         o4.setCreateTime(now);
 
-        targetOrm.insert(o1);
-        targetOrm.insert(o2);
-        targetOrm.insert(o3);
-        targetOrm.insert(o4);
+        targetOrm.insert(o1).exec();
+        targetOrm.insert(o2).exec();
+        targetOrm.insert(o3).exec();
+        targetOrm.insert(o4).exec();
 
         // 订单明细
         MatrixOrderItem item1 = new MatrixOrderItem();
@@ -397,9 +397,9 @@ public abstract class AbstractSqlMatrixTest {
         item3.setPrice(new BigDecimal("299.00"));
         item3.setQuantity(1);
 
-        targetOrm.insert(item1);
-        targetOrm.insert(item2);
-        targetOrm.insert(item3);
+        targetOrm.insert(item1).exec();
+        targetOrm.insert(item2).exec();
+        targetOrm.insert(item3).exec();
 
         // 分类（用于自连接）
         MatrixCategory c1 = new MatrixCategory();
@@ -418,10 +418,10 @@ public abstract class AbstractSqlMatrixTest {
         c4.setName("Laptop");
         c4.setParentId(2L);
 
-        targetOrm.insert(c1);
-        targetOrm.insert(c2);
-        targetOrm.insert(c3);
-        targetOrm.insert(c4);
+        targetOrm.insert(c1).exec();
+        targetOrm.insert(c2).exec();
+        targetOrm.insert(c3).exec();
+        targetOrm.insert(c4).exec();
 
         MatrixSoftDelete s1 = new MatrixSoftDelete();
         s1.setTitle("Document 1");
@@ -431,8 +431,8 @@ public abstract class AbstractSqlMatrixTest {
         s2.setTitle("Document 2");
         s2.setIsDeleted(0);
 
-        targetOrm.insert(s1);
-        targetOrm.insert(s2);
+        targetOrm.insert(s1).exec();
+        targetOrm.insert(s2).exec();
     }
 
     /**

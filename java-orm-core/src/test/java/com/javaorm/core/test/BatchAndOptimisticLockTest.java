@@ -97,13 +97,13 @@ public class BatchAndOptimisticLockTest {
         p.setId(1001L);
         p.setName("MacBook Pro");
         p.setPrice(12999.0);
-        orm.insert(p);
+        orm.insert(p).exec();
 
         assertEquals(Integer.valueOf(1), p.getVersion());
 
         // 2. 正常更新，版本号自动递增为 2
         p.setPrice(13999.0);
-        int affected = orm.update(p);
+        int affected = orm.update(p).exec();
         assertEquals(1, affected);
         assertEquals(Integer.valueOf(2), p.getVersion());
 
@@ -121,7 +121,7 @@ public class BatchAndOptimisticLockTest {
         oldVersionP.setVersion(1); // 旧版本
 
         try {
-            orm.update(oldVersionP);
+            orm.update(oldVersionP).exec();
             fail("Should throw OptimisticLockException when version does not match");
         } catch (OptimisticLockException e) {
             assertEquals(1001L, e.getId());
@@ -199,7 +199,7 @@ public class BatchAndOptimisticLockTest {
         orm.insertBatch(list).execute();
 
         // 1. 批量按 ID 删除前 5 条
-        int delCount1 = orm.deleteByIds(Product.class, Arrays.asList(1L, 2L, 3L, 4L, 5L));
+        int delCount1 = orm.deleteByIds(Product.class, Arrays.asList(1L, 2L, 3L, 4L, 5L)).exec();
         assertEquals(5, delCount1);
         assertEquals(10L, orm.select(Product.class).count());
 
@@ -422,7 +422,7 @@ public class BatchAndOptimisticLockTest {
         item51.setPrice(555.0);
 
         // 验证即使直接调用 orm.insert(list)，也会继承全局的 batchKeepOrder = true
-        int rows = orderedOrm.insert(Arrays.asList(item50, item51));
+        int rows = orderedOrm.insert(Arrays.asList(item50, item51)).exec();
         assertEquals(2, rows);
 
         Item db50 = orderedOrm.select(Item.class).where().eq(Item::getId, 50L).firstOrNull();

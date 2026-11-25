@@ -66,34 +66,34 @@ public class JavaOrmFullFeatureTest {
         t1.setTeacherName("张教授");
         t1.setAge(45);
         t1.setTitle("教授");
-        orm.insert(t1);
+        orm.insert(t1).exec();
         assertNotNull("Teacher 1 ID should be generated", t1.getId());
 
         Teacher t2 = new Teacher();
         t2.setTeacherName("李讲师");
         t2.setAge(28);
         t2.setTitle("讲师");
-        orm.insert(t2);
+        orm.insert(t2).exec();
         assertNotNull("Teacher 2 ID should be generated", t2.getId());
 
         Student s1 = new Student();
         s1.setStudentName("王小明");
         s1.setAge(20);
         s1.setTeacherId(t1.getId());
-        orm.insert(s1);
+        orm.insert(s1).exec();
         assertNotNull("Student 1 ID should be generated", s1.getId());
 
         Student s2 = new Student();
         s2.setStudentName("王大锤");
         s2.setAge(17);
         s2.setTeacherId(t1.getId());
-        orm.insert(s2);
+        orm.insert(s2).exec();
 
         Student s3 = new Student();
         s3.setStudentName("李小华");
         s3.setAge(22);
         s3.setTeacherId(t2.getId());
-        orm.insert(s3);
+        orm.insert(s3).exec();
 
         // 2. 基础条件查询与排序
         List<Student> adultStudents = orm.select(Student.class)
@@ -165,7 +165,7 @@ public class JavaOrmFullFeatureTest {
         assertEquals(Integer.valueOf(99), s2Updated.getAge());
 
         // 7. 逻辑删除验证
-        int deleted = orm.delete(s1);
+        int deleted = orm.delete(s1).exec();
         assertEquals(1, deleted);
 
         // 再次查询学生列表，s1 应当被全局逻辑删除自动过滤
@@ -185,19 +185,19 @@ public class JavaOrmFullFeatureTest {
         Teacher t = new Teacher();
         t.setTeacherName("孙教授");
         t.setAge(50);
-        orm.insert(t);
+        orm.insert(t).exec();
 
         Student s1 = new Student();
         s1.setStudentName("赵六");
         s1.setAge(25);
         s1.setTeacherId(t.getId());
-        orm.insert(s1);
+        orm.insert(s1).exec();
 
         Student s2 = new Student();
         s2.setStudentName("钱七");
         s2.setAge(16);
         s2.setTeacherId(t.getId());
-        orm.insert(s2);
+        orm.insert(s2).exec();
 
         // 场景 1：用户诉求的 andGroup((w, s) -> ...) 直接使用 s.getAge()
         List<Student> list1 = orm.select(Student.class)

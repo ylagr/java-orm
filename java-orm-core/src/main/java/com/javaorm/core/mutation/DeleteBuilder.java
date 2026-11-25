@@ -363,14 +363,7 @@ public class DeleteBuilder<T> {
     }
 
     private <R> PropertyPath recordPath(Function<T, R> getter) {
-        RecordingContext.start(entityClass);
-        try {
-            T proxy = ProxyFactory.getProxy(entityClass);
-            getter.apply(proxy);
-            return RecordingContext.finish();
-        } finally {
-            RecordingContext.clearRecording();
-        }
+        return RecordingContext.recordPath(entityClass, getter);
     }
 
     public static class DeleteWhereBuilder<T> extends WhereBuilder<T> {

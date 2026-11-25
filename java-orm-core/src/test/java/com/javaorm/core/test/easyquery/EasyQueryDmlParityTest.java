@@ -54,15 +54,15 @@ public class EasyQueryDmlParityTest {
         Topic newTopic = new Topic("100", 99, "Inserted Topic", LocalDateTime.now());
 
         // 1. toSQL check
-        String sql = orm.insertable(newTopic).toSQL();
+        String sql = orm.insert(newTopic).toSQL();
         assertTrue("Insert SQL must contain INSERT INTO: " + sql, sql.startsWith("INSERT INTO"));
         assertTrue("Must quote table name: " + sql, sql.contains("\"t_topic\""));
 
         // 2. executeRows
-        int rows = orm.insertable(newTopic).executeRows();
+        int rows = orm.insert(newTopic).executeRows();
         assertEquals(1, rows);
 
-        Topic query = orm.queryable(Topic.class).whereById("100").firstOrNull();
+        Topic query = orm.select(Topic.class).whereById("100").firstOrNull();
         assertNotNull(query);
         assertEquals("Inserted Topic", query.getTitle());
         assertEquals(Integer.valueOf(99), query.getStars());
@@ -70,10 +70,10 @@ public class EasyQueryDmlParityTest {
         // 3. Batch insert
         Topic t1 = new Topic("101", 10, "Batch 1", LocalDateTime.now());
         Topic t2 = new Topic("102", 20, "Batch 2", LocalDateTime.now());
-        int batchRows = orm.insert(Arrays.asList(t1, t2));
+        int batchRows = orm.insert(Arrays.asList(t1, t2)).exec();
         assertEquals(2, batchRows);
 
-        List<Topic> batchQuery = orm.queryable(Topic.class).whereByIds("101", "102").toList();
+        List<Topic> batchQuery = orm.select(Topic.class).whereByIds("101", "102").toList();
         assertEquals(2, batchQuery.size());
     }
 
@@ -82,7 +82,7 @@ public class EasyQueryDmlParityTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // 1. Fluent update with whereById
-        String sql = orm.updatable(Topic.class)
+        String sql = orm.update(Topic.class)
                 .set(proxy.getTitle(), "Updated Title 1")
                 .set(proxy.getStars(), 88)
                 .whereById("1")
@@ -91,35 +91,35 @@ public class EasyQueryDmlParityTest {
         assertTrue(sql.contains("\"title\" = ?"));
         assertTrue(sql.contains("\"stars\" = ?"));
 
-        int rows = orm.updatable(Topic.class)
+        int rows = orm.update(Topic.class)
                 .set(proxy.getTitle(), "Updated Title 1")
                 .set(proxy.getStars(), 88)
                 .whereById("1")
                 .executeRows();
         assertEquals(1, rows);
 
-        Topic query = orm.queryable(Topic.class).whereById("1").firstOrNull();
+        Topic query = orm.select(Topic.class).whereById("1").firstOrNull();
         assertNotNull(query);
         assertEquals("Updated Title 1", query.getTitle());
         assertEquals(Integer.valueOf(88), query.getStars());
 
         // 2. Entity-level updatable
         query.setTitle("Entity Updated");
-        int entityRows = orm.updatable(query).executeRows();
+        int entityRows = orm.update(query).executeRows();
         assertEquals(1, entityRows);
 
-        Topic updated = orm.queryable(Topic.class).whereById("1").firstOrNull();
+        Topic updated = orm.select(Topic.class).whereById("1").firstOrNull();
         assertNotNull(updated);
         assertEquals("Entity Updated", updated.getTitle());
 
         // 3. Multi-dialect SQL output
-        String mysqlSql = orm.updatable(Topic.class)
+        String mysqlSql = orm.update(Topic.class)
                 .set(proxy.getTitle(), "Dialect Title")
                 .whereById("1")
                 .toSQL(new MySQLDialect());
         assertTrue("MySQL must use backticks: " + mysqlSql, mysqlSql.contains("`t_topic`"));
 
-        String pgSql = orm.updatable(Topic.class)
+        String pgSql = orm.update(Topic.class)
                 .set(proxy.getTitle(), "Dialect Title")
                 .whereById("1")
                 .toSQL(new PostgreSQLDialect());
@@ -131,47 +131,47 @@ public class EasyQueryDmlParityTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // 1. Logic delete: should rewrite to UPDATE t_topic SET is_deleted = 1
-        String logicDeleteSql = orm.deletable(Topic.class)
+        String logicDeleteSql = orm.delete(Topic.class)
                 .whereById("1")
                 .toSQL();
         assertTrue("Logic delete must rewrite to UPDATE: " + logicDeleteSql, logicDeleteSql.startsWith("UPDATE"));
         assertTrue("Must set is_deleted: " + logicDeleteSql, logicDeleteSql.contains("\"is_deleted\" = ?"));
 
-        int rows = orm.deletable(Topic.class).whereById("1").executeRows();
+        int rows = orm.delete(Topic.class).whereById("1").executeRows();
         assertEquals(1, rows);
 
         // Verify normal query cannot find it anymore
-        Topic normalQuery = orm.queryable(Topic.class).whereById("1").firstOrNull();
+        Topic normalQuery = orm.select(Topic.class).whereById("1").firstOrNull();
         assertNull(normalQuery);
 
         // Verify record still physically exists in database
-        Topic rawRecord = orm.queryable(Topic.class).disableLogicDelete().whereById("1").firstOrNull();
+        Topic rawRecord = orm.select(Topic.class).disableLogicDelete().whereById("1").firstOrNull();
         assertNotNull(rawRecord);
         assertEquals(Integer.valueOf(1), rawRecord.getIsDeleted());
 
         // 2. Physical delete with disableLogicDelete(): DELETE FROM t_topic
-        String physicalSql = orm.deletable(Topic.class)
+        String physicalSql = orm.delete(Topic.class)
                 .disableLogicDelete()
                 .whereById("1")
                 .toSQL();
         assertTrue("Physical delete must use DELETE FROM: " + physicalSql, physicalSql.startsWith("DELETE FROM"));
 
-        int physicalRows = orm.deletable(Topic.class)
+        int physicalRows = orm.delete(Topic.class)
                 .disableLogicDelete()
                 .whereById("1")
                 .executeRows();
         assertEquals(1, physicalRows);
 
         // Record completely removed
-        Topic physicallyDeleted = orm.queryable(Topic.class).disableLogicDelete().whereById("1").firstOrNull();
+        Topic physicallyDeleted = orm.select(Topic.class).disableLogicDelete().whereById("1").firstOrNull();
         assertNull(physicallyDeleted);
 
         // 3. Entity-level deletable and batch deletable
-        Topic t2 = orm.queryable(Topic.class).whereById("2").firstOrNull();
+        Topic t2 = orm.select(Topic.class).whereById("2").firstOrNull();
         assertNotNull(t2);
-        int delRows = orm.deletable(t2).executeRows();
+        int delRows = orm.delete(t2).executeRows();
         assertEquals(1, delRows);
 
-        assertNull(orm.queryable(Topic.class).whereById("2").firstOrNull());
+        assertNull(orm.select(Topic.class).whereById("2").firstOrNull());
     }
 }

@@ -19,11 +19,11 @@ public class EasyQuerySelectTest extends EasyQueryBaseTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // 1. 全表查询（自动应用 is_deleted = 0 逻辑删除过滤）
-        List<Topic> list = orm.queryable(Topic.class).toList();
+        List<Topic> list = orm.select(Topic.class).toList();
         assertEquals(6, list.size()); // 7 条中 1 条被逻辑删除
 
         // 2. 校验 SQL 结构
-        String sql = orm.queryable(Topic.class).toSQL();
+        String sql = orm.select(Topic.class).toSQL();
         assertTrue("SQL 必须包含 t_topic: " + sql, sql.contains("\"t_topic\""));
         assertTrue("SQL 必须包含逻辑删除条件: " + sql, sql.contains("\"is_deleted\" = ?"));
     }
@@ -33,35 +33,35 @@ public class EasyQuerySelectTest extends EasyQueryBaseTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // 1. eq
-        Topic t1 = orm.queryable(Topic.class)
+        Topic t1 = orm.select(Topic.class)
                 .where(w -> w.eq(proxy.getId(), "1"))
                 .firstOrNull();
         assertNotNull(t1);
         assertEquals("Java ORM Guide", t1.getTitle());
 
         // 2. ne
-        List<Topic> listNe = orm.queryable(Topic.class)
+        List<Topic> listNe = orm.select(Topic.class)
                 .where(w -> w.ne(proxy.getId(), "1"))
                 .toList();
         assertEquals(5, listNe.size());
 
         // 3. gt / ge / lt / le
-        List<Topic> listGt = orm.queryable(Topic.class)
+        List<Topic> listGt = orm.select(Topic.class)
                 .where(w -> w.gt(proxy.getStars(), 30))
                 .toList();
         assertEquals(3, listGt.size()); // 40, 50, 60
 
-        List<Topic> listGe = orm.queryable(Topic.class)
+        List<Topic> listGe = orm.select(Topic.class)
                 .where(w -> w.ge(proxy.getStars(), 30))
                 .toList();
         assertEquals(4, listGe.size()); // 30, 40, 50, 60
 
-        List<Topic> listLt = orm.queryable(Topic.class)
+        List<Topic> listLt = orm.select(Topic.class)
                 .where(w -> w.lt(proxy.getStars(), 30))
                 .toList();
         assertEquals(2, listLt.size()); // 10, 20
 
-        List<Topic> listLe = orm.queryable(Topic.class)
+        List<Topic> listLe = orm.select(Topic.class)
                 .where(w -> w.le(proxy.getStars(), 20))
                 .toList();
         assertEquals(2, listLe.size()); // 10, 20
@@ -72,21 +72,21 @@ public class EasyQuerySelectTest extends EasyQueryBaseTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // 1. like (全模糊)
-        List<Topic> listLike = orm.queryable(Topic.class)
+        List<Topic> listLike = orm.select(Topic.class)
                 .where(w -> w.like(proxy.getTitle(), "%ORM%"))
                 .toList();
         assertEquals(1, listLike.size());
         assertEquals("1", listLike.get(0).getId());
 
         // 2. likeLeft (以...结尾)
-        List<Topic> listLeft = orm.queryable(Topic.class)
+        List<Topic> listLeft = orm.select(Topic.class)
                 .where(w -> w.likeLeft(proxy.getTitle(), "Guide"))
                 .toList();
         assertEquals(1, listLeft.size());
         assertEquals("Java ORM Guide", listLeft.get(0).getTitle());
 
         // 3. likeRight (以...开头)
-        List<Topic> listRight = orm.queryable(Topic.class)
+        List<Topic> listRight = orm.select(Topic.class)
                 .where(w -> w.likeRight(proxy.getTitle(), "Deep"))
                 .toList();
         assertEquals(1, listRight.size());
@@ -98,13 +98,13 @@ public class EasyQuerySelectTest extends EasyQueryBaseTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // 1. in
-        List<Topic> listIn = orm.queryable(Topic.class)
+        List<Topic> listIn = orm.select(Topic.class)
                 .where(w -> w.in(proxy.getId(), Arrays.asList("1", "2", "3")))
                 .toList();
         assertEquals(3, listIn.size());
 
         // 2. notIn
-        List<Topic> listNotIn = orm.queryable(Topic.class)
+        List<Topic> listNotIn = orm.select(Topic.class)
                 .where(w -> w.notIn(proxy.getId(), Arrays.asList("1", "2")))
                 .toList();
         assertEquals(4, listNotIn.size());
@@ -114,7 +114,7 @@ public class EasyQuerySelectTest extends EasyQueryBaseTest {
     public void testWhereBetween() {
         Topic proxy = orm.proxy(Topic.class);
 
-        List<Topic> list = orm.queryable(Topic.class)
+        List<Topic> list = orm.select(Topic.class)
                 .where(w -> w.between(proxy.getStars(), 20, 50))
                 .toList();
         assertEquals(4, list.size()); // 20, 30, 40, 50
@@ -125,14 +125,14 @@ public class EasyQuerySelectTest extends EasyQueryBaseTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // 1. isNull
-        List<Topic> listNull = orm.queryable(Topic.class)
+        List<Topic> listNull = orm.select(Topic.class)
                 .where(w -> w.isNull(proxy.getTitle()))
                 .toList();
         assertEquals(1, listNull.size());
         assertEquals("6", listNull.get(0).getId());
 
         // 2. isNotNull
-        List<Topic> listNotNull = orm.queryable(Topic.class)
+        List<Topic> listNotNull = orm.select(Topic.class)
                 .where(w -> w.isNotNull(proxy.getTitle()))
                 .toList();
         assertEquals(5, listNotNull.size());
@@ -141,12 +141,12 @@ public class EasyQuerySelectTest extends EasyQueryBaseTest {
     @Test
     public void testWhereByIdAndIds() {
         // 1. whereById
-        Topic t = orm.queryable(Topic.class).whereById("2").firstOrNull();
+        Topic t = orm.select(Topic.class).whereById("2").firstOrNull();
         assertNotNull(t);
         assertEquals("EasyQuery Parity", t.getTitle());
 
         // 2. whereByIds
-        List<Topic> list = orm.queryable(Topic.class).whereByIds("1", "3").toList();
+        List<Topic> list = orm.select(Topic.class).whereByIds("1", "3").toList();
         assertEquals(2, list.size());
     }
 
@@ -155,19 +155,19 @@ public class EasyQuerySelectTest extends EasyQueryBaseTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // 1. firstOrNull 存在
-        Topic first = orm.queryable(Topic.class)
+        Topic first = orm.select(Topic.class)
                 .where(w -> w.eq(proxy.getId(), "1"))
                 .firstOrNull();
         assertNotNull(first);
 
         // 2. firstOrNull 不存在
-        Topic notFound = orm.queryable(Topic.class)
+        Topic notFound = orm.select(Topic.class)
                 .where(w -> w.eq(proxy.getId(), "non_existing_id"))
                 .firstOrNull();
         assertNull(notFound);
 
         // 3. singleOrNull
-        Topic single = orm.queryable(Topic.class)
+        Topic single = orm.select(Topic.class)
                 .where(w -> w.eq(proxy.getId(), "3"))
                 .singleOrNull();
         assertNotNull(single);
@@ -179,21 +179,21 @@ public class EasyQuerySelectTest extends EasyQueryBaseTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // 1. count
-        long count = orm.queryable(Topic.class).count();
+        long count = orm.select(Topic.class).count();
         assertEquals(6, count);
 
-        long countFilter = orm.queryable(Topic.class)
+        long countFilter = orm.select(Topic.class)
                 .where(w -> w.gt(proxy.getStars(), 30))
                 .count();
         assertEquals(3, countFilter);
 
         // 2. any (exists)
-        boolean exists = orm.queryable(Topic.class)
+        boolean exists = orm.select(Topic.class)
                 .where(w -> w.eq(proxy.getId(), "1"))
                 .any();
         assertTrue(exists);
 
-        boolean notExists = orm.queryable(Topic.class)
+        boolean notExists = orm.select(Topic.class)
                 .where(w -> w.eq(proxy.getId(), "9999"))
                 .any();
         assertFalse(notExists);
@@ -204,7 +204,7 @@ public class EasyQuerySelectTest extends EasyQueryBaseTest {
         Topic proxy = orm.proxy(Topic.class);
 
         // 自动按 DTO 列投影并映射
-        List<TopicDTO> dtos = orm.queryable(Topic.class)
+        List<TopicDTO> dtos = orm.select(Topic.class)
                 .where(w -> w.le(proxy.getStars(), 20))
                 .select(TopicDTO.class)
                 .toList();
@@ -219,7 +219,7 @@ public class EasyQuerySelectTest extends EasyQueryBaseTest {
     public void testSelectColumn() {
         Topic proxy = orm.proxy(Topic.class);
 
-        List<String> titles = orm.queryable(Topic.class)
+        List<String> titles = orm.select(Topic.class)
                 .where(w -> w.isNotNull(proxy.getTitle()))
                 .orderByAsc(proxy.getStars())
                 .selectColumn(proxy.getTitle());

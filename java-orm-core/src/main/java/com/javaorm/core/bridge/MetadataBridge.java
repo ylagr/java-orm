@@ -1,5 +1,6 @@
 package com.javaorm.core.bridge;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
@@ -9,6 +10,19 @@ import java.lang.reflect.Method;
  * 框架在解析类和字段时，从已启用的桥接器列表中按优先级提取信息并自动去重合并。
  */
 public interface MetadataBridge {
+
+    static <A extends Annotation> A getAnnotation(Field field, Method getter, Class<A> annotationClass) {
+        if (field != null) {
+            A ann = field.getAnnotation(annotationClass);
+            if (ann != null) {
+                return ann;
+            }
+        }
+        if (getter != null) {
+            return getter.getAnnotation(annotationClass);
+        }
+        return null;
+    }
 
     /**
      * 桥接器优先级，数值越小优先级越高。

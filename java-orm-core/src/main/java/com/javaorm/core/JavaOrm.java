@@ -178,20 +178,6 @@ public class JavaOrm {
     }
 
     /**
-     * 开启流式查询别名（等价于 select(entityClass)）
-     */
-    public <T> SelectBuilder<T> queryable(Class<T> entityClass) {
-        return select(entityClass);
-    }
-
-    /**
-     * 开启流式查询别名（等价于 select(entityClass)）
-     */
-    public <T> SelectBuilder<T> query(Class<T> entityClass) {
-        return select(entityClass);
-    }
-
-    /**
      * 根据主键查询单条实体
      */
     public <T> T findById(Class<T> entityClass, Object id) {
@@ -322,83 +308,38 @@ public class JavaOrm {
     }
 
     /**
-     * 实体级插入（自增主键自动回填）
+     * 开启实体插入构建器（需调用 .exec() 或 .execute() 执行）
      */
-    public <T> int insert(T entity) {
-        try {
-            return env().createInsert(entity).execute();
-        } finally {
-            SelectBuilder.resetAliasSeq();
-        }
+    public <T> InsertBuilder<T> insert(T entity) {
+        return env().createInsert(entity);
     }
 
     /**
-     * 批量实体插入（默认分批执行，每批 500 条）
+     * 开启批量实体插入构建器（需调用 .exec() 或 .execute() 执行）
      */
-    public <T> int insert(java.util.Collection<T> entities) {
-        if (entities == null || entities.isEmpty()) return 0;
-        return insertBatch(entities).execute();
+    public <T> com.javaorm.core.batch.BatchInsertBuilder<T> insert(java.util.Collection<T> entities) {
+        return insertBatch(entities);
     }
 
     /**
-     * 开启批处理插入构建器（参考 EasyQuery，支持自定义 batchSize、多值/JDBC Batch 模式）
+     * 开启批处理插入构建器（支持自定义 batchSize、多值/JDBC Batch 模式）
      */
     public <T> com.javaorm.core.batch.BatchInsertBuilder<T> insertBatch(java.util.Collection<T> entities) {
         return new com.javaorm.core.batch.BatchInsertBuilder<>(env(), entities);
     }
 
     /**
-     * 开启实体插入构造器
+     * 开启实体级 UPSERT 构建器（需调用 .exec() 或 .execute() 执行）
      */
-    public <T> InsertBuilder<T> insertable(T entity) {
-        return env().createInsert(entity);
-    }
-
-    /**
-     * 实体级 UPSERT（存在即更新，不存在即插入，跨方言自适应）
-     */
-    public <T> int insertOrUpdate(T entity) {
-        try {
-            return env().createUpsert(entity).execute();
-        } finally {
-            SelectBuilder.resetAliasSeq();
-        }
-    }
-
-    /**
-     * 实体级 UPSERT 别名（等价于 insertOrUpdate(entity)）
-     */
-    public <T> int upsert(T entity) {
-        return insertOrUpdate(entity);
-    }
-
-    /**
-     * 批量实体 UPSERT（默认分批执行，每批 500 条）
-     */
-    public <T> int insertOrUpdate(java.util.Collection<T> entities) {
-        if (entities == null || entities.isEmpty()) return 0;
-        return insertOrUpdateBatch(entities).execute();
-    }
-
-    /**
-     * 批量实体 UPSERT 别名（等价于 insertOrUpdate(entities)）
-     */
-    public <T> int upsert(java.util.Collection<T> entities) {
-        return insertOrUpdate(entities);
-    }
-
-    /**
-     * 开启实体级 UPSERT 构建器（支持指定 onConflict 列、updateColumns、ignoreColumns、doNothing 等）
-     */
-    public <T> com.javaorm.core.mutation.UpsertBuilder<T> insertOrUpdateable(T entity) {
+    public <T> com.javaorm.core.mutation.UpsertBuilder<T> insertOrUpdate(T entity) {
         return env().createUpsert(entity);
     }
 
     /**
-     * 开启实体级 UPSERT 构建器别名
+     * 开启批量实体 UPSERT 构建器（需调用 .exec() 或 .execute() 执行）
      */
-    public <T> com.javaorm.core.mutation.UpsertBuilder<T> upsertable(T entity) {
-        return insertOrUpdateable(entity);
+    public <T> com.javaorm.core.batch.BatchUpsertBuilder<T> insertOrUpdate(java.util.Collection<T> entities) {
+        return insertOrUpdateBatch(entities);
     }
 
     /**
@@ -409,29 +350,17 @@ public class JavaOrm {
     }
 
     /**
-     * 开启批量 UPSERT 构建器别名
+     * 开启实体级选择性更新构建器（按主键更新非 null 属性，需调用 .exec() 或 .execute() 执行）
      */
-    public <T> com.javaorm.core.batch.BatchUpsertBuilder<T> upsertBatch(java.util.Collection<T> entities) {
-        return insertOrUpdateBatch(entities);
+    public <T> UpdateBuilder<T> update(T entity) {
+        return UpdateBuilder.forEntity(env(), entity, true);
     }
 
     /**
-     * 实体级选择性更新（按主键更新非 null 属性）
+     * 开启批量实体更新构建器（需调用 .exec() 或 .execute() 执行）
      */
-    public <T> int update(T entity) {
-        try {
-            return UpdateBuilder.updateEntity(entity, env(), true);
-        } finally {
-            SelectBuilder.resetAliasSeq();
-        }
-    }
-
-    /**
-     * 批量实体更新（默认分批执行，支持乐观锁与分库分表）
-     */
-    public <T> int update(java.util.Collection<T> entities) {
-        if (entities == null || entities.isEmpty()) return 0;
-        return updateBatch(entities).execute();
+    public <T> com.javaorm.core.batch.BatchUpdateBuilder<T> update(java.util.Collection<T> entities) {
+        return updateBatch(entities);
     }
 
     /**
@@ -442,75 +371,44 @@ public class JavaOrm {
     }
 
     /**
-     * 实体级全量更新（按主键更新包括 null 在内的所有属性）
+     * 开启实体级全量更新构建器（按主键更新包括 null 在内的所有属性，需调用 .exec() 或 .execute() 执行）
      */
-    public <T> int updateAllColumns(T entity) {
-        try {
-            return UpdateBuilder.updateEntity(entity, env(), false);
-        } finally {
-            SelectBuilder.resetAliasSeq();
-        }
+    public <T> UpdateBuilder<T> updateAllColumns(T entity) {
+        return UpdateBuilder.forEntity(env(), entity, false);
     }
 
     /**
-     * 开启流式条件更新：orm.update(Student.class).set(s -> s.getAge(), 20).where()...
+     * 开启流式条件更新：orm.update(Student.class).set(s -> s.getAge(), 20).where()...exec()
      */
     public <T> UpdateBuilder<T> update(Class<T> entityClass) {
         return env().createUpdate(entityClass);
     }
 
     /**
-     * 别名方法：updatable 等价于 update
+     * 开启实体级删除构建器（按实体主键删除，支持逻辑删除自动重写，需调用 .exec() 或 .execute() 执行）
      */
-    public <T> UpdateBuilder<T> updatable(Class<T> entityClass) {
-        return update(entityClass);
-    }
-
-    public <T> UpdateBuilder<T> updatable(T entity) {
+    @SuppressWarnings("unchecked")
+    public <T> DeleteBuilder<T> delete(T entity) {
         if (entity == null) {
             throw new IllegalArgumentException("Entity must not be null");
         }
         Class<T> clazz = (Class<T>) entity.getClass();
         com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(clazz, config);
-        UpdateBuilder<T> builder = update(clazz);
-        builder.setColumns(entity);
-        if (meta.getIdColumn() != null) {
-            Object idVal = meta.getIdColumn().getValue(entity);
-            if (idVal != null) {
-                builder.whereById(idVal);
-            }
+        if (meta.getIdColumn() == null) {
+            throw new IllegalStateException("Entity " + clazz.getName() + " does not have a primary key for delete");
         }
-        return builder;
-    }
-
-    public <T> UpdateBuilder<T> updateable(Class<T> entityClass) {
-        return updatable(entityClass);
-    }
-
-    public <T> UpdateBuilder<T> updateable(T entity) {
-        return updatable(entity);
-    }
-
-    /**
-     * 实体级删除（按实体主键删除，支持逻辑删除自动重写）
-     */
-    /**
-     * 实体级删除（按实体主键删除，支持逻辑删除自动重写）
-     */
-    public <T> int delete(T entity) {
-        try {
-            return DeleteBuilder.deleteEntity(entity, env());
-        } finally {
-            SelectBuilder.resetAliasSeq();
+        Object idVal = meta.getIdColumn().getValue(entity);
+        if (idVal == null) {
+            throw new IllegalArgumentException("Primary key value is null for delete");
         }
+        return delete(clazz).whereById(idVal);
     }
 
     /**
-     * 批量实体删除
+     * 开启批量实体删除构建器（需调用 .exec() 或 .execute() 执行）
      */
-    public <T> int delete(java.util.Collection<T> entities) {
-        if (entities == null || entities.isEmpty()) return 0;
-        return deleteBatch(entities).execute();
+    public <T> com.javaorm.core.batch.BatchDeleteBuilder<T> delete(java.util.Collection<T> entities) {
+        return deleteBatch(entities);
     }
 
     /**
@@ -521,92 +419,27 @@ public class JavaOrm {
     }
 
     /**
-     * 根据主键 ID 删除
+     * 开启按主键 ID 删除构建器（需调用 .exec() 或 .execute() 执行）
      */
-    public <T> int deleteById(Class<T> entityClass, Object id) {
-        try {
-            return DeleteBuilder.deleteById(entityClass, id, env());
-        } finally {
-            SelectBuilder.resetAliasSeq();
+    public <T> DeleteBuilder<T> deleteById(Class<T> entityClass, Object id) {
+        if (id == null) {
+            throw new IllegalArgumentException("Primary key value is null for delete");
         }
+        return delete(entityClass).whereById(id);
     }
 
     /**
-     * 批量根据主键 ID 删除
+     * 开启批量按主键 ID 删除构建器（需调用 .exec() 或 .execute() 执行）
      */
-    public <T> int deleteByIds(Class<T> entityClass, java.util.Collection<?> ids) {
-        if (ids == null || ids.isEmpty()) return 0;
-        return deleteByIdsBuilder(entityClass, ids).execute();
-    }
-
-    /**
-     * 开启批处理 ID 删除构建器
-     */
-    public <T> com.javaorm.core.batch.BatchDeleteBuilder<T> deleteByIdsBuilder(Class<T> entityClass, java.util.Collection<?> ids) {
+    public <T> com.javaorm.core.batch.BatchDeleteBuilder<T> deleteByIds(Class<T> entityClass, java.util.Collection<?> ids) {
         return new com.javaorm.core.batch.BatchDeleteBuilder<>(env(), entityClass, ids);
     }
 
     /**
-     * 开启流式条件删除：orm.delete(Student.class).where().and(s -> s.getAge()).lt(10)...
+     * 开启流式条件删除：orm.delete(Student.class).where().and(s -> s.getAge()).lt(10)...exec()
      */
     public <T> DeleteBuilder<T> delete(Class<T> entityClass) {
         return env().createDelete(entityClass);
-    }
-
-    /**
-     * 别名方法：deletable 等价于 delete
-     */
-    public <T> DeleteBuilder<T> deletable(Class<T> entityClass) {
-        return delete(entityClass);
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> DeleteBuilder<T> deletable(T entity) {
-        if (entity == null) {
-            throw new IllegalArgumentException("Entity must not be null");
-        }
-        Class<T> clazz = (Class<T>) entity.getClass();
-        com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(clazz, config);
-        DeleteBuilder<T> builder = delete(clazz);
-        if (meta.getIdColumn() != null) {
-            Object idVal = meta.getIdColumn().getValue(entity);
-            if (idVal != null) {
-                builder.whereById(idVal);
-            }
-        }
-        return builder;
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> DeleteBuilder<T> deletable(java.util.Collection<T> entities) {
-        if (entities == null || entities.isEmpty()) {
-            throw new IllegalArgumentException("Entities must not be empty");
-        }
-        T first = entities.iterator().next();
-        Class<T> clazz = (Class<T>) first.getClass();
-        com.javaorm.core.metadata.EntityMetadata meta = com.javaorm.core.metadata.EntityMetadataManager.get(clazz, config);
-        DeleteBuilder<T> builder = delete(clazz);
-        if (meta.getIdColumn() != null) {
-            java.util.List<Object> ids = new java.util.ArrayList<>();
-            for (T e : entities) {
-                Object idVal = meta.getIdColumn().getValue(e);
-                if (idVal != null) ids.add(idVal);
-            }
-            builder.whereByIds(ids);
-        }
-        return builder;
-    }
-
-    public <T> DeleteBuilder<T> deleteable(Class<T> entityClass) {
-        return deletable(entityClass);
-    }
-
-    public <T> DeleteBuilder<T> deleteable(T entity) {
-        return deletable(entity);
-    }
-
-    public <T> DeleteBuilder<T> deleteable(java.util.Collection<T> entities) {
-        return deletable(entities);
     }
 
 

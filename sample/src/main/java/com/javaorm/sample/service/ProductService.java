@@ -90,7 +90,7 @@ public class ProductService {
         if (product.getStatus() == null) {
             product.setStatus(1); // 默认上架
         }
-        orm.insert(product);
+        orm.insert(product).exec();
         return product.getId();
     }
 
@@ -100,7 +100,7 @@ public class ProductService {
     @Transactional
     public boolean update(MallProduct product) {
         product.setUpdateTime(new Date());
-        return orm.update(product) > 0;
+        return orm.update(product).exec() > 0;
     }
 
     /**
@@ -123,7 +123,7 @@ public class ProductService {
     public boolean delete(Long id) {
         MallProduct product = getById(id);
         if (product != null) {
-            return orm.delete(product) > 0;
+            return orm.delete(product).exec() > 0;
         }
         return false;
     }

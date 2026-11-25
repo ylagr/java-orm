@@ -711,21 +711,29 @@ public class WhereBuilder<T> implements Query<T> {
         return this;
     }
 
-    public WhereBuilder<T> andGroup(Consumer<WhereBuilder<T>> groupConsumer) {
-        return andGroup(true, groupConsumer);
-    }
-
-    public WhereBuilder<T> andGroup(boolean condition, Consumer<WhereBuilder<T>> groupConsumer) {
+    private WhereBuilder<T> addGroup(boolean condition, LogicalOperator op, Consumer<WhereBuilder<T>> groupConsumer) {
         if (!condition) {
             return this;
         }
-        GroupCondition group = new GroupCondition(LogicalOperator.AND);
+        GroupCondition group = new GroupCondition(op);
         WhereBuilder<T> sub = new WhereBuilder<>(env, statement, entityClass, scopeAlias, group::addCondition, rootQuery, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
         groupConsumer.accept(sub);
         if (!group.getChildren().isEmpty()) {
             conditionReceiver.accept(group);
         }
         return this;
+    }
+
+    private WhereBuilder<T> addGroup(boolean condition, LogicalOperator op, BiWhereConsumer<T> groupConsumer) {
+        return addGroup(condition, op, sub -> groupConsumer.accept(sub, sub.proxy()));
+    }
+
+    public WhereBuilder<T> andGroup(Consumer<WhereBuilder<T>> groupConsumer) {
+        return andGroup(true, groupConsumer);
+    }
+
+    public WhereBuilder<T> andGroup(boolean condition, Consumer<WhereBuilder<T>> groupConsumer) {
+        return addGroup(condition, LogicalOperator.AND, groupConsumer);
     }
 
     public WhereBuilder<T> andGroup(BiWhereConsumer<T> groupConsumer) {
@@ -733,16 +741,7 @@ public class WhereBuilder<T> implements Query<T> {
     }
 
     public WhereBuilder<T> andGroup(boolean condition, BiWhereConsumer<T> groupConsumer) {
-        if (!condition) {
-            return this;
-        }
-        GroupCondition group = new GroupCondition(LogicalOperator.AND);
-        WhereBuilder<T> sub = new WhereBuilder<>(env, statement, entityClass, scopeAlias, group::addCondition, rootQuery, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
-        groupConsumer.accept(sub, sub.proxy());
-        if (!group.getChildren().isEmpty()) {
-            conditionReceiver.accept(group);
-        }
-        return this;
+        return addGroup(condition, LogicalOperator.AND, groupConsumer);
     }
 
     public WhereBuilder<T> orGroup(Consumer<WhereBuilder<T>> groupConsumer) {
@@ -750,16 +749,7 @@ public class WhereBuilder<T> implements Query<T> {
     }
 
     public WhereBuilder<T> orGroup(boolean condition, Consumer<WhereBuilder<T>> groupConsumer) {
-        if (!condition) {
-            return this;
-        }
-        GroupCondition group = new GroupCondition(LogicalOperator.OR);
-        WhereBuilder<T> sub = new WhereBuilder<>(env, statement, entityClass, scopeAlias, group::addCondition, rootQuery, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
-        groupConsumer.accept(sub);
-        if (!group.getChildren().isEmpty()) {
-            conditionReceiver.accept(group);
-        }
-        return this;
+        return addGroup(condition, LogicalOperator.OR, groupConsumer);
     }
 
     public WhereBuilder<T> orGroup(BiWhereConsumer<T> groupConsumer) {
@@ -767,16 +757,7 @@ public class WhereBuilder<T> implements Query<T> {
     }
 
     public WhereBuilder<T> orGroup(boolean condition, BiWhereConsumer<T> groupConsumer) {
-        if (!condition) {
-            return this;
-        }
-        GroupCondition group = new GroupCondition(LogicalOperator.OR);
-        WhereBuilder<T> sub = new WhereBuilder<>(env, statement, entityClass, scopeAlias, group::addCondition, rootQuery, customListSupplier, executeSupplier, sqlAndParamsSupplier, printSqlConsumer);
-        groupConsumer.accept(sub, sub.proxy());
-        if (!group.getChildren().isEmpty()) {
-            conditionReceiver.accept(group);
-        }
-        return this;
+        return addGroup(condition, LogicalOperator.OR, groupConsumer);
     }
 
     // ==================== 快捷扁平断言语法 (eq, ne, gt, ge, lt, le, like 等) ====================
@@ -2834,14 +2815,7 @@ public class WhereBuilder<T> implements Query<T> {
     }
 
     private <R> PropertyPath recordPath(Function<T, R> getter) {
-        RecordingContext.start(entityClass);
-        try {
-            T proxy = ProxyFactory.getProxy(entityClass);
-            getter.apply(proxy);
-            return RecordingContext.finish();
-        } finally {
-            RecordingContext.clearRecording();
-        }
+        return RecordingContext.recordPath(entityClass, getter);
     }
 
     // 快捷委托给 rootQuery

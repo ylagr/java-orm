@@ -249,7 +249,7 @@ public class OrmBenchmarkRunner {
                 t.setTeacherName("测试插入_" + i);
                 t.setAge(30 + (i % 20));
                 t.setTitle("讲师");
-                javaOrm.insert(t);
+                javaOrm.insert(t).exec();
                 consume(t.getId());
             }
         }, warmup, rounds);

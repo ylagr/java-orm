@@ -92,25 +92,25 @@ public class ComplexSqlComprehensiveTest {
         t1.setTeacherName("张教授");
         t1.setAge(48);
         t1.setTitle("教授");
-        orm.insert(t1); // id = 1
+        orm.insert(t1).exec(); // id = 1
 
         Teacher t2 = new Teacher();
         t2.setTeacherName("李副教授");
         t2.setAge(38);
         t2.setTitle("副教授");
-        orm.insert(t2); // id = 2
+        orm.insert(t2).exec(); // id = 2
 
         Teacher t3 = new Teacher();
         t3.setTeacherName("王讲师");
         t3.setAge(29);
         t3.setTitle("讲师");
-        orm.insert(t3); // id = 3
+        orm.insert(t3).exec(); // id = 3
 
         Teacher t4 = new Teacher();
         t4.setTeacherName("赵助教");
         t4.setAge(24);
         t4.setTitle("助教");
-        orm.insert(t4); // id = 4 (无学生)
+        orm.insert(t4).exec(); // id = 4 (无学生)
 
         // 学生数据
         // Teacher 1 组: 学生A(20), 学生B(22), 学生C(24), 学生H(25, 已删除)
@@ -139,7 +139,7 @@ public class ComplexSqlComprehensiveTest {
         s.setTeacherId(teacherId);
         s.setIsDeleted(isDeleted);
         s.setCreateTime(LocalDateTime.now());
-        orm.insert(s);
+        orm.insert(s).exec();
     }
 
     @After

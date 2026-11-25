@@ -99,6 +99,7 @@ public class JavaOrmMyBatisSupport {
             if (interceptor instanceof com.javaorm.core.interceptor.SqlInterceptor) {
                 config.addInterceptor((com.javaorm.core.interceptor.SqlInterceptor) interceptor);
             } else {
+                boolean registeredMp = false;
                 try {
                     Class<?> mpInterceptorClass = Class.forName("com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor");
                     if (mpInterceptorClass.isInstance(interceptor)) {
@@ -106,8 +107,12 @@ public class JavaOrmMyBatisSupport {
                         Constructor<?> ctor = bridgeClass.getConstructor(mpInterceptorClass);
                         com.javaorm.core.interceptor.SqlInterceptor bridge = (com.javaorm.core.interceptor.SqlInterceptor) ctor.newInstance(interceptor);
                         config.addInterceptor(bridge);
+                        registeredMp = true;
                     }
                 } catch (Throwable ignored) {
+                }
+                if (!registeredMp) {
+                    config.addInterceptor(new MyBatisSqlInterceptorBridge(interceptor, configuration));
                 }
             }
         }

@@ -202,12 +202,12 @@ public class MultiDataSourceShardingTest {
         ShardedUser u1 = new ShardedUser();
         u1.setUserId(100L);
         u1.setUsername("Alice_DS0");
-        orm.insert(u1);
+        orm.insert(u1).exec();
 
         ShardedUser u2 = new ShardedUser();
         u2.setUserId(101L);
         u2.setUsername("Bob_DS1");
-        orm.insert(u2);
+        orm.insert(u2).exec();
 
         // 验证精准路由查询
         ShardedUser found0 = orm.select(ShardedUser.class)
@@ -236,7 +236,7 @@ public class MultiDataSourceShardingTest {
         t0.setId(1L);
         t0.setTradeId(200L);
         t0.setAmount(99.5);
-        orm.insert(t0);
+        orm.insert(t0).exec();
 
         // tradeId = 201:
         // dsRouter: 201 % 2 = 1 -> ds_1
@@ -245,7 +245,7 @@ public class MultiDataSourceShardingTest {
         t1.setId(2L);
         t1.setTradeId(201L);
         t1.setAmount(199.5);
-        orm.insert(t1);
+        orm.insert(t1).exec();
 
         // 精准单库单表查询
         ShardedTrade res0 = orm.select(ShardedTrade.class)

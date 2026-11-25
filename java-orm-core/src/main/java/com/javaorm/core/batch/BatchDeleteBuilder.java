@@ -61,6 +61,10 @@ public class BatchDeleteBuilder<T> {
         return this;
     }
 
+    public int exec() {
+        return execute();
+    }
+
     public int execute() {
         if (entityClass == null) return 0;
         EntityMetadata metadata = EntityMetadataManager.get(entityClass, env.getConfig());
@@ -72,12 +76,12 @@ public class BatchDeleteBuilder<T> {
         // 1. 如果传入的是实体列表
         if (entities != null) {
             if (entities.isEmpty()) return 0;
-            Map<PhysicalTarget, List<Object>> groups = groupEntitiesToIdList(entities, metadata, idCol);
+            Map<BatchSupport.PhysicalTarget, List<Object>> groups = BatchSupport.groupByPhysicalTarget(entities, metadata, idCol::getValue);
             int total = 0;
-            for (Map.Entry<PhysicalTarget, List<Object>> entry : groups.entrySet()) {
-                PhysicalTarget target = entry.getKey();
+            for (Map.Entry<BatchSupport.PhysicalTarget, List<Object>> entry : groups.entrySet()) {
+                BatchSupport.PhysicalTarget target = entry.getKey();
                 List<Object> idList = entry.getValue();
-                DataSource ds = resolveDataSource(target.dataSourceName);
+                DataSource ds = BatchSupport.resolveDataSource(env, target.dataSourceName);
                 total += deleteIdChunks(idList, metadata, target.tableName, ds);
             }
             return total;
@@ -88,7 +92,7 @@ public class BatchDeleteBuilder<T> {
             if (ids.isEmpty()) return 0;
             List<Object> idList = new ArrayList<>(ids);
             // 非分片实体直接单表删除；分片实体且未指定具体分片键时广播全分片或默认库表
-            DataSource ds = resolveDataSource(metadata.getShardingDataSource());
+            DataSource ds = BatchSupport.resolveDataSource(env, metadata.getShardingDataSource());
             return deleteIdChunks(idList, metadata, metadata.getTableName(), ds);
         }
 
@@ -152,7 +156,7 @@ public class BatchDeleteBuilder<T> {
         }
 
         String finalSql = sql.toString();
-        logSql(finalSql, params);
+        BatchSupport.logSql(log, env, "Batch Delete", finalSql, params);
 
         Connection conn = null;
         PreparedStatement ps = null;
@@ -168,91 +172,6 @@ public class BatchDeleteBuilder<T> {
         } finally {
             if (ps != null) try { ps.close(); } catch (Exception ignored) {}
             ConnectionUtils.closeConnection(conn);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<PhysicalTarget, List<Object>> groupEntitiesToIdList(Collection<T> entities, EntityMetadata metadata, ColumnMetadata idCol) {
-        Map<PhysicalTarget, List<Object>> map = new LinkedHashMap<>();
-        if (!metadata.isSharding()) {
-            PhysicalTarget defaultTarget = new PhysicalTarget(metadata.getShardingDataSource(), metadata.getTableName());
-            List<Object> idList = new ArrayList<>(entities.size());
-            for (T e : entities) {
-                idList.add(idCol.getValue(e));
-            }
-            map.put(defaultTarget, idList);
-            return map;
-        }
-
-        DataSourceRouter<Object> dsRouter = (DataSourceRouter<Object>) metadata.getShardingDataSourceRouter();
-        TableRouter<Object> tableRouter = (TableRouter<Object>) metadata.getShardingRouter();
-        ColumnMetadata shardingCol = metadata.getShardingColumn();
-
-        for (T entity : entities) {
-            Object shardingVal = shardingCol != null ? shardingCol.getValue(entity) : null;
-            String dsName = metadata.getShardingDataSource();
-            if (dsRouter != null) {
-                if (shardingVal == null) {
-                    throw new IllegalArgumentException("Sharding key value cannot be null for entity: " + entity);
-                }
-                dsName = dsRouter.route(shardingVal);
-            }
-
-            String tableName = metadata.getTableName();
-            if (tableRouter != null) {
-                if (shardingVal == null) {
-                    throw new IllegalArgumentException("Sharding key value cannot be null for entity: " + entity);
-                }
-                tableName = tableRouter.route(metadata.getTableName(), shardingVal);
-            }
-
-            PhysicalTarget target = new PhysicalTarget(dsName, tableName);
-            map.computeIfAbsent(target, k -> new ArrayList<>()).add(idCol.getValue(entity));
-        }
-
-        return map;
-    }
-
-    private DataSource resolveDataSource(String dsName) {
-        OrmConfig config = env.getConfig();
-        if (config != null && config.getDataSourceManager() != null) {
-            return config.getDataSourceManager().getDataSource(dsName);
-        }
-        return env.getDataSource();
-    }
-
-    private void logSql(String sql, List<Object> params) {
-        if (env.getConfig() != null && env.getConfig().isPrintSql()) {
-            log.info("==>  Preparing Batch Delete: {}", sql);
-            if (params != null && params.size() <= 20) {
-                log.info("==> Parameters: {}", params);
-            } else if (params != null) {
-                log.info("==> Parameters: (total {} params)", params.size());
-            }
-        }
-    }
-
-    private static class PhysicalTarget {
-        final String dataSourceName;
-        final String tableName;
-
-        PhysicalTarget(String dataSourceName, String tableName) {
-            this.dataSourceName = dataSourceName;
-            this.tableName = tableName;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            PhysicalTarget that = (PhysicalTarget) o;
-            return Objects.equals(dataSourceName, that.dataSourceName) &&
-                    Objects.equals(tableName, that.tableName);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(dataSourceName, tableName);
         }
     }
 }

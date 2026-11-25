@@ -258,7 +258,7 @@ public class MyBatisPlusBridgeTest {
         user.setAge(20);
         user.setStatus(UserStatus.ACTIVE);
         user.setGrade(UserGrade.VIP);
-        int rows = orm.insert(user);
+        int rows = orm.insert(user).exec();
         Assert.assertEquals(1, rows);
         Assert.assertNotNull(user.getId());
         Assert.assertEquals(Integer.valueOf(1), user.getVersion());
@@ -269,7 +269,7 @@ public class MyBatisPlusBridgeTest {
         Assert.assertEquals(UserGrade.VIP, queried.getGrade());
 
         user.setAge(21);
-        int updated = orm.update(user);
+        int updated = orm.update(user).exec();
         Assert.assertEquals(1, updated);
         Assert.assertEquals(Integer.valueOf(2), user.getVersion());
 
@@ -280,13 +280,13 @@ public class MyBatisPlusBridgeTest {
         staleUser.setVersion(1);
 
         try {
-            orm.update(staleUser);
+            orm.update(staleUser).exec();
             Assert.fail("Should throw OptimisticLockException on version mismatch");
         } catch (OptimisticLockException e) {
             // expected
         }
 
-        int deleted = orm.delete(user);
+        int deleted = orm.delete(user).exec();
         Assert.assertEquals(1, deleted);
 
         MpUser found = orm.findById(MpUser.class, user.getId());
@@ -365,7 +365,7 @@ public class MyBatisPlusBridgeTest {
         MpUser user = new MpUser();
         user.setName("InterceptorUser");
         user.setAge(18);
-        interceptorOrm.insert(user);
+        interceptorOrm.insert(user).exec();
         Assert.assertEquals(1, updateCount.get());
 
         interceptorOrm.select(MpUser.class).where().eq(MpUser::getName, "InterceptorUser").first();
@@ -390,7 +390,7 @@ public class MyBatisPlusBridgeTest {
         MpUser u = new MpUser();
         u.setName("DynUser");
         u.setAge(22);
-        dynamicOrm.insert(u);
+        dynamicOrm.insert(u).exec();
 
         MpUser found = dynamicOrm.select(MpUser.class)
                 .where()
@@ -426,7 +426,7 @@ public class MyBatisPlusBridgeTest {
         MpUser u = new MpUser();
         u.setName("TenantUser");
         u.setAge(30);
-        tenantOrm.insert(u);
+        tenantOrm.insert(u).exec();
 
         List<MpUser> list = orm.select(MpUser.class).where().eq(MpUser::getName, "TenantUser").list();
         Assert.assertFalse(list.isEmpty());
@@ -493,7 +493,7 @@ public class MyBatisPlusBridgeTest {
         user.setAge(28);
         user.setStatus(UserStatus.ACTIVE);
         user.setGrade(UserGrade.VIP);
-        adapterOrm.insert(user);
+        adapterOrm.insert(user).exec();
         Assert.assertNotNull(user.getId());
         Assert.assertEquals(Integer.valueOf(1), user.getVersion());
         Assert.assertEquals(Integer.valueOf(0), user.getDeleted());
@@ -508,10 +508,10 @@ public class MyBatisPlusBridgeTest {
         Assert.assertEquals(UserGrade.VIP, page.getRecords().get(0).getGrade());
 
         user.setAge(29);
-        adapterOrm.update(user);
+        adapterOrm.update(user).exec();
         Assert.assertEquals(Integer.valueOf(2), user.getVersion());
 
-        adapterOrm.delete(user);
+        adapterOrm.delete(user).exec();
         MpUser afterDel = adapterOrm.select(MpUser.class)
                 .where()
                 .eq(MpUser::getId, user.getId())
@@ -540,14 +540,14 @@ public class MyBatisPlusBridgeTest {
 
         MpAutoUser user = new MpAutoUser();
         user.setName("Jack");
-        fillOrm.insert(user);
+        fillOrm.insert(user).exec();
 
         Assert.assertNotNull(user.getId());
         Assert.assertEquals("admin_insert", user.getCreateBy());
         Assert.assertEquals("admin_insert", user.getUpdateBy());
 
         user.setName("Jackson");
-        fillOrm.update(user);
+        fillOrm.update(user).exec();
         Assert.assertEquals("admin_update", user.getUpdateBy());
         Assert.assertEquals("admin_insert", user.getCreateBy());
     }
@@ -637,7 +637,7 @@ public class MyBatisPlusBridgeTest {
         entity.setSimpleStatus(SimpleStatus.ON);
         entity.setPureEnum(PureEnum.BAR);
 
-        int rows = orm.insert(entity);
+        int rows = orm.insert(entity).exec();
         Assert.assertEquals(1, rows);
         Assert.assertNotNull(entity.getId());
 
@@ -655,7 +655,7 @@ public class MyBatisPlusBridgeTest {
         Assert.assertEquals(PureEnum.BAR, found.getPureEnum());
 
         // 测试逻辑删除（默认 0 未删，1 已删）
-        orm.delete(found);
+        orm.delete(found).exec();
         MpComplexEntity afterDelete = orm.select(MpComplexEntity.class)
                 .where()
                 .eq(MpComplexEntity::getId, entity.getId())

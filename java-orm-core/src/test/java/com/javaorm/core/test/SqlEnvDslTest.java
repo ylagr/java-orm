@@ -187,7 +187,7 @@ public class SqlEnvDslTest {
 
             return e.select(s.getStudentName(), t.getTeacherName())
                     .from(s)
-                    .leftjoin(t).on(on -> on.eq(s.getTeacherId(), t.getId()).eq(s.getTeacherId(), t.getId()))
+                    .leftJoin(t).on(on -> on.eq(s.getTeacherId(), t.getId()).eq(s.getTeacherId(), t.getId()))
                     .where().eq(s.getAge(), 25);
         }).toSql();
         assertTrue(sql.contains("\"s\".\"teacher_id\" = \"t\".\"id\" AND \"s\".\"teacher_id\" = \"t\".\"id\""));
@@ -198,7 +198,7 @@ public class SqlEnvDslTest {
 
             e.select(s.getStudentName(), t.getTeacherName())
                     .from(s)
-                    .leftjoin(t).on(on -> on.eq(s.getTeacherId(), t.getId()).eq(s.getTeacherId(), t.getId()))
+                    .leftJoin(t).on(on -> on.eq(s.getTeacherId(), t.getId()).eq(s.getTeacherId(), t.getId()))
                     .where().eq(s.getAge(), 25);
         }).listMaps();
 
@@ -217,7 +217,7 @@ public class SqlEnvDslTest {
 
             return e.select(s.getStudentName(), t.getTeacherName())
                     .from(s)
-                    .leftjoin(t).on(s.getTeacherId(), t.getId())
+                    .leftJoin(t).on(s.getTeacherId(), t.getId())
                                 .on(s.getTeacherId(), t.getId())
                     .where().eq(s.getAge(), 25);
         }).toSql();
@@ -231,13 +231,13 @@ public class SqlEnvDslTest {
         Teacher t = com.javaorm.core.proxy.ProxyFactory.createProxy(Teacher.class, "t1");
 
         String sql1 = orm.select(Student.class)
-                .leftjoin(Teacher.class)
+                .leftJoin(Teacher.class)
                 .on(s.getTeacherId(), t.getId())
                 .toSql();
         assertTrue(sql1.contains("t0.\"teacher_id\" = t1.\"id\""));
 
         String sql2 = orm.select(Student.class)
-                .leftjoin(Teacher.class)
+                .leftJoin(Teacher.class)
                 .on(on -> on.eq(s.getTeacherId(), t.getId()).eq(s.getTeacherId(), t.getId()))
                 .toSql();
         assertTrue(sql2.contains("t0.\"teacher_id\" = t1.\"id\" AND t0.\"teacher_id\" = t1.\"id\""));

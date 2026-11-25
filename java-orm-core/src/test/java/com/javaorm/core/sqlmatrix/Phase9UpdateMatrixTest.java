@@ -297,7 +297,7 @@ public class Phase9UpdateMatrixTest extends AbstractSqlMatrixTest {
             user.setUsername("david_dirty_updated");
 
             // 执行实体更新：底层脏检查机制应只更新 username
-            int affected = targetOrm.update(user);
+            int affected = targetOrm.update(user).exec();
             Assert.assertEquals(1, affected);
 
             MatrixUser reloaded = targetOrm.select(MatrixUser.class)

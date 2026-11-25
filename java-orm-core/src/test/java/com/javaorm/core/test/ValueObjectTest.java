@@ -288,7 +288,7 @@ public class ValueObjectTest {
         Address address = new Address("Shanghai", "Shanghai", "Century Ave", area);
         Company company = new Company(5L, "Bilibili", address);
 
-        int rows = orm.insert(company);
+        int rows = orm.insert(company).exec();
         assertEquals(1, rows);
 
         Company queried = findById(5L);
@@ -306,7 +306,7 @@ public class ValueObjectTest {
     @Test
     public void testInsertEntityWithNullValueObject() {
         Company company = new Company(6L, "ByteDance", null);
-        int rows = orm.insert(company);
+        int rows = orm.insert(company).exec();
         assertEquals(1, rows);
 
         Company queried = findById(6L);
@@ -325,7 +325,7 @@ public class ValueObjectTest {
         company.getAddress().setCity("Dongguan");
         company.getAddress().getArea().setName("Songshan Lake");
 
-        int rows = orm.update(company);
+        int rows = orm.update(company).exec();
         assertEquals(1, rows);
 
         Company queried = findById(1L);

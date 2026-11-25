@@ -23,7 +23,7 @@ public class EasyQueryIncludeNavigateTest extends EasyQueryBaseTest {
         BlogEntity b = orm.proxy(BlogEntity.class);
 
         // BlogEntity include Topic (ManyToOne)
-        List<BlogEntity> blogs = orm.queryable(BlogEntity.class)
+        List<BlogEntity> blogs = orm.select(BlogEntity.class)
                 .where(w -> w.in(b.getId(), java.util.Arrays.asList("b1", "b2", "b3")))
                 .orderByAsc(b.getId())
                 .include(b.getTopic())
@@ -54,7 +54,7 @@ public class EasyQueryIncludeNavigateTest extends EasyQueryBaseTest {
         Company c = orm.proxy(Company.class);
 
         // Company include List<SysUser> users (OneToMany)
-        List<Company> companies = orm.queryable(Company.class)
+        List<Company> companies = orm.select(Company.class)
                 .orderByAsc(c.getId())
                 .includes(c.getUsers())
                 .toList();
@@ -83,7 +83,7 @@ public class EasyQueryIncludeNavigateTest extends EasyQueryBaseTest {
         SysUser u = orm.proxy(SysUser.class);
 
         // SysUser include UserExtra (OneToOne)
-        List<SysUser> users = orm.queryable(SysUser.class)
+        List<SysUser> users = orm.select(SysUser.class)
                 .where(w -> w.in(u.getId(), java.util.Arrays.asList("u1", "u2")))
                 .orderByAsc(u.getId())
                 .include(u.getExtra())
@@ -107,7 +107,7 @@ public class EasyQueryIncludeNavigateTest extends EasyQueryBaseTest {
         Company c = orm.proxy(Company.class);
 
         // 一比一复刻 EasyQuery：查询 CompanyDTO，底层只查询 DTO 声明的列，并自动识别装配 users 列表
-        List<CompanyDTO> companyDtos = orm.queryable(Company.class)
+        List<CompanyDTO> companyDtos = orm.select(Company.class)
                 .where(w -> w.eq(c.getId(), "c1"))
                 .selectAutoInclude(CompanyDTO.class)
                 .toList();
@@ -128,7 +128,7 @@ public class EasyQueryIncludeNavigateTest extends EasyQueryBaseTest {
         BlogEntity b = orm.proxy(BlogEntity.class);
 
         // 一比一复刻 EasyQuery：查询 BlogDTO，自动按嵌套 DTO 装配关联 TopicDTO
-        List<BlogDTO> blogDtos = orm.queryable(BlogEntity.class)
+        List<BlogDTO> blogDtos = orm.select(BlogEntity.class)
                 .where(w -> w.eq(b.getId(), "b1"))
                 .selectAutoInclude(BlogDTO.class)
                 .toList();

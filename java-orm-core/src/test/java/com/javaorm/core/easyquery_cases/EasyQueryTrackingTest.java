@@ -13,7 +13,7 @@ public class EasyQueryTrackingTest extends EasyQueryBaseTest {
     @Test
     public void testAttachAndDirtyCheckingUpdate() {
         // 1. 查询实体
-        Topic topic = orm.queryable(Topic.class)
+        Topic topic = orm.select(Topic.class)
                 .whereById("1")
                 .firstOrNull();
         assertNotNull(topic);
@@ -27,11 +27,11 @@ public class EasyQueryTrackingTest extends EasyQueryBaseTest {
         topic.setStars(99);
 
         // 4. 执行更新，脏检查机制自动计算 Diff，仅生成包含变更列的 UPDATE SET 语句
-        int rows = orm.update(topic);
+        int rows = orm.update(topic).exec();
         assertEquals(1, rows);
 
         // 5. 重新读取验证
-        Topic reloaded = orm.queryable(Topic.class).whereById("1").firstOrNull();
+        Topic reloaded = orm.select(Topic.class).whereById("1").firstOrNull();
         assertNotNull(reloaded);
         assertEquals(Integer.valueOf(99), reloaded.getStars());
         assertEquals("Java ORM Guide", reloaded.getTitle()); // 未被污染
@@ -40,7 +40,7 @@ public class EasyQueryTrackingTest extends EasyQueryBaseTest {
     @Test
     public void testAsTrackingQueryAndDirtyUpdate() {
         // 开启 asTracking() 流式查询并自动挂载跟踪
-        Topic topic = orm.queryable(Topic.class)
+        Topic topic = orm.select(Topic.class)
                 .whereById("2")
                 .asTracking()
                 .firstOrNull();
@@ -50,10 +50,10 @@ public class EasyQueryTrackingTest extends EasyQueryBaseTest {
 
         // 修改 title
         topic.setTitle("EasyQuery Tracking Success");
-        int rows = orm.update(topic);
+        int rows = orm.update(topic).exec();
         assertEquals(1, rows);
 
-        Topic reloaded = orm.queryable(Topic.class).whereById("2").firstOrNull();
+        Topic reloaded = orm.select(Topic.class).whereById("2").firstOrNull();
         assertNotNull(reloaded);
         assertEquals("EasyQuery Tracking Success", reloaded.getTitle());
         assertEquals(Integer.valueOf(20), reloaded.getStars()); // 未修改字段不变

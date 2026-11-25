@@ -192,21 +192,21 @@ public class ReviewIssuesRegressionTest {
         TenantDocument doc1 = new TenantDocument();
         doc1.setTitle("Tenant 100 Document 1");
         doc1.setContent("Secret 100");
-        orm.insert(doc1);
+        orm.insert(doc1).exec();
         assertNotNull("Generated PK should be backfilled", doc1.getId());
         assertEquals(Long.valueOf(100L), doc1.getTenantId()); // 自动填充
 
         TenantDocument doc2 = new TenantDocument();
         doc2.setTitle("Tenant 100 Document 2");
         doc2.setContent("Secret 100-2");
-        orm.insert(doc2);
+        orm.insert(doc2).exec();
 
         // 2. 租户 200 插入数据
         TenantContext.setTenantId(200L);
         TenantDocument doc3 = new TenantDocument();
         doc3.setTitle("Tenant 200 Document");
         doc3.setContent("Secret 200");
-        orm.insert(doc3);
+        orm.insert(doc3).exec();
         assertEquals(Long.valueOf(200L), doc3.getTenantId());
 
         // 3. 租户 100 查询：仅能查到租户 100 的两条数据
@@ -353,7 +353,7 @@ public class ReviewIssuesRegressionTest {
             s.setStudentName("TxSuccessStudent");
             s.setAge(21);
             s.setTeacherId(1L);
-            tx.insert(s);
+            tx.insert(s).exec();
         });
 
         Student found = orm.select(Student.class).where().eq(Student::getStudentName, "TxSuccessStudent").firstOrNull();
@@ -366,7 +366,7 @@ public class ReviewIssuesRegressionTest {
                 s.setStudentName("TxFailStudent");
                 s.setAge(22);
                 s.setTeacherId(1L);
-                tx.insert(s);
+                tx.insert(s).exec();
                 throw new RuntimeException("Simulated business error for rollback");
             });
             fail("Should throw exception");

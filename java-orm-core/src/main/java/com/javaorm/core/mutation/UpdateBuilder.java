@@ -400,16 +400,37 @@ public class UpdateBuilder<T> {
         return execute();
     }
 
+    private T boundEntity;
+    private boolean boundSelective = true;
+
+    @SuppressWarnings("unchecked")
+    public static <E> UpdateBuilder<E> forEntity(SqlEnv env, E entity, boolean selective) {
+        if (entity == null) {
+            throw new IllegalArgumentException("Entity must not be null");
+        }
+        UpdateBuilder<E> builder = new UpdateBuilder<>(env, (Class<E>) entity.getClass());
+        builder.boundEntity = entity;
+        builder.boundSelective = selective;
+        return builder;
+    }
+
     public int exec() {
         return execute();
     }
 
     public int execute() {
-        if (statement.getSetValues().isEmpty()) {
-            return 0;
-        }
         if (printSqlOverride != null) {
             env.setPrintSql(printSqlOverride);
+        }
+        if (boundEntity != null && statement.getSetValues().isEmpty()) {
+            try {
+                return updateEntity(boundEntity, env, boundSelective);
+            } finally {
+                SelectBuilder.resetAliasSeq();
+            }
+        }
+        if (statement.getSetValues().isEmpty()) {
+            return 0;
         }
         return env.executeUpdate(statement);
     }
@@ -523,14 +544,7 @@ public class UpdateBuilder<T> {
     }
 
     private <R> PropertyPath recordPath(Function<T, R> getter) {
-        RecordingContext.start(entityClass);
-        try {
-            T proxy = ProxyFactory.getProxy(entityClass);
-            getter.apply(proxy);
-            return RecordingContext.finish();
-        } finally {
-            RecordingContext.clearRecording();
-        }
+        return RecordingContext.recordPath(entityClass, getter);
     }
 
     public static class UpdateWhereBuilder<T> extends WhereBuilder<T> {

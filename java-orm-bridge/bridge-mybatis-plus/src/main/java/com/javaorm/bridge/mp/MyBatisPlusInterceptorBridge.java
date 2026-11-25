@@ -80,6 +80,15 @@ public class MyBatisPlusInterceptorBridge implements SqlInterceptor {
 
     @Override
     public SqlAndParams beforeQuery(SqlAndParams sqlAndParams, EntityMetadata metadata, Dialect dialect) {
+        return applyInterceptors(sqlAndParams);
+    }
+
+    @Override
+    public SqlAndParams beforeUpdate(SqlAndParams sqlAndParams, EntityMetadata metadata, Dialect dialect) {
+        return applyInterceptors(sqlAndParams);
+    }
+
+    private SqlAndParams applyInterceptors(SqlAndParams sqlAndParams) {
         if (sqlAndParams == null || sqlAndParams.getSql() == null || innerInterceptors.isEmpty()) {
             return sqlAndParams;
         }
@@ -93,31 +102,6 @@ public class MyBatisPlusInterceptorBridge implements SqlInterceptor {
                     currentSql = ((JsqlParserSupport) interceptor).parserSingle(currentSql, null);
                 } catch (UnsupportedOperationException ignored) {
                     // MP 拦截器未重写该 SQL 类型处理器时安全跳过
-                }
-            }
-        }
-
-        if (currentSql.equals(sqlAndParams.getSql())) {
-            return sqlAndParams;
-        }
-        return new SqlAndParams(currentSql, sqlAndParams.getParams());
-    }
-
-    @Override
-    public SqlAndParams beforeUpdate(SqlAndParams sqlAndParams, EntityMetadata metadata, Dialect dialect) {
-        if (sqlAndParams == null || sqlAndParams.getSql() == null || innerInterceptors.isEmpty()) {
-            return sqlAndParams;
-        }
-
-        String currentSql = sqlAndParams.getSql();
-        for (InnerInterceptor interceptor : innerInterceptors) {
-            if (interceptor instanceof DynamicTableNameInnerInterceptor) {
-                currentSql = processDynamicTableName((DynamicTableNameInnerInterceptor) interceptor, currentSql);
-            } else if (interceptor instanceof JsqlParserSupport) {
-                try {
-                    currentSql = ((JsqlParserSupport) interceptor).parserSingle(currentSql, null);
-                } catch (UnsupportedOperationException ignored) {
-                    // MP 拦截器（如 BlockAttackInnerInterceptor）未重写 INSERT 处理器时安全跳过
                 }
             }
         }

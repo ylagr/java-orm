@@ -152,19 +152,19 @@ public class EasyQueryFunctionsAndAggregationsTest {
         assertEquals(2, leftJoinList.size());
 
         // 2. EXISTS Subquery in WHERE
-        SelectBuilder<Blog> existsSubQuery = orm.queryable(Blog.class)
+        SelectBuilder<Blog> existsSubQuery = orm.select(Blog.class)
                 .where(w -> w.eq(blog.getTopicId(), topic.getId()));
 
-        List<Topic> existsList = orm.queryable(Topic.class)
+        List<Topic> existsList = orm.select(Topic.class)
                 .where(w -> w.andExists(existsSubQuery))
                 .toList();
         assertEquals(2, existsList.size()); // topics 1 and 2 have blogs
 
         // 3. IN Subquery in WHERE
-        SelectBuilder<Blog> topicIdSubQuery = orm.queryable(Blog.class)
+        SelectBuilder<Blog> topicIdSubQuery = orm.select(Blog.class)
                 .select(blog.getTopicId());
 
-        List<Topic> inSubQueryList = orm.queryable(Topic.class)
+        List<Topic> inSubQueryList = orm.select(Topic.class)
                 .where(w -> w.in(topic.getId(), topicIdSubQuery))
                 .toList();
         assertEquals(2, inSubQueryList.size());
@@ -190,7 +190,7 @@ public class EasyQueryFunctionsAndAggregationsTest {
         assertEquals("EasyQuery Parity", dtoList.get(0).getTitle());
 
         // 2. CTE query
-        Cte<Topic> highStarsCte = orm.queryable(Topic.class)
+        Cte<Topic> highStarsCte = orm.select(Topic.class)
                 .where(w -> w.ge(topic.getStars(), 30))
                 .asCte("cte_high_stars");
 

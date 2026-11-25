@@ -221,18 +221,6 @@ public class SqlSelectStream<T> implements Query<T> {
         return createJoin(TableJoin.JoinType.LEFT_JOIN, (Object) targetTable);
     }
 
-    public <E> SqlJoinClause<T> leftjoin(Class<E> entityClass) {
-        return leftJoin(entityClass);
-    }
-
-    public <E> SqlJoinClause<T> leftjoin(Cte<E> cte) {
-        return leftJoin(cte);
-    }
-
-    public <P> SqlJoinClause<T> leftjoin(P targetTable) {
-        return leftJoin(targetTable);
-    }
-
     public <E> SqlJoinClause<T> innerJoin(Class<E> entityClass) {
         return createJoin(TableJoin.JoinType.INNER_JOIN, env.resolveTable(entityClass));
     }
@@ -243,18 +231,6 @@ public class SqlSelectStream<T> implements Query<T> {
 
     public <P> SqlJoinClause<T> innerJoin(P targetTable) {
         return createJoin(TableJoin.JoinType.INNER_JOIN, (Object) targetTable);
-    }
-
-    public <E> SqlJoinClause<T> innerjoin(Class<E> entityClass) {
-        return innerJoin(entityClass);
-    }
-
-    public <E> SqlJoinClause<T> innerjoin(Cte<E> cte) {
-        return innerJoin(cte);
-    }
-
-    public <P> SqlJoinClause<T> innerjoin(P targetTable) {
-        return innerJoin(targetTable);
     }
 
     public <E> SqlJoinClause<T> join(Class<E> entityClass) {
@@ -281,18 +257,6 @@ public class SqlSelectStream<T> implements Query<T> {
         return createJoin(TableJoin.JoinType.RIGHT_JOIN, (Object) targetTable);
     }
 
-    public <E> SqlJoinClause<T> rightjoin(Class<E> entityClass) {
-        return rightJoin(entityClass);
-    }
-
-    public <E> SqlJoinClause<T> rightjoin(Cte<E> cte) {
-        return rightJoin(cte);
-    }
-
-    public <P> SqlJoinClause<T> rightjoin(P targetTable) {
-        return rightJoin(targetTable);
-    }
-
     public <E> SqlJoinClause<T> fullJoin(Class<E> entityClass) {
         return createJoin(TableJoin.JoinType.FULL_JOIN, env.resolveTable(entityClass));
     }
@@ -303,18 +267,6 @@ public class SqlSelectStream<T> implements Query<T> {
 
     public <P> SqlJoinClause<T> fullJoin(P targetTable) {
         return createJoin(TableJoin.JoinType.FULL_JOIN, (Object) targetTable);
-    }
-
-    public <E> SqlJoinClause<T> fulljoin(Class<E> entityClass) {
-        return fullJoin(entityClass);
-    }
-
-    public <E> SqlJoinClause<T> fulljoin(Cte<E> cte) {
-        return fullJoin(cte);
-    }
-
-    public <P> SqlJoinClause<T> fulljoin(P targetTable) {
-        return fullJoin(targetTable);
     }
 
     public <E> SqlSelectStream<T> crossJoin(Class<E> entityClass) {
@@ -335,18 +287,6 @@ public class SqlSelectStream<T> implements Query<T> {
         TableJoin join = new TableJoin(TableJoin.JoinType.CROSS_JOIN, info.getTableName(), info.getAlias());
         query.getStatement().addJoin(join);
         return this;
-    }
-
-    public <E> SqlSelectStream<T> crossjoin(Class<E> entityClass) {
-        return crossJoin(entityClass);
-    }
-
-    public <E> SqlSelectStream<T> crossjoin(Cte<E> cte) {
-        return crossJoin(cte);
-    }
-
-    public <P> SqlSelectStream<T> crossjoin(P targetTable) {
-        return crossJoin(targetTable);
     }
 
     private SqlJoinClause<T> createJoin(TableJoin.JoinType joinType, SqlTableInfo<?> targetInfo) {
@@ -375,7 +315,7 @@ public class SqlSelectStream<T> implements Query<T> {
     }
 
     /**
-     * 追加等值关联条件：.leftjoin(t).on(c1, c2).on(c3, c4)
+     * 追加等值关联条件：.leftJoin(t).on(c1, c2).on(c3, c4)
      */
     public SqlSelectStream<T> on(Object leftProp, Object rightProp) {
         if (lastJoin != null && lastJoinTargetInfo != null) {
@@ -385,7 +325,7 @@ public class SqlSelectStream<T> implements Query<T> {
     }
 
     /**
-     * 追加多条件关联配置：.leftjoin(t).on(on -> on.eq(c1, c2).eq(c3, c4))
+     * 追加多条件关联配置：.leftJoin(t).on(on -> on.eq(c1, c2).eq(c3, c4))
      */
     public SqlSelectStream<T> on(Consumer<WhereBuilder<?>> onConsumer) {
         if (lastJoin != null && lastJoinTargetInfo != null) {

@@ -79,6 +79,10 @@ public class BatchUpdateBuilder<T> {
         return this;
     }
 
+    public int exec() {
+        return execute();
+    }
+
     public int execute() {
         if (entities == null || entities.isEmpty()) {
             return 0;
@@ -95,13 +99,13 @@ public class BatchUpdateBuilder<T> {
         }
 
         // 分组处理分库分表
-        Map<PhysicalTarget, List<T>> groups = groupEntitiesBySharding(entities, metadata);
+        Map<BatchSupport.PhysicalTarget, List<T>> groups = BatchSupport.groupByPhysicalTarget(entities, metadata);
         int totalAffected = 0;
 
-        for (Map.Entry<PhysicalTarget, List<T>> entry : groups.entrySet()) {
-            PhysicalTarget target = entry.getKey();
+        for (Map.Entry<BatchSupport.PhysicalTarget, List<T>> entry : groups.entrySet()) {
+            BatchSupport.PhysicalTarget target = entry.getKey();
             List<T> targetEntities = entry.getValue();
-            DataSource ds = resolveDataSource(target.dataSourceName);
+            DataSource ds = BatchSupport.resolveDataSource(env, target.dataSourceName);
             totalAffected += executeTargetEntities(targetEntities, metadata, target.tableName, ds);
         }
 
@@ -336,79 +340,9 @@ public class BatchUpdateBuilder<T> {
         return 1;
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<PhysicalTarget, List<T>> groupEntitiesBySharding(Collection<T> entities, EntityMetadata metadata) {
-        Map<PhysicalTarget, List<T>> map = new LinkedHashMap<>();
-        if (!metadata.isSharding()) {
-            PhysicalTarget defaultTarget = new PhysicalTarget(metadata.getShardingDataSource(), metadata.getTableName());
-            map.put(defaultTarget, new ArrayList<>(entities));
-            return map;
-        }
-
-        DataSourceRouter<Object> dsRouter = (DataSourceRouter<Object>) metadata.getShardingDataSourceRouter();
-        TableRouter<Object> tableRouter = (TableRouter<Object>) metadata.getShardingRouter();
-        ColumnMetadata shardingCol = metadata.getShardingColumn();
-
-        for (T entity : entities) {
-            Object shardingVal = shardingCol != null ? shardingCol.getValue(entity) : null;
-            String dsName = metadata.getShardingDataSource();
-            if (dsRouter != null) {
-                if (shardingVal == null) {
-                    throw new IllegalArgumentException("Sharding key value cannot be null for entity: " + entity);
-                }
-                dsName = dsRouter.route(shardingVal);
-            }
-
-            String tableName = metadata.getTableName();
-            if (tableRouter != null) {
-                if (shardingVal == null) {
-                    throw new IllegalArgumentException("Sharding key value cannot be null for entity: " + entity);
-                }
-                tableName = tableRouter.route(metadata.getTableName(), shardingVal);
-            }
-
-            PhysicalTarget target = new PhysicalTarget(dsName, tableName);
-            map.computeIfAbsent(target, k -> new ArrayList<>()).add(entity);
-        }
-
-        return map;
-    }
-
-    private DataSource resolveDataSource(String dsName) {
-        OrmConfig config = env.getConfig();
-        if (config != null && config.getDataSourceManager() != null) {
-            return config.getDataSourceManager().getDataSource(dsName);
-        }
-        return env.getDataSource();
-    }
-
     private void logSql(String sql, int count) {
-        if (env.getConfig() != null && env.getConfig().isPrintSql()) {
+        if (env.shouldPrintSql()) {
             log.info("==>  Preparing Batch Update ({} entities): {}", count, sql);
-        }
-    }
-
-    private static class PhysicalTarget {
-        final String dataSourceName;
-        final String tableName;
-
-        PhysicalTarget(String dataSourceName, String tableName) {
-            this.dataSourceName = dataSourceName;
-            this.tableName = tableName;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            PhysicalTarget that = (PhysicalTarget) o;
-            return Objects.equals(dataSourceName, that.dataSourceName) &&
-                    Objects.equals(tableName, that.tableName);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(dataSourceName, tableName);
         }
     }
 }

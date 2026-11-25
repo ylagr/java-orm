@@ -20,7 +20,7 @@ public class EasyQuerySubQueryTest extends EasyQueryBaseTest {
         Topic t = orm.proxy(Topic.class);
 
         // 查询发表过 star >= 25 博客的 Topic
-        List<Topic> list = orm.queryable(Topic.class)
+        List<Topic> list = orm.select(Topic.class)
                 .where(w -> w.in(Topic::getId,
                         orm.select(b.getTopicId())
                                 .from(BlogEntity.class)
@@ -40,7 +40,7 @@ public class EasyQuerySubQueryTest extends EasyQueryBaseTest {
         Topic t = orm.proxy(Topic.class);
 
         // 查询没有关联任何博客的 Topic (总共 6 条有效 Topic，b1-b4 关联了 1, 2, 3，剩下 4, 5, 6 没有博客)
-        List<Topic> list = orm.queryable(Topic.class)
+        List<Topic> list = orm.select(Topic.class)
                 .where(w -> w.notIn(Topic::getId,
                         orm.select(b.getTopicId()).from(BlogEntity.class)))
                 .orderByAsc(t.getId())
@@ -61,7 +61,7 @@ public class EasyQuerySubQueryTest extends EasyQueryBaseTest {
 
         // 查询 stars 大于所有主题平均 stars 的主题
         // 10, 20, 30, 40, 50, 60 -> avg = 35
-        List<Topic> list = orm.queryable(Topic.class)
+        List<Topic> list = orm.select(Topic.class)
                 .where(w -> w.gt(t.getStars(), com.javaorm.core.SQL.subQuery(avgSubQuery)))
                 .orderByAsc(t.getStars())
                 .toList();
@@ -78,16 +78,16 @@ public class EasyQuerySubQueryTest extends EasyQueryBaseTest {
 
         // query1: stars <= 20 (id: 1, 2)
         // query2: stars >= 20 and stars <= 30 (id: 2, 3)
-        com.javaorm.core.query.SelectBuilder<Topic> q1 = orm.queryable(Topic.class).where(w -> w.le(t.getStars(), 20));
-        com.javaorm.core.query.SelectBuilder<Topic> q2 = orm.queryable(Topic.class).where(w -> w.between(t.getStars(), 20, 30));
+        com.javaorm.core.query.SelectBuilder<Topic> q1 = orm.select(Topic.class).where(w -> w.le(t.getStars(), 20));
+        com.javaorm.core.query.SelectBuilder<Topic> q2 = orm.select(Topic.class).where(w -> w.between(t.getStars(), 20, 30));
 
         // 1. UNION (自动去重，预期 1, 2, 3 共 3 条)
         List<Topic> unionList = q1.union(q2).toList();
         assertEquals(3, unionList.size());
 
         // 2. UNION ALL (不去重，id 2 重复，预期共 4 条)
-        com.javaorm.core.query.SelectBuilder<Topic> q3 = orm.queryable(Topic.class).where(w -> w.le(t.getStars(), 20));
-        com.javaorm.core.query.SelectBuilder<Topic> q4 = orm.queryable(Topic.class).where(w -> w.between(t.getStars(), 20, 30));
+        com.javaorm.core.query.SelectBuilder<Topic> q3 = orm.select(Topic.class).where(w -> w.le(t.getStars(), 20));
+        com.javaorm.core.query.SelectBuilder<Topic> q4 = orm.select(Topic.class).where(w -> w.between(t.getStars(), 20, 30));
         List<Topic> unionAllList = q3.unionAll(q4).toList();
         assertEquals(4, unionAllList.size());
     }

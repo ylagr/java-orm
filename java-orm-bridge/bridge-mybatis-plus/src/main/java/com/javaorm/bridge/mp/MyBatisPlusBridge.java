@@ -237,13 +237,6 @@ public class MyBatisPlusBridge implements MetadataBridge {
     }
 
     private <A extends Annotation> A getAnnotation(Field field, Method getter, Class<A> annotationClass) {
-        if (field != null) {
-            A ann = field.getAnnotation(annotationClass);
-            if (ann != null) return ann;
-        }
-        if (getter != null) {
-            return getter.getAnnotation(annotationClass);
-        }
-        return null;
+        return MetadataBridge.getAnnotation(field, getter, annotationClass);
     }
 }

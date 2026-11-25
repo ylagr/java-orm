@@ -62,19 +62,19 @@ public class AdvancedSqlFeaturesTest {
         t1.setTeacherName("张教授");
         t1.setAge(45);
         t1.setTitle("教授");
-        orm.insert(t1); // id = 1
+        orm.insert(t1).exec(); // id = 1
 
         Teacher t2 = new Teacher();
         t2.setTeacherName("李讲师");
         t2.setAge(28);
         t2.setTitle("讲师");
-        orm.insert(t2); // id = 2
+        orm.insert(t2).exec(); // id = 2
 
         Teacher t3 = new Teacher();
         t3.setTeacherName("王副教授");
         t3.setAge(38);
         t3.setTitle("副教授");
-        orm.insert(t3); // id = 3
+        orm.insert(t3).exec(); // id = 3
 
         // 学生 1: 属于 t1, age 20
         Student s1 = new Student();
@@ -83,7 +83,7 @@ public class AdvancedSqlFeaturesTest {
         s1.setTeacherId(t1.getId());
         s1.setIsDeleted(0);
         s1.setCreateTime(LocalDateTime.now());
-        orm.insert(s1);
+        orm.insert(s1).exec();
 
         // 学生 2: 属于 t1, age 22
         Student s2 = new Student();
@@ -92,7 +92,7 @@ public class AdvancedSqlFeaturesTest {
         s2.setTeacherId(t1.getId());
         s2.setIsDeleted(0);
         s2.setCreateTime(LocalDateTime.now());
-        orm.insert(s2);
+        orm.insert(s2).exec();
 
         // 学生 3: 属于 t1, age 24
         Student s3 = new Student();
@@ -101,7 +101,7 @@ public class AdvancedSqlFeaturesTest {
         s3.setTeacherId(t1.getId());
         s3.setIsDeleted(0);
         s3.setCreateTime(LocalDateTime.now());
-        orm.insert(s3);
+        orm.insert(s3).exec();
 
         // 学生 4: 属于 t2, age 18
         Student s4 = new Student();
@@ -110,7 +110,7 @@ public class AdvancedSqlFeaturesTest {
         s4.setTeacherId(t2.getId());
         s4.setIsDeleted(0);
         s4.setCreateTime(LocalDateTime.now());
-        orm.insert(s4);
+        orm.insert(s4).exec();
     }
 
     @After

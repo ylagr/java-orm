@@ -63,7 +63,7 @@ public class UserService {
         if (user.getStatus() == null) user.setStatus(1);
         if (user.getPoints() == null) user.setPoints(0);
         if (user.getBalance() == null) user.setBalance(new java.math.BigDecimal("0.00"));
-        orm.insert(user);
+        orm.insert(user).exec();
         return user.getId();
     }
 

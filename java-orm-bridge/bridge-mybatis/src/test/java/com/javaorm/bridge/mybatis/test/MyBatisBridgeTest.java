@@ -142,7 +142,7 @@ public class MyBatisBridgeTest {
             user.setAge(30);
             user.setAddress(new Address("Beijing", "Zhongguancun"));
             user.setGender(Gender.MALE);
-            int rows = mybatisOrm.insert(user);
+            int rows = mybatisOrm.insert(user).exec();
             Assert.assertEquals(1, rows);
             Assert.assertNotNull(user.getId());
 
@@ -198,7 +198,7 @@ public class MyBatisBridgeTest {
             user.setAge(28);
             user.setAddress(new Address("Shanghai", "Pudong"));
             user.setGender(Gender.FEMALE);
-            customOrm.insert(user);
+            customOrm.insert(user).exec();
 
             MyUser found = customOrm.select(MyUser.class).where().eq(MyUser::getId, user.getId()).first();
             Assert.assertNotNull(found);
@@ -206,5 +206,88 @@ public class MyBatisBridgeTest {
             Assert.assertEquals("Shanghai", found.getAddress().getCity());
             Assert.assertEquals(Gender.FEMALE, found.getGender());
         }
+    }
+
+    @org.apache.ibatis.plugin.Intercepts({
+            @org.apache.ibatis.plugin.Signature(
+                    type = org.apache.ibatis.executor.statement.StatementHandler.class,
+                    method = "prepare",
+                    args = {Connection.class, Integer.class}
+            )
+    })
+    public static class DummyMyBatisStatementInterceptor implements org.apache.ibatis.plugin.Interceptor {
+        final java.util.concurrent.atomic.AtomicBoolean invoked = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+        @Override
+        public Object intercept(org.apache.ibatis.plugin.Invocation invocation) throws Throwable {
+            invoked.set(true);
+            org.apache.ibatis.executor.statement.StatementHandler sh = (org.apache.ibatis.executor.statement.StatementHandler) invocation.getTarget();
+            org.apache.ibatis.mapping.BoundSql boundSql = sh.getBoundSql();
+            org.apache.ibatis.reflection.SystemMetaObject.forObject(boundSql).setValue("sql", "/* bridged */ " + boundSql.getSql());
+            return invocation.proceed();
+        }
+    }
+
+    @Test
+    public void testMyBatisSqlInterceptorBridgeBidirectional() throws Throwable {
+        // 1. MyBatis Interceptor -> JavaORM SqlInterceptor (自动注册并改写 SQL)
+        DummyMyBatisStatementInterceptor mybatisPlugin = new DummyMyBatisStatementInterceptor();
+        Configuration cfg = new Configuration(new Environment("bridgeTest", new JdbcTransactionFactory(), dataSource));
+        cfg.addInterceptor(mybatisPlugin);
+        SqlSessionFactory customFactory = new SqlSessionFactoryBuilder().build(cfg);
+
+        JavaOrm bridgedOrm = JavaOrmMyBatisSupport.from(customFactory);
+        List<MyUser> users = bridgedOrm.select(MyUser.class).toList();
+        Assert.assertNotNull(users);
+        Assert.assertTrue("原生 MyBatis Interceptor 应通过 MyBatisSqlInterceptorBridge 自动挂载并触发", mybatisPlugin.invoked.get());
+
+        // 2. JavaORM SqlInterceptor -> MyBatis Interceptor (双向桥接)
+        java.util.concurrent.atomic.AtomicBoolean beforeQueryCalled = new java.util.concurrent.atomic.AtomicBoolean(false);
+        java.util.concurrent.atomic.AtomicBoolean afterExecCalled = new java.util.concurrent.atomic.AtomicBoolean(false);
+        com.javaorm.core.interceptor.SqlInterceptor joInterceptor = new com.javaorm.core.interceptor.SqlInterceptor() {
+            @Override
+            public com.javaorm.core.dialect.SqlAndParams beforeQuery(com.javaorm.core.dialect.SqlAndParams sqlAndParams,
+                                                                     com.javaorm.core.metadata.EntityMetadata metadata,
+                                                                     com.javaorm.core.dialect.Dialect dialect) {
+                beforeQueryCalled.set(true);
+                return new com.javaorm.core.dialect.SqlAndParams("/* jo */ " + sqlAndParams.getSql(), sqlAndParams.getParams());
+            }
+
+            @Override
+            public void afterExecution(String sql, List<Object> params, long elapsedMillis, Throwable throwable) {
+                afterExecCalled.set(true);
+            }
+        };
+
+        com.javaorm.bridge.mybatis.MyBatisSqlInterceptorBridge reverseBridge =
+                new com.javaorm.bridge.mybatis.MyBatisSqlInterceptorBridge(joInterceptor);
+        org.apache.ibatis.mapping.BoundSql boundSql = new org.apache.ibatis.mapping.BoundSql(
+                cfg, "SELECT 1", java.util.Collections.emptyList(), null);
+        org.apache.ibatis.executor.statement.StatementHandler dummySh =
+                (org.apache.ibatis.executor.statement.StatementHandler) java.lang.reflect.Proxy.newProxyInstance(
+                        org.apache.ibatis.executor.statement.StatementHandler.class.getClassLoader(),
+                        new Class<?>[]{org.apache.ibatis.executor.statement.StatementHandler.class},
+                        (p, m, a) -> "getBoundSql".equals(m.getName()) ? boundSql : null
+                );
+        java.lang.reflect.Method prepareMethod = org.apache.ibatis.executor.statement.StatementHandler.class
+                .getMethod("prepare", Connection.class, Integer.class);
+        reverseBridge.intercept(new org.apache.ibatis.plugin.Invocation(dummySh, prepareMethod, new Object[]{null, null}));
+        Assert.assertTrue(beforeQueryCalled.get());
+        Assert.assertTrue(boundSql.getSql().startsWith("/* jo */ "));
+
+        org.apache.ibatis.mapping.MappedStatement ms = new org.apache.ibatis.mapping.MappedStatement.Builder(
+                cfg, "test.exec", p -> boundSql, org.apache.ibatis.mapping.SqlCommandType.SELECT).build();
+        org.apache.ibatis.executor.Executor dummyExec =
+                (org.apache.ibatis.executor.Executor) java.lang.reflect.Proxy.newProxyInstance(
+                        org.apache.ibatis.executor.Executor.class.getClassLoader(),
+                        new Class<?>[]{org.apache.ibatis.executor.Executor.class},
+                        (p, m, a) -> java.util.Collections.emptyList()
+                );
+        java.lang.reflect.Method queryMethod = org.apache.ibatis.executor.Executor.class.getMethod(
+                "query", org.apache.ibatis.mapping.MappedStatement.class, Object.class,
+                org.apache.ibatis.session.RowBounds.class, org.apache.ibatis.session.ResultHandler.class);
+        reverseBridge.intercept(new org.apache.ibatis.plugin.Invocation(dummyExec, queryMethod,
+                new Object[]{ms, null, org.apache.ibatis.session.RowBounds.DEFAULT, null}));
+        Assert.assertTrue(afterExecCalled.get());
     }
 }

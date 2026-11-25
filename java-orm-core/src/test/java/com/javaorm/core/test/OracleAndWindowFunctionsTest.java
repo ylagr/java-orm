@@ -69,13 +69,13 @@ public class OracleAndWindowFunctionsTest {
         t1.setTeacherName("Prof. Smith");
         t1.setAge(45);
         t1.setTitle("Professor");
-        orm.insert(t1);
+        orm.insert(t1).exec();
 
         Teacher t2 = new Teacher();
         t2.setTeacherName("Dr. Johnson");
         t2.setAge(38);
         t2.setTitle("Associate Professor");
-        orm.insert(t2);
+        orm.insert(t2).exec();
 
         // Teacher 1 组学生
         insertStudent("Alice", 20, t1.getId());
@@ -95,7 +95,7 @@ public class OracleAndWindowFunctionsTest {
         s.setTeacherId(teacherId);
         s.setIsDeleted(0);
         s.setCreateTime(LocalDateTime.now());
-        orm.insert(s);
+        orm.insert(s).exec();
     }
 
     @After

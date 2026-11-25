@@ -100,40 +100,20 @@ public class SqlJoinClause<T> implements Query<T> {
         return selectStream.leftJoin(targetTable);
     }
 
-    public SqlJoinClause<T> leftjoin(Object targetTable) {
-        return selectStream.leftjoin(targetTable);
-    }
-
     public SqlJoinClause<T> innerJoin(Object targetTable) {
         return selectStream.innerJoin(targetTable);
-    }
-
-    public SqlJoinClause<T> innerjoin(Object targetTable) {
-        return selectStream.innerjoin(targetTable);
     }
 
     public SqlJoinClause<T> rightJoin(Object targetTable) {
         return selectStream.rightJoin(targetTable);
     }
 
-    public SqlJoinClause<T> rightjoin(Object targetTable) {
-        return selectStream.rightjoin(targetTable);
-    }
-
     public SqlJoinClause<T> fullJoin(Object targetTable) {
         return selectStream.fullJoin(targetTable);
     }
 
-    public SqlJoinClause<T> fulljoin(Object targetTable) {
-        return selectStream.fulljoin(targetTable);
-    }
-
     public SqlSelectStream<T> crossJoin(Object targetTable) {
         return selectStream.crossJoin(targetTable);
-    }
-
-    public SqlSelectStream<T> crossjoin(Object targetTable) {
-        return selectStream.crossjoin(targetTable);
     }
 
     public WhereBuilder<T> where() {

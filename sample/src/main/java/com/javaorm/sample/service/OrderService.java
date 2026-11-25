@@ -79,13 +79,13 @@ public class OrderService {
         order.setCreateTime(new Date());
         order.setVersion(1);
         order.setDeleted(0);
-        orm.insert(order);
+        orm.insert(order).exec();
 
         if (items != null) {
             for (MallOrderItem item : items) {
                 item.setOrderId(order.getId());
                 item.setCreateTime(new Date());
-                orm.insert(item);
+                orm.insert(item).exec();
             }
         }
         return order.getId();

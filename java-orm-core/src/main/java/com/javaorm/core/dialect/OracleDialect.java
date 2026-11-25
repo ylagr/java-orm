@@ -370,18 +370,6 @@ public class OracleDialect extends AbstractDialect {
             sql.append(")");
         });
 
-        registerFunction(BuiltinSqlFunction.TRUNCATE, (fn, args, sql, params, d) -> {
-            if (args.isEmpty()) return;
-            sql.append("TRUNC(");
-            d.renderArg(args.get(0), sql, params);
-            if (args.size() > 1) {
-                sql.append(", ");
-                d.renderArg(args.get(1), sql, params);
-            }
-            sql.append(")");
-        });
-        registerFunction(BuiltinSqlFunction.TRUNC, getFunctionRenderer(BuiltinSqlFunction.TRUNCATE));
-
         registerFunction(BuiltinSqlFunction.CHAR_LENGTH, (fn, args, sql, params, d) -> {
             if (args.isEmpty()) return;
             sql.append("LENGTH(");

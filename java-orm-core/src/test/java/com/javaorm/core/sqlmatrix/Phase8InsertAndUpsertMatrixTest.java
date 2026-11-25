@@ -44,7 +44,7 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
                     user.setScore(new BigDecimal("91.00"));
                     user.setCreateTime(testTime);
                     user.setIsDeleted(0);
-                    return oOrm.insertable(user);
+                    return oOrm.insert(user);
                 },
                 // MySQL
                 "INSERT INTO `matrix_user` (`username`, `email`, `age`, `status`, `score`, `create_time`, `is_deleted`) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -70,7 +70,7 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
             user.setCreateTime(testTime);
             user.setIsDeleted(0);
 
-            int rows = targetOrm.insert(user);
+            int rows = targetOrm.insert(user).exec();
             Assert.assertEquals(1, rows);
             Assert.assertNotNull(user.getId());
 
@@ -163,7 +163,7 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
         user.setIsDeleted(0);
 
         assertMatrixSql(
-                oOrm -> oOrm.insertOrUpdateable(user),
+                oOrm -> oOrm.insertOrUpdate(user),
                 // MySQL
                 "INSERT INTO `matrix_user` (`id`, `username`, `email`, `age`, `status`, `score`, `create_time`, `is_deleted`) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `username` = VALUES(`username`), `email` = VALUES(`email`), `age` = VALUES(`age`), `status` = VALUES(`status`), `score` = VALUES(`score`), `is_deleted` = VALUES(`is_deleted`)",
                 // PostgreSQL
@@ -189,7 +189,7 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
             upsertUser.setCreateTime(testTime);
             upsertUser.setIsDeleted(0);
 
-            int affected = targetOrm.insertOrUpdate(upsertUser);
+            int affected = targetOrm.insertOrUpdate(upsertUser).exec();
             Assert.assertTrue(affected >= 1);
 
             MatrixUser loaded = targetOrm.select(MatrixUser.class)
@@ -234,7 +234,7 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
         List<Object> standardParams = Arrays.asList(2L, "bob_conflict_ignore", "bob_conflict@example.com", 99, 1, new BigDecimal("10.00"), testTime, 0);
 
         assertMatrixSqlWithDialectParams(
-                oOrm -> oOrm.insertOrUpdateable(user).doNothing(),
+                oOrm -> oOrm.insertOrUpdate(user).doNothing(),
                 // MySQL (MySQL 通过 id = id 模拟 do nothing)
                 "INSERT INTO `matrix_user` (`id`, `username`, `email`, `age`, `status`, `score`, `create_time`, `is_deleted`) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `id` = `id`",
                 standardParams,
@@ -264,7 +264,7 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
             ignoreUser.setCreateTime(testTime);
             ignoreUser.setIsDeleted(0);
 
-            targetOrm.insertOrUpdateable(ignoreUser).doNothing().execute();
+            targetOrm.insertOrUpdate(ignoreUser).doNothing().execute();
 
             MatrixUser loaded = targetOrm.select(MatrixUser.class)
                     .where().eq(MatrixUser::getId, 2L)
@@ -300,7 +300,7 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
         user.setIsDeleted(0);
 
         assertMatrixSql(
-                oOrm -> oOrm.insertOrUpdateable(user).updateColumns(MatrixUser::getScore),
+                oOrm -> oOrm.insertOrUpdate(user).updateColumns(MatrixUser::getScore),
                 // MySQL
                 "INSERT INTO `matrix_user` (`id`, `username`, `email`, `age`, `status`, `score`, `create_time`, `is_deleted`) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `score` = VALUES(`score`)",
                 // PostgreSQL
@@ -326,7 +326,7 @@ public class Phase8InsertAndUpsertMatrixTest extends AbstractSqlMatrixTest {
             partialUser.setCreateTime(testTime);
             partialUser.setIsDeleted(0);
 
-            targetOrm.insertOrUpdateable(partialUser).updateColumns(MatrixUser::getScore).execute();
+            targetOrm.insertOrUpdate(partialUser).updateColumns(MatrixUser::getScore).execute();
 
             MatrixUser loaded = targetOrm.select(MatrixUser.class)
                     .where().eq(MatrixUser::getId, 3L)

@@ -36,13 +36,13 @@ public class CategoryService {
         if (category.getSort() == null) {
             category.setSort(0);
         }
-        orm.insert(category);
+        orm.insert(category).exec();
         return category.getId();
     }
 
     @Transactional
     public boolean update(MallCategory category) {
-        return orm.update(category) > 0;
+        return orm.update(category).exec() > 0;
     }
 
     @Transactional
@@ -50,7 +50,7 @@ public class CategoryService {
         MallCategory category = getById(id);
         if (category != null) {
             // JavaORM 自动识别 @TableLogic，执行逻辑删除 UPDATE mall_category SET deleted = 1
-            return orm.delete(category) > 0;
+            return orm.delete(category).exec() > 0;
         }
         return false;
     }
