@@ -282,6 +282,114 @@ public class DefaultJdbcExecutor implements SqlExecutor {
         }
     }
 
+    @Override
+    public int executeBatchInsert(Connection conn, String sql, List<List<Object>> batchParams, List<?> entities,
+                                  EntityMetadata metadata, boolean returnKeys, boolean multiValues,
+                                  Dialect dialect, OrmConfig config, DataSource dataSource) {
+        long start = System.currentTimeMillis();
+        Throwable err = null;
+        try {
+            return withConnection(conn, dataSource, config, null, true, "Failed to execute batch insert statement", effectiveConn -> {
+                if (multiValues) {
+                    List<Object> flatParams = (batchParams != null && !batchParams.isEmpty()) ? batchParams.get(0) : java.util.Collections.emptyList();
+                    return executeMultiValuesBatchInsert(effectiveConn, sql, flatParams, entities, metadata, returnKeys);
+                }
+                return executeJdbcBatchInsert(effectiveConn, sql, batchParams, entities, metadata, returnKeys);
+            });
+        } catch (RuntimeException e) {
+            err = e.getCause() != null ? e.getCause() : e;
+            throw e;
+        } finally {
+            triggerAfterExecution(config, sql, null, start, err);
+            RecordingContext.clearRecording();
+            SelectBuilder.resetAliasSeq();
+        }
+    }
+
+    private int executeMultiValuesBatchInsert(Connection effectiveConn, String sql, List<Object> flatParams,
+                                              List<?> entities, EntityMetadata metadata, boolean returnKeys) throws Exception {
+        try {
+            int autoKeys = returnKeys ? Statement.RETURN_GENERATED_KEYS : Statement.NO_GENERATED_KEYS;
+            try (PreparedStatement ps = effectiveConn.prepareStatement(sql, autoKeys)) {
+                bindParams(ps, flatParams);
+                int rows = ps.executeUpdate();
+                com.javaorm.core.datasource.ReadWriteContext.recordWrite();
+                if (returnKeys && entities != null && metadata != null && metadata.getIdColumn() != null) {
+                    try (ResultSet rs = ps.getGeneratedKeys()) {
+                        List<Object> keys = new java.util.ArrayList<>();
+                        while (rs != null && rs.next()) {
+                            keys.add(rs.getObject(1));
+                        }
+                        if (keys.size() == entities.size()) {
+                            for (int i = 0; i < entities.size(); i++) {
+                                Object entity = entities.get(i);
+                                if (metadata.getIdColumn().getValue(entity) == null) {
+                                    metadata.getIdColumn().setValue(entity, keys.get(i));
+                                }
+                            }
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                return rows;
+            }
+        } catch (Exception ex) {
+            if (returnKeys) {
+                try (PreparedStatement ps = effectiveConn.prepareStatement(sql)) {
+                    bindParams(ps, flatParams);
+                    int rows = ps.executeUpdate();
+                    com.javaorm.core.datasource.ReadWriteContext.recordWrite();
+                    return rows;
+                }
+            }
+            throw ex;
+        }
+    }
+
+    private int executeJdbcBatchInsert(Connection effectiveConn, String sql, List<List<Object>> batchParams,
+                                       List<?> entities, EntityMetadata metadata, boolean returnKeys) throws Exception {
+        boolean useGeneratedKeys = returnKeys;
+        PreparedStatement ps;
+        if (useGeneratedKeys) {
+            try {
+                ps = effectiveConn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            } catch (Exception ex) {
+                useGeneratedKeys = false;
+                ps = effectiveConn.prepareStatement(sql);
+            }
+        } else {
+            ps = effectiveConn.prepareStatement(sql);
+        }
+        try (PreparedStatement statement = ps) {
+            if (batchParams != null) {
+                for (List<Object> params : batchParams) {
+                    bindParams(statement, params);
+                    statement.addBatch();
+                }
+            }
+            int[] results = statement.executeBatch();
+            com.javaorm.core.datasource.ReadWriteContext.recordWrite();
+            int sum = 0;
+            for (int r : results) {
+                if (r >= 0) sum += r;
+                else if (r == Statement.SUCCESS_NO_INFO) sum += 1;
+            }
+            if (useGeneratedKeys && entities != null && metadata != null && metadata.getIdColumn() != null) {
+                try (ResultSet rs = statement.getGeneratedKeys()) {
+                    int idx = 0;
+                    while (rs != null && rs.next() && idx < entities.size()) {
+                        Object entity = entities.get(idx++);
+                        if (metadata.getIdColumn().getValue(entity) == null) {
+                            metadata.getIdColumn().setValue(entity, rs.getObject(1));
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            return sum;
+        }
+    }
+
     private static void bindParams(PreparedStatement ps, List<Object> params) throws Exception {
         if (params != null) {
             for (int i = 0; i < params.size(); i++) {

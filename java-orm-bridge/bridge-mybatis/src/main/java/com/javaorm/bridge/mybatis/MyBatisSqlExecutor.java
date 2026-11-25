@@ -140,4 +140,11 @@ public class MyBatisSqlExecutor implements SqlExecutor {
                                      Dialect dialect, OrmConfig config, DataSource dataSource) {
         return withConnection(conn, c -> delegate.executeBatchUpdate(c, sql, batchParams, dialect, config, dataSource));
     }
+
+    @Override
+    public int executeBatchInsert(Connection conn, String sql, List<List<Object>> batchParams, List<?> entities,
+                                  EntityMetadata metadata, boolean returnKeys, boolean multiValues,
+                                  Dialect dialect, OrmConfig config, DataSource dataSource) {
+        return withConnection(conn, c -> delegate.executeBatchInsert(c, sql, batchParams, entities, metadata, returnKeys, multiValues, dialect, config, dataSource));
+    }
 }

@@ -281,59 +281,10 @@ public class BatchInsertBuilder<T> {
 
         String finalSql = sql.toString();
         BatchSupport.logSql(log, env, "Batch Insert", finalSql, params);
-
-        Connection conn = null;
-        PreparedStatement ps = null;
-        try {
-            conn = ConnectionUtils.getConnection(ds, config);
-            boolean returnKeys = metadata.getIdColumn() != null && metadata.getIdColumn().isGenerated();
-            try {
-                if (returnKeys) {
-                    ps = conn.prepareStatement(finalSql, java.sql.Statement.RETURN_GENERATED_KEYS);
-                } else {
-                    ps = conn.prepareStatement(finalSql);
-                }
-                for (int i = 0; i < params.size(); i++) {
-                    ps.setObject(i + 1, params.get(i));
-                }
-                int rows = ps.executeUpdate();
-                if (returnKeys) {
-                    try (java.sql.ResultSet rs = ps.getGeneratedKeys()) {
-                        List<Object> keys = new ArrayList<>();
-                        while (rs != null && rs.next()) {
-                            keys.add(rs.getObject(1));
-                        }
-                        if (keys.size() == chunk.size()) {
-                            for (int i = 0; i < chunk.size(); i++) {
-                                T entity = chunk.get(i);
-                                if (metadata.getIdColumn().getValue(entity) == null) {
-                                    metadata.getIdColumn().setValue(entity, keys.get(i));
-                                }
-                            }
-                        }
-                    } catch (Exception ignored) {
-                    }
-                }
-                return rows;
-            } catch (Exception ex) {
-                if (returnKeys) {
-                    if (ps != null) {
-                        try { ps.close(); } catch (Exception ignored) {}
-                    }
-                    ps = conn.prepareStatement(finalSql);
-                    for (int i = 0; i < params.size(); i++) {
-                        ps.setObject(i + 1, params.get(i));
-                    }
-                    return ps.executeUpdate();
-                }
-                throw ex;
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute batch multi-values insert into " + tableName, e);
-        } finally {
-            if (ps != null) try { ps.close(); } catch (Exception ignored) {}
-            ConnectionUtils.closeConnection(conn);
-        }
+        boolean returnKeys = metadata.getIdColumn() != null && metadata.getIdColumn().isGenerated();
+        return env.getSqlExecutor().executeBatchInsert(
+                null, finalSql, Collections.singletonList(params), chunk, metadata, returnKeys, true, dialect, config, ds
+        );
     }
 
     private int executeWithJdbcBatch(List<T> chunk, EntityMetadata metadata, String tableName,
@@ -367,58 +318,19 @@ public class BatchInsertBuilder<T> {
         String finalSql = sql.toString();
         BatchSupport.logSql(log, env, "Batch Insert", finalSql, Collections.singletonList("batch size: " + chunk.size()));
 
-        Connection conn = null;
-        PreparedStatement ps = null;
-        try {
-            conn = ConnectionUtils.getConnection(ds, config);
-            boolean returnKeys = metadata.getIdColumn() != null && metadata.getIdColumn().isGenerated();
-            if (returnKeys) {
-                try {
-                    ps = conn.prepareStatement(finalSql, java.sql.Statement.RETURN_GENERATED_KEYS);
-                } catch (Exception ex) {
-                    returnKeys = false;
-                    ps = conn.prepareStatement(finalSql);
-                }
-            } else {
-                ps = conn.prepareStatement(finalSql);
+        List<List<Object>> batchParams = new ArrayList<>(chunk.size());
+        for (T entity : chunk) {
+            List<Object> rowParams = new ArrayList<>(insertCols.size());
+            for (ColumnMetadata col : insertCols) {
+                rowParams.add(col.getValue(entity));
             }
-
-            for (T entity : chunk) {
-                if (!insertCols.isEmpty()) {
-                    for (int colIdx = 0; colIdx < insertCols.size(); colIdx++) {
-                        ColumnMetadata col = insertCols.get(colIdx);
-                        Object val = col.getValue(entity);
-                        ps.setObject(colIdx + 1, val);
-                    }
-                }
-                ps.addBatch();
-            }
-            int[] results = ps.executeBatch();
-            int sum = 0;
-            for (int r : results) {
-                if (r >= 0) sum += r;
-                else if (r == PreparedStatement.SUCCESS_NO_INFO) sum += 1;
-            }
-
-            if (returnKeys) {
-                try (java.sql.ResultSet rs = ps.getGeneratedKeys()) {
-                    int idx = 0;
-                    while (rs != null && rs.next() && idx < chunk.size()) {
-                        T entity = chunk.get(idx++);
-                        if (metadata.getIdColumn().getValue(entity) == null) {
-                            metadata.getIdColumn().setValue(entity, rs.getObject(1));
-                        }
-                    }
-                } catch (Exception ignored) {}
-            }
-
-            return sum;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute JDBC batch insert into " + tableName, e);
-        } finally {
-            if (ps != null) try { ps.close(); } catch (Exception ignored) {}
-            ConnectionUtils.closeConnection(conn);
+            batchParams.add(rowParams);
         }
+
+        boolean returnKeys = metadata.getIdColumn() != null && metadata.getIdColumn().isGenerated();
+        return env.getSqlExecutor().executeBatchInsert(
+                null, finalSql, batchParams, chunk, metadata, returnKeys, false, dialect, config, ds
+        );
     }
 
     private void prepareEntityDefaults(T entity, EntityMetadata metadata, OrmConfig config) {

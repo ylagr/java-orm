@@ -80,4 +80,23 @@ public interface SqlExecutor {
                               boolean returnKeys, Object entity, Dialect dialect, OrmConfig config, DataSource dataSource) {
         return executeInsert(conn, statement, metadata, returnKeys, entity, dialect, config, dataSource);
     }
+
+    /**
+     * 执行批量插入（支持多值 INSERT 与 JDBC Batch，以及自增主键批量回填）
+     */
+    default int executeBatchInsert(Connection conn, String sql, List<List<Object>> batchParams, List<?> entities,
+                                   EntityMetadata metadata, boolean returnKeys, boolean multiValues,
+                                   Dialect dialect, OrmConfig config, DataSource dataSource) {
+        if (multiValues) {
+            List<Object> flatParams = (batchParams != null && !batchParams.isEmpty()) ? batchParams.get(0) : java.util.Collections.emptyList();
+            return executeUpdate(conn, new SqlAndParams(sql, flatParams), "INSERT", dialect, config, dataSource);
+        }
+        int[] results = executeBatchUpdate(conn, sql, batchParams, dialect, config, dataSource);
+        int sum = 0;
+        for (int r : results) {
+            if (r >= 0) sum += r;
+            else if (r == java.sql.PreparedStatement.SUCCESS_NO_INFO) sum += 1;
+        }
+        return sum;
+    }
 }

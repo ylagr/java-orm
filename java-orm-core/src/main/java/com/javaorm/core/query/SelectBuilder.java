@@ -349,28 +349,13 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public ColumnExpression stringToColumnExpression(String str) {
-        if (str == null) return null;
-        str = str.trim();
-        String alias = null;
-        String colPart = str;
-        String[] parts = str.split(" (?i)as ");
-        if (parts.length == 2) {
-            colPart = parts[0].trim();
-            alias = parts[1].trim();
-        } else {
-            int spaceIdx = str.lastIndexOf(' ');
-            if (spaceIdx > 0 && !str.contains("(")) {
-                colPart = str.substring(0, spaceIdx).trim();
-                alias = str.substring(spaceIdx + 1).trim();
-            }
-        }
+        ColumnExpression<?> parsed = com.javaorm.core.SQL.col(str);
+        if (parsed == null) return null;
+        String alias = parsed.getAlias();
+        String tableAlias = parsed.getTableAlias();
+        String colName = parsed.getColumnName();
 
-        String tableAlias;
-        String colName;
-        if (colPart.contains(".")) {
-            int dot = colPart.lastIndexOf('.');
-            tableAlias = colPart.substring(0, dot);
-            colName = colPart.substring(dot + 1);
+        if (tableAlias != null) {
             boolean isRoot = tableAlias.equalsIgnoreCase(statement.getRootTableAlias())
                     || (rootEntityClass != null && tableAlias.equalsIgnoreCase(rootEntityClass.getSimpleName()))
                     || (rootMetadata != null && tableAlias.equalsIgnoreCase(rootMetadata.getTableName()))
@@ -388,7 +373,6 @@ public class SelectBuilder<T> implements Query<T> {
             }
         } else {
             tableAlias = statement.getRootTableAlias();
-            colName = colPart;
         }
         if (rootMetadata != null) {
             ColumnMetadata cm = rootMetadata.getColumnByProperty(colName);
