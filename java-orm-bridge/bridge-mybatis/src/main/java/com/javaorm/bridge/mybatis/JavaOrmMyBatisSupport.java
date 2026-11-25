@@ -143,13 +143,7 @@ public class JavaOrmMyBatisSupport {
                 for (java.lang.reflect.Type t : map.keySet()) {
                     if (t instanceof Class<?>) {
                         Class<?> clazz = (Class<?>) t;
-                        if (!isJdkBasicType(clazz)) {
-                            org.apache.ibatis.type.TypeHandler<?> handler = registry.getTypeHandler(clazz);
-                            if (handler != null && !(handler instanceof org.apache.ibatis.type.UnknownTypeHandler)) {
-                                config.addAutoConverter(new MyBatisAutoTypeHandlerConverter<>(handler, clazz));
-                                processedTypes.add(clazz);
-                            }
-                        }
+                        registerIfCustomTypeHandler(config, registry.getTypeHandler(clazz), clazz, processedTypes);
                     }
                 }
             }
@@ -159,20 +153,34 @@ public class JavaOrmMyBatisSupport {
         // 2. 备用兜底：遍历 getTypeHandlers()，根据 TypeReference 获取绑定的泛型 rawType
         try {
             java.util.Collection<org.apache.ibatis.type.TypeHandler<?>> handlers = registry.getTypeHandlers();
-            if (handlers != null) {
-                for (org.apache.ibatis.type.TypeHandler<?> handler : handlers) {
-                    if (handler instanceof org.apache.ibatis.type.TypeReference<?>) {
-                        java.lang.reflect.Type raw = ((org.apache.ibatis.type.TypeReference<?>) handler).getRawType();
-                        if (raw instanceof Class<?>) {
-                            Class<?> clazz = (Class<?>) raw;
-                            if (!isJdkBasicType(clazz) && processedTypes.add(clazz)) {
-                                config.addAutoConverter(new MyBatisAutoTypeHandlerConverter<>(handler, clazz));
-                            }
-                        }
-                    }
+            if (handlers == null) {
+                return;
+            }
+            for (org.apache.ibatis.type.TypeHandler<?> handler : handlers) {
+                if (!(handler instanceof org.apache.ibatis.type.TypeReference<?>)) {
+                    continue;
+                }
+                java.lang.reflect.Type raw = ((org.apache.ibatis.type.TypeReference<?>) handler).getRawType();
+                if (raw instanceof Class<?>) {
+                    registerIfCustomTypeHandler(config, handler, (Class<?>) raw, processedTypes);
                 }
             }
         } catch (Throwable ignored) {
+        }
+    }
+
+    private static void registerIfCustomTypeHandler(OrmConfig config,
+                                                    org.apache.ibatis.type.TypeHandler<?> handler,
+                                                    Class<?> clazz,
+                                                    java.util.Set<Class<?>> processedTypes) {
+        if (clazz == null || isJdkBasicType(clazz)) {
+            return;
+        }
+        if (handler == null || handler instanceof org.apache.ibatis.type.UnknownTypeHandler) {
+            return;
+        }
+        if (processedTypes.add(clazz)) {
+            config.addAutoConverter(new MyBatisAutoTypeHandlerConverter<>(handler, clazz));
         }
     }
 

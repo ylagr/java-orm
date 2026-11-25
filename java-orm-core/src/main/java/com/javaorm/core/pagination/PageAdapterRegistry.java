@@ -106,27 +106,30 @@ public class PageAdapterRegistry {
         private void invokeSetter(Object target, Object value, String... methodNames) {
             for (String name : methodNames) {
                 for (Method m : target.getClass().getMethods()) {
-                    if (m.getName().equals(name) && m.getParameterCount() == 1) {
-                        try {
-                            Class<?> paramType = m.getParameterTypes()[0];
-                            if (value instanceof Number) {
-                                Number num = (Number) value;
-                                if (paramType == long.class || paramType == Long.class) {
-                                    m.invoke(target, num.longValue());
-                                } else if (paramType == int.class || paramType == Integer.class) {
-                                    m.invoke(target, num.intValue());
-                                } else {
-                                    m.invoke(target, value);
-                                }
-                            } else {
-                                m.invoke(target, value);
-                            }
-                            return;
-                        } catch (Exception ignored) {
-                        }
+                    if (!m.getName().equals(name) || m.getParameterCount() != 1) {
+                        continue;
+                    }
+                    try {
+                        m.invoke(target, adaptSetterArgument(value, m.getParameterTypes()[0]));
+                        return;
+                    } catch (Exception ignored) {
                     }
                 }
             }
+        }
+
+        private Object adaptSetterArgument(Object value, Class<?> paramType) {
+            if (!(value instanceof Number)) {
+                return value;
+            }
+            Number num = (Number) value;
+            if (paramType == long.class || paramType == Long.class) {
+                return num.longValue();
+            }
+            if (paramType == int.class || paramType == Integer.class) {
+                return num.intValue();
+            }
+            return value;
         }
     }
 }

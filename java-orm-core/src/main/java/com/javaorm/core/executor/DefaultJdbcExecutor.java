@@ -314,22 +314,8 @@ public class DefaultJdbcExecutor implements SqlExecutor {
                 bindParams(ps, flatParams);
                 int rows = ps.executeUpdate();
                 com.javaorm.core.datasource.ReadWriteContext.recordWrite();
-                if (returnKeys && entities != null && metadata != null && metadata.getIdColumn() != null) {
-                    try (ResultSet rs = ps.getGeneratedKeys()) {
-                        List<Object> keys = new java.util.ArrayList<>();
-                        while (rs != null && rs.next()) {
-                            keys.add(rs.getObject(1));
-                        }
-                        if (keys.size() == entities.size()) {
-                            for (int i = 0; i < entities.size(); i++) {
-                                Object entity = entities.get(i);
-                                if (metadata.getIdColumn().getValue(entity) == null) {
-                                    metadata.getIdColumn().setValue(entity, keys.get(i));
-                                }
-                            }
-                        }
-                    } catch (Exception ignored) {
-                    }
+                if (returnKeys) {
+                    bindGeneratedKeys(ps, entities, metadata, false);
                 }
                 return rows;
             }
@@ -374,19 +360,36 @@ public class DefaultJdbcExecutor implements SqlExecutor {
                 if (r >= 0) sum += r;
                 else if (r == Statement.SUCCESS_NO_INFO) sum += 1;
             }
-            if (useGeneratedKeys && entities != null && metadata != null && metadata.getIdColumn() != null) {
-                try (ResultSet rs = statement.getGeneratedKeys()) {
-                    int idx = 0;
-                    while (rs != null && rs.next() && idx < entities.size()) {
-                        Object entity = entities.get(idx++);
-                        if (metadata.getIdColumn().getValue(entity) == null) {
-                            metadata.getIdColumn().setValue(entity, rs.getObject(1));
-                        }
-                    }
-                } catch (Exception ignored) {
-                }
+            if (useGeneratedKeys) {
+                bindGeneratedKeys(statement, entities, metadata, true);
             }
             return sum;
+        }
+    }
+
+    private static void bindGeneratedKeys(PreparedStatement ps, List<?> entities, EntityMetadata metadata, boolean allowPartial) {
+        if (entities == null || entities.isEmpty() || metadata == null || metadata.getIdColumn() == null) {
+            return;
+        }
+        try (ResultSet rs = ps.getGeneratedKeys()) {
+            if (rs == null) {
+                return;
+            }
+            List<Object> keys = new java.util.ArrayList<>(entities.size());
+            while (rs.next()) {
+                keys.add(rs.getObject(1));
+            }
+            if (!allowPartial && keys.size() != entities.size()) {
+                return;
+            }
+            int count = Math.min(keys.size(), entities.size());
+            for (int i = 0; i < count; i++) {
+                Object entity = entities.get(i);
+                if (metadata.getIdColumn().getValue(entity) == null) {
+                    metadata.getIdColumn().setValue(entity, keys.get(i));
+                }
+            }
+        } catch (Exception ignored) {
         }
     }
 

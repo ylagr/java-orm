@@ -174,7 +174,7 @@ public class AutoIncludeProcessor {
                                                       Class<?> dtoClass,
                                                       OrmConfig config,
                                                       Set<String> extraRequiredColumns) {
-        if (statement == null) {
+        if (statement == null || rootMetadata == null) {
             return;
         }
         String rootAlias = statement.getRootTableAlias();
@@ -185,47 +185,9 @@ public class AutoIncludeProcessor {
         // 1. 按照 DTO 字段声明顺序遍历属性，确保生成的投影 SQL 列顺序与 DTO 保持完全一致
         for (DtoMetadata.DtoProperty prop : dtoMeta.getAllProperties()) {
             if (prop.isRelation()) {
-                RelationMetadata relation = prop.getRelation();
-                if (relation != null) {
-                    RelationType relType = relation.getRelationType();
-                    if (relType == RelationType.MANY_TO_ONE || relType == RelationType.ONE_TO_ONE) {
-                        if (rootMetadata != null) {
-                            ColumnMetadata selfCol = rootMetadata.getColumnByProperty(relation.getSelfProperty());
-                            if (selfCol != null) {
-                                targetColumns.add(selfCol.getColumnName());
-                            } else if (config != null && config.getNameConversion() != null) {
-                                targetColumns.add(config.getNameConversion().convert(relation.getSelfProperty()));
-                            }
-                        }
-                    } else if (relType == RelationType.ONE_TO_MANY) {
-                        if (rootMetadata != null) {
-                            ColumnMetadata selfCol = rootMetadata.getColumnByProperty(relation.getSelfProperty());
-                            if (selfCol != null) {
-                                targetColumns.add(selfCol.getColumnName());
-                            } else {
-                                ColumnMetadata idCol = rootMetadata.getIdColumn();
-                                if (idCol != null) {
-                                    targetColumns.add(idCol.getColumnName());
-                                }
-                            }
-                        }
-                    }
-                }
+                collectRelationProjectionColumn(prop.getRelation(), rootMetadata, config, targetColumns);
             } else {
-                String propName = prop.getPropertyName();
-                if (rootMetadata != null) {
-                    ColumnMetadata col = rootMetadata.getColumnByProperty(propName);
-                    if (col == null) {
-                        col = rootMetadata.getColumnByDbName(propName);
-                    }
-                    if (col == null && config != null && config.getNameConversion() != null) {
-                        String dbCol = config.getNameConversion().convert(propName);
-                        col = rootMetadata.getColumnByDbName(dbCol);
-                    }
-                    if (col != null) {
-                        targetColumns.add(col.getColumnName());
-                    }
-                }
+                collectScalarProjectionColumn(prop.getPropertyName(), rootMetadata, config, targetColumns);
             }
         }
 
@@ -243,6 +205,41 @@ public class AutoIncludeProcessor {
         statement.getProjectExpressions().clear();
         for (String colName : targetColumns) {
             statement.addProjectExpression(new ColumnExpression(rootAlias, colName));
+        }
+    }
+
+    private static void collectRelationProjectionColumn(RelationMetadata relation,
+                                                        EntityMetadata rootMetadata,
+                                                        OrmConfig config,
+                                                        Set<String> targetColumns) {
+        if (relation == null) {
+            return;
+        }
+        String selfProp = relation.getSelfProperty();
+        if (selfProp == null || selfProp.isEmpty()) {
+            return;
+        }
+        ColumnMetadata selfCol = rootMetadata.getColumnByProperty(selfProp);
+        if (selfCol != null) {
+            targetColumns.add(selfCol.getColumnName());
+            return;
+        }
+        String colName = config != null && config.getNameConversion() != null
+                ? config.getNameConversion().convert(selfProp)
+                : toUnderscore(selfProp);
+        targetColumns.add(colName);
+    }
+
+    private static void collectScalarProjectionColumn(String propName,
+                                                      EntityMetadata rootMetadata,
+                                                      OrmConfig config,
+                                                      Set<String> targetColumns) {
+        if (propName == null || propName.isEmpty()) {
+            return;
+        }
+        ColumnMetadata col = rootMetadata.getColumnByProperty(propName);
+        if (col != null) {
+            targetColumns.add(col.getColumnName());
         }
     }
 

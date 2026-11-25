@@ -311,6 +311,9 @@ public class JavaOrm {
      * 开启实体插入构建器（需调用 .exec() 或 .execute() 执行）
      */
     public <T> InsertBuilder<T> insert(T entity) {
+        if (entity == null) {
+            throw new IllegalArgumentException("Entity must not be null");
+        }
         return env().createInsert(entity);
     }
 
@@ -325,6 +328,9 @@ public class JavaOrm {
      * 开启实体级 UPSERT 构建器（需调用 .exec() 或 .execute() 执行）
      */
     public <T> com.javaorm.core.mutation.UpsertBuilder<T> insertOrUpdate(T entity) {
+        if (entity == null) {
+            throw new IllegalArgumentException("Entity must not be null");
+        }
         return env().createUpsert(entity);
     }
 
