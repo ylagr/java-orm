@@ -11,7 +11,7 @@ import java.util.List;
  */
 public abstract class AbstractConditionalStatement implements Statement {
 
-    protected final Class<?> entityClass;
+    protected Class<?> entityClass;
     protected String tableName;
     protected final List<Condition> systemConditions = new ArrayList<>();
     protected final List<Condition> whereConditions = new ArrayList<>();

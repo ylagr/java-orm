@@ -3,15 +3,11 @@ package com.javaorm.core.ast;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SelectStatement implements Statement {
-    private Class<?> rootEntityClass;
-    private String rootTableName;
+public class SelectStatement extends AbstractConditionalStatement {
     private String rootTableAlias = "t0";
     private final List<String> selectColumns = new ArrayList<>();
     private final List<SqlExpression<?>> projectExpressions = new ArrayList<>();
     private final List<TableJoin> joins = new ArrayList<>();
-    private final List<Condition> systemConditions = new ArrayList<>();
-    private final List<Condition> whereConditions = new ArrayList<>();
     private final List<SqlExpression<?>> groupByExpressions = new ArrayList<>();
     private final List<Condition> havingConditions = new ArrayList<>();
     private final List<OrderBy> orderBys = new ArrayList<>();
@@ -23,15 +19,10 @@ public class SelectStatement implements Statement {
     private LockMode lockMode = LockMode.NONE;
     private boolean tracking = false;
     private com.javaorm.core.datasource.RouteRole routeRole = com.javaorm.core.datasource.RouteRole.AUTO;
-    private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
-    private com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter;
-    private String targetDataSource;
-    private Boolean allowFullShardingScan;
     private com.javaorm.core.config.OrmConfig config;
 
     public SelectStatement(Class<?> rootEntityClass, String rootTableName, String rootTableAlias) {
-        this.rootEntityClass = rootEntityClass;
-        this.rootTableName = rootTableName;
+        super(rootEntityClass, rootTableName);
         this.rootTableAlias = rootTableAlias;
     }
 
@@ -55,14 +46,6 @@ public class SelectStatement implements Statement {
         joins.add(join);
     }
 
-    public void addSystemCondition(Condition condition) {
-        systemConditions.add(condition);
-    }
-
-    public void addWhereCondition(Condition condition) {
-        whereConditions.add(condition);
-    }
-
     public void addGroupByExpression(SqlExpression<?> expr) {
         groupByExpressions.add(expr);
     }
@@ -83,30 +66,20 @@ public class SelectStatement implements Statement {
         if (cte != null) ctes.add(cte);
     }
 
-    @Override
-    public Class<?> getEntityClass() {
-        return rootEntityClass;
-    }
-
     public Class<?> getRootEntityClass() {
-        return rootEntityClass;
+        return entityClass;
     }
 
     public void setRootEntityClass(Class<?> rootEntityClass) {
-        this.rootEntityClass = rootEntityClass;
-    }
-
-    @Override
-    public String getTableName() {
-        return rootTableName;
+        this.entityClass = rootEntityClass;
     }
 
     public String getRootTableName() {
-        return rootTableName;
+        return tableName;
     }
 
     public void setRootTableName(String rootTableName) {
-        this.rootTableName = rootTableName;
+        this.tableName = rootTableName;
     }
 
     public String getRootTableAlias() {
@@ -127,14 +100,6 @@ public class SelectStatement implements Statement {
 
     public List<TableJoin> getJoins() {
         return joins;
-    }
-
-    public List<Condition> getSystemConditions() {
-        return systemConditions;
-    }
-
-    public List<Condition> getWhereConditions() {
-        return whereConditions;
     }
 
     public List<SqlExpression<?>> getGroupByExpressions() {
@@ -188,45 +153,11 @@ public class SelectStatement implements Statement {
         this.distinct = distinct;
     }
 
-    public com.javaorm.core.sharding.TableRouter<?> getShardingRouter() {
-        return shardingRouter;
-    }
-
-    public void setShardingRouter(com.javaorm.core.sharding.TableRouter<?> shardingRouter) {
-        this.shardingRouter = shardingRouter;
-    }
-
-    public Boolean getAllowFullShardingScan() {
-        return allowFullShardingScan;
-    }
-
-    public void setAllowFullShardingScan(Boolean allowFullShardingScan) {
-        this.allowFullShardingScan = allowFullShardingScan;
-    }
-
-    public String getTargetDataSource() {
-        return targetDataSource;
-    }
-
-    public void setTargetDataSource(String targetDataSource) {
-        this.targetDataSource = targetDataSource;
-    }
-
-    public com.javaorm.core.sharding.DataSourceRouter<?> getDataSourceRouter() {
-        return dataSourceRouter;
-    }
-
-    public void setDataSourceRouter(com.javaorm.core.sharding.DataSourceRouter<?> dataSourceRouter) {
-        this.dataSourceRouter = dataSourceRouter;
-    }
-
     public SelectStatement copyWithTableName(String newTableName) {
-        SelectStatement copy = new SelectStatement(this.rootEntityClass, newTableName, this.rootTableAlias);
+        SelectStatement copy = new SelectStatement(this.entityClass, newTableName, this.rootTableAlias);
         copy.selectColumns.addAll(this.selectColumns);
         copy.projectExpressions.addAll(this.projectExpressions);
         copy.joins.addAll(this.joins);
-        copy.systemConditions.addAll(this.systemConditions);
-        copy.whereConditions.addAll(this.whereConditions);
         copy.groupByExpressions.addAll(this.groupByExpressions);
         copy.havingConditions.addAll(this.havingConditions);
         copy.orderBys.addAll(this.orderBys);
@@ -238,11 +169,8 @@ public class SelectStatement implements Statement {
         copy.lockMode = this.lockMode;
         copy.tracking = this.tracking;
         copy.routeRole = this.routeRole;
-        copy.shardingRouter = this.shardingRouter;
-        copy.dataSourceRouter = this.dataSourceRouter;
-        copy.targetDataSource = this.targetDataSource;
-        copy.allowFullShardingScan = this.allowFullShardingScan;
         copy.config = this.config;
+        copyConditionalBaseTo(copy);
         return copy;
     }
 
