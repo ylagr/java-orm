@@ -419,11 +419,14 @@ public class UpdateBuilder<T> {
     }
 
     public int execute() {
-        if (printSqlOverride != null) {
-            env.setPrintSql(printSqlOverride);
-        }
+        com.javaorm.core.executor.ExecutionContext ctx = printSqlOverride != null
+                ? env.getExecutionContext().withPrintSql(printSqlOverride)
+                : env.getExecutionContext();
         if (boundEntity != null && statement.getSetValues().isEmpty()) {
             try {
+                if (printSqlOverride != null) {
+                    env.setPrintSql(printSqlOverride);
+                }
                 return updateEntity(boundEntity, env, boundSelective);
             } finally {
                 SelectBuilder.resetAliasSeq();
@@ -432,7 +435,7 @@ public class UpdateBuilder<T> {
         if (statement.getSetValues().isEmpty()) {
             return 0;
         }
-        return env.executeUpdate(statement);
+        return ctx.executeUpdate(statement);
     }
 
     public static <E> int updateEntity(E entity, DataSource dataSource, Dialect dialect, OrmConfig config, boolean selective) {
@@ -546,7 +549,7 @@ public class UpdateBuilder<T> {
         if (plan == null || plan.statement.getSetValues().isEmpty()) {
             return 0;
         }
-        int affected = env.executeUpdate(plan.statement);
+        int affected = env.getExecutionContext().executeUpdate(plan.statement);
         if (plan.versionCol != null) {
             if (affected == 0) {
                 throw new com.javaorm.core.exception.OptimisticLockException(plan.entityClass, plan.idVal, plan.currentVersion);

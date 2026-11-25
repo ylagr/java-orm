@@ -99,4 +99,55 @@ public interface SqlExecutor {
         }
         return sum;
     }
+
+    // ========== ExecutionContext 重载（组合全局配置与当前语句级覆盖） ==========
+
+    default <R> List<R> executeQuery(Connection conn, SelectStatement statement, EntityMetadata metadata,
+                                     List<IncludeSpec> includes, ExecutionContext ctx) {
+        return executeQuery(conn, statement, metadata, includes, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource());
+    }
+
+    default <DTO> List<DTO> executeDtoQuery(Connection conn, SelectStatement statement, Class<DTO> dtoClass, ExecutionContext ctx) {
+        return executeDtoQuery(conn, statement, dtoClass, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource());
+    }
+
+    default List<Map<String, Object>> executeMaps(Connection conn, SelectStatement statement, ExecutionContext ctx) {
+        return executeMaps(conn, statement, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource());
+    }
+
+    default <V> V executeScalar(Connection conn, SelectStatement statement, Class<V> targetType, ExecutionContext ctx) {
+        return executeScalar(conn, statement, targetType, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource());
+    }
+
+    default <V> List<V> executeScalarList(Connection conn, SelectStatement statement, Class<V> targetType, ExecutionContext ctx) {
+        return executeScalarList(conn, statement, targetType, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource());
+    }
+
+    default long executeCount(Connection conn, SelectStatement statement, ExecutionContext ctx) {
+        return executeCount(conn, statement, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource());
+    }
+
+    default int executeUpdate(Connection conn, SqlAndParams sqlAndParams, String prefix, ExecutionContext ctx) {
+        return executeUpdate(conn, sqlAndParams, prefix, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource());
+    }
+
+    default int executeInsert(Connection conn, InsertStatement statement, EntityMetadata metadata,
+                              boolean returnKeys, Object entity, ExecutionContext ctx) {
+        return executeInsert(conn, statement, metadata, returnKeys, entity, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource());
+    }
+
+    default int[] executeBatchUpdate(Connection conn, String sql, List<List<Object>> batchParams, ExecutionContext ctx) {
+        return executeBatchUpdate(conn, sql, batchParams, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource());
+    }
+
+    default int executeUpsert(Connection conn, com.javaorm.core.ast.UpsertStatement statement, EntityMetadata metadata,
+                              boolean returnKeys, Object entity, ExecutionContext ctx) {
+        return executeUpsert(conn, statement, metadata, returnKeys, entity, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource());
+    }
+
+    default int executeBatchInsert(Connection conn, String sql, List<List<Object>> batchParams, List<?> entities,
+                                   EntityMetadata metadata, boolean returnKeys, boolean multiValues, ExecutionContext ctx) {
+        return executeBatchInsert(conn, sql, batchParams, entities, metadata, returnKeys, multiValues,
+                ctx.getDialect(), ctx.getConfig(), ctx.getDataSource());
+    }
 }

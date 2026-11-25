@@ -255,7 +255,7 @@ public class AutoIncludeProcessor {
                                                     DataSource dataSource,
                                                     SqlEnv env) throws Exception {
         // 1. 执行主查询，获取行映射数据
-        List<Map<String, Object>> rows = env.executeSelectMaps(conn, statement);
+        List<Map<String, Object>> rows = env.getExecutionContext().executeSelectMaps(conn, statement);
         if (rows == null || rows.isEmpty()) {
             return Collections.emptyList();
         }

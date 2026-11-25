@@ -285,7 +285,7 @@ public class BatchUpdateBuilder<T> {
             batchParams.add(rowParams);
         }
 
-        int[] results = env.getSqlExecutor().executeBatchUpdate(null, finalSql, batchParams, dialect, config, ds);
+        int[] results = env.getExecutionContext().getSqlExecutor().executeBatchUpdate(null, finalSql, batchParams, dialect, config, ds);
         int total = 0;
         for (int row = 0; row < results.length; row++) {
             int r = results[row];

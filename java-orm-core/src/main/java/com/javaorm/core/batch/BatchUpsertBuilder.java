@@ -295,7 +295,7 @@ public class BatchUpsertBuilder<T> {
             batchParams.add(rowParams);
         }
 
-        int[] results = env.getSqlExecutor().executeBatchUpdate(null, sql, batchParams, dialect, config, ds);
+        int[] results = env.getExecutionContext().getSqlExecutor().executeBatchUpdate(null, sql, batchParams, dialect, config, ds);
         int total = 0;
         for (int r : results) {
             if (r >= 0) total += r;

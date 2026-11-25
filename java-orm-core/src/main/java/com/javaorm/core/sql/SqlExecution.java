@@ -255,12 +255,12 @@ public class SqlExecution<T> implements Query<T> {
                     return (List<R>) q.toList();
                 }
                 if (ColumnMetadata.isScalarType(resultClass)) {
-                    return (List<R>) env.executeSelectScalarList(null, q.getStatement(), resultClass);
+                    return (List<R>) env.getExecutionContext().executeSelectScalarList(null, q.getStatement(), resultClass);
                 }
                 if (Map.class.isAssignableFrom(resultClass)) {
-                    return (List<R>) env.executeSelectMaps(null, q.getStatement());
+                    return (List<R>) env.getExecutionContext().executeSelectMaps(null, q.getStatement());
                 }
-                return (List<R>) env.executeSelectDtoList(null, q.getStatement(), resultClass);
+                return (List<R>) env.getExecutionContext().executeSelectDtoList(null, q.getStatement(), resultClass);
             }
             return (List<R>) q.toList();
         }
@@ -281,12 +281,12 @@ public class SqlExecution<T> implements Query<T> {
         if (operation instanceof SelectBuilder<?>) {
             SelectBuilder<?> q = (SelectBuilder<?>) operation;
             if (ColumnMetadata.isScalarType(targetClass)) {
-                return env.executeSelectScalarList(null, q.getStatement(), targetClass);
+                return env.getExecutionContext().executeSelectScalarList(null, q.getStatement(), targetClass);
             }
             if (Map.class.isAssignableFrom(targetClass)) {
-                return (List<R>) env.executeSelectMaps(null, q.getStatement());
+                return (List<R>) env.getExecutionContext().executeSelectMaps(null, q.getStatement());
             }
-            return env.executeSelectDtoList(null, q.getStatement(), targetClass);
+            return env.getExecutionContext().executeSelectDtoList(null, q.getStatement(), targetClass);
         }
         throw new IllegalStateException("Cannot call toList(Class) on an UPDATE or DELETE operation. Please call .exec() instead.");
     }
@@ -339,10 +339,10 @@ public class SqlExecution<T> implements Query<T> {
                     return (R) q.firstOrNull();
                 }
                 if (ColumnMetadata.isScalarType(resultClass)) {
-                    return (R) env.executeSelectScalar(null, q.getStatement(), resultClass);
+                    return (R) env.getExecutionContext().executeSelectScalar(null, q.getStatement(), resultClass);
                 }
                 if (Map.class.isAssignableFrom(resultClass)) {
-                    List<Map<String, Object>> maps = env.executeSelectMaps(null, q.getStatement());
+                    List<Map<String, Object>> maps = env.getExecutionContext().executeSelectMaps(null, q.getStatement());
                     return (maps != null && !maps.isEmpty()) ? (R) maps.get(0) : null;
                 }
                 List<R> list = toList((Class<R>) resultClass);
@@ -367,10 +367,10 @@ public class SqlExecution<T> implements Query<T> {
         if (operation instanceof SelectBuilder<?>) {
             SelectBuilder<?> q = (SelectBuilder<?>) operation;
             if (ColumnMetadata.isScalarType(targetClass)) {
-                return env.executeSelectScalar(null, q.getStatement(), targetClass);
+                return env.getExecutionContext().executeSelectScalar(null, q.getStatement(), targetClass);
             }
             if (Map.class.isAssignableFrom(targetClass)) {
-                List<Map<String, Object>> maps = env.executeSelectMaps(null, q.getStatement());
+                List<Map<String, Object>> maps = env.getExecutionContext().executeSelectMaps(null, q.getStatement());
                 return (maps != null && !maps.isEmpty()) ? (R) maps.get(0) : null;
             }
             List<R> list = toList(targetClass);

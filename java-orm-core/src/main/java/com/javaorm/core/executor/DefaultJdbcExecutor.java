@@ -55,8 +55,19 @@ public class DefaultJdbcExecutor implements SqlExecutor {
     @Override
     public <R> List<R> executeQuery(Connection conn, SelectStatement statement, EntityMetadata metadata,
                                     List<IncludeSpec> includes, Dialect dialect, OrmConfig config, DataSource dataSource) {
+        return executeQuery(conn, statement, metadata, includes, dialect, config, dataSource, config != null && config.isPrintSql());
+    }
+
+    @Override
+    public <R> List<R> executeQuery(Connection conn, SelectStatement statement, EntityMetadata metadata,
+                                    List<IncludeSpec> includes, ExecutionContext ctx) {
+        return executeQuery(conn, statement, metadata, includes, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource(), ctx.isPrintSql());
+    }
+
+    private <R> List<R> executeQuery(Connection conn, SelectStatement statement, EntityMetadata metadata,
+                                     List<IncludeSpec> includes, Dialect dialect, OrmConfig config, DataSource dataSource, boolean printSql) {
         return withConnection(conn, dataSource, config, statement, false, "Failed to execute query list", effectiveConn -> {
-            List<R> result = EntityHydrator.queryList(effectiveConn, statement, metadata, dialect, config);
+            List<R> result = EntityHydrator.queryList(effectiveConn, statement, metadata, dialect, config, printSql);
             if (includes != null && !includes.isEmpty() && result != null && !result.isEmpty()) {
                 IncludeProcessor.processIncludes(effectiveConn, result, metadata, includes, dialect, config, dataSource);
             }
@@ -67,30 +78,70 @@ public class DefaultJdbcExecutor implements SqlExecutor {
     @Override
     public <DTO> List<DTO> executeDtoQuery(Connection conn, SelectStatement statement, Class<DTO> dtoClass,
                                            Dialect dialect, OrmConfig config, DataSource dataSource) {
+        return executeDtoQuery(conn, statement, dtoClass, dialect, config, dataSource, config != null && config.isPrintSql());
+    }
+
+    @Override
+    public <DTO> List<DTO> executeDtoQuery(Connection conn, SelectStatement statement, Class<DTO> dtoClass, ExecutionContext ctx) {
+        return executeDtoQuery(conn, statement, dtoClass, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource(), ctx.isPrintSql());
+    }
+
+    private <DTO> List<DTO> executeDtoQuery(Connection conn, SelectStatement statement, Class<DTO> dtoClass,
+                                            Dialect dialect, OrmConfig config, DataSource dataSource, boolean printSql) {
         String errMsg = "Failed to query list for " + (dtoClass != null ? dtoClass.getName() : "DTO");
         return withConnection(conn, dataSource, config, statement, false, errMsg,
-                effectiveConn -> EntityHydrator.queryDtoList(effectiveConn, statement, dtoClass, dialect, config));
+                effectiveConn -> EntityHydrator.queryDtoList(effectiveConn, statement, dtoClass, dialect, config, printSql));
     }
 
     @Override
     public List<Map<String, Object>> executeMaps(Connection conn, SelectStatement statement,
                                                  Dialect dialect, OrmConfig config, DataSource dataSource) {
+        return executeMaps(conn, statement, dialect, config, dataSource, config != null && config.isPrintSql());
+    }
+
+    @Override
+    public List<Map<String, Object>> executeMaps(Connection conn, SelectStatement statement, ExecutionContext ctx) {
+        return executeMaps(conn, statement, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource(), ctx.isPrintSql());
+    }
+
+    private List<Map<String, Object>> executeMaps(Connection conn, SelectStatement statement,
+                                                  Dialect dialect, OrmConfig config, DataSource dataSource, boolean printSql) {
         return withConnection(conn, dataSource, config, statement, false, "Failed to execute listMaps query",
-                effectiveConn -> EntityHydrator.queryMaps(effectiveConn, statement, dialect, config));
+                effectiveConn -> EntityHydrator.queryMaps(effectiveConn, statement, dialect, config, printSql));
     }
 
     @Override
     public <V> V executeScalar(Connection conn, SelectStatement statement, Class<V> targetType,
                                Dialect dialect, OrmConfig config, DataSource dataSource) {
+        return executeScalar(conn, statement, targetType, dialect, config, dataSource, config != null && config.isPrintSql());
+    }
+
+    @Override
+    public <V> V executeScalar(Connection conn, SelectStatement statement, Class<V> targetType, ExecutionContext ctx) {
+        return executeScalar(conn, statement, targetType, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource(), ctx.isPrintSql());
+    }
+
+    private <V> V executeScalar(Connection conn, SelectStatement statement, Class<V> targetType,
+                                Dialect dialect, OrmConfig config, DataSource dataSource, boolean printSql) {
         return withConnection(conn, dataSource, config, statement, false, "Failed to fetch one scalar",
-                effectiveConn -> EntityHydrator.queryScalar(effectiveConn, statement, targetType, dialect, config));
+                effectiveConn -> EntityHydrator.queryScalar(effectiveConn, statement, targetType, dialect, config, printSql));
     }
 
     @Override
     public <V> List<V> executeScalarList(Connection conn, SelectStatement statement, Class<V> targetType,
                                          Dialect dialect, OrmConfig config, DataSource dataSource) {
+        return executeScalarList(conn, statement, targetType, dialect, config, dataSource, config != null && config.isPrintSql());
+    }
+
+    @Override
+    public <V> List<V> executeScalarList(Connection conn, SelectStatement statement, Class<V> targetType, ExecutionContext ctx) {
+        return executeScalarList(conn, statement, targetType, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource(), ctx.isPrintSql());
+    }
+
+    private <V> List<V> executeScalarList(Connection conn, SelectStatement statement, Class<V> targetType,
+                                          Dialect dialect, OrmConfig config, DataSource dataSource, boolean printSql) {
         return withConnection(conn, dataSource, config, statement, false, "Failed to fetch scalar list",
-                effectiveConn -> EntityHydrator.queryScalarList(effectiveConn, statement, targetType, dialect, config));
+                effectiveConn -> EntityHydrator.queryScalarList(effectiveConn, statement, targetType, dialect, config, printSql));
     }
 
     @Override
@@ -126,6 +177,15 @@ public class DefaultJdbcExecutor implements SqlExecutor {
 
     @Override
     public long executeCount(Connection conn, SelectStatement statement, Dialect dialect, OrmConfig config, DataSource dataSource) {
+        return executeCount(conn, statement, dialect, config, dataSource, config != null && config.isPrintSql());
+    }
+
+    @Override
+    public long executeCount(Connection conn, SelectStatement statement, ExecutionContext ctx) {
+        return executeCount(conn, statement, ctx.getDialect(), ctx.getConfig(), ctx.getDataSource(), ctx.isPrintSql());
+    }
+
+    private long executeCount(Connection conn, SelectStatement statement, Dialect dialect, OrmConfig config, DataSource dataSource, boolean printSql) {
         boolean isComplex = statement.isDistinct()
                 || !statement.getGroupByExpressions().isEmpty()
                 || !statement.getHavingConditions().isEmpty()
@@ -147,7 +207,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
                 for (com.javaorm.core.ast.Condition cond : statement.getWhereConditions()) {
                     countStmt.addWhereCondition(cond);
                 }
-                return EntityHydrator.queryCount(effectiveConn, countStmt, dialect, config);
+                return EntityHydrator.queryCount(effectiveConn, countStmt, dialect, config, printSql);
             }
 
             SelectStatement innerStmt = new SelectStatement(statement.getRootEntityClass(), statement.getRootTableName(), statement.getRootTableAlias());
@@ -199,7 +259,7 @@ public class DefaultJdbcExecutor implements SqlExecutor {
                 String countSql = "SELECT COUNT(1) FROM (" + innerSql.getSql() + ") count_sub";
                 countSqlAndParams = new SqlAndParams(countSql, innerSql.getParams());
             }
-            return EntityHydrator.queryCount(effectiveConn, countSqlAndParams, config, !innerStmt.getCtes().isEmpty(), dialect);
+            return EntityHydrator.queryCount(effectiveConn, countSqlAndParams, config, !innerStmt.getCtes().isEmpty(), dialect, printSql);
         });
     }
 

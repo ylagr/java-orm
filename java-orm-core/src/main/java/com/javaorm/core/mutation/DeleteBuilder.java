@@ -301,26 +301,26 @@ public class DeleteBuilder<T> {
 
     public int execute() {
         try {
-            if (printSqlOverride != null) {
-                env.setPrintSql(printSqlOverride);
-            }
+            com.javaorm.core.executor.ExecutionContext ctx = printSqlOverride != null
+                    ? env.getExecutionContext().withPrintSql(printSqlOverride)
+                    : env.getExecutionContext();
             // 如果存在逻辑删除，自动重写为 UPDATE t SET is_deleted = 1 WHERE ...
             if (metadata != null && metadata.hasLogicDelete() && !logicDeleteDisabled) {
-                return env.executeLogicDelete(metadata, entityClass, statement.getWhereConditions(), statement.getShardingRouter(), statement.getAllowFullShardingScan());
+                return ctx.executeLogicDelete(metadata, entityClass, statement.getWhereConditions(), statement.getShardingRouter(), statement.getAllowFullShardingScan());
             }
 
             // 物理删除
             if (metadata != null && metadata.hasTenant()) {
                 ColumnMetadata tc = metadata.getTenantColumn();
-                Object tenantId = env.getConfig() != null ? env.getConfig().getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
+                Object tenantId = ctx.getConfig().getCurrentTenantId() != null ? ctx.getConfig().getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
                 if (tenantId != null) {
                     statement.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
-                } else if (env.getConfig() != null && env.getConfig().isTenantStrict()) {
+                } else if (ctx.getConfig().isTenantStrict()) {
                     throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
                 }
             }
 
-            return env.executeDelete(statement);
+            return ctx.executeDelete(statement);
         } finally {
             SelectBuilder.resetAliasSeq();
         }

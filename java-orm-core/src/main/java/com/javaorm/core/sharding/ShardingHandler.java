@@ -516,37 +516,36 @@ public class ShardingHandler {
     }
 
     public static <R> List<R> executeSelectList(Connection conn, SelectStatement statement, EntityMetadata metadata,
-                                                List<IncludeSpec> includes, Dialect dialect, OrmConfig config,
-                                                DataSource defaultDs, SqlExecutor executor) {
-        return executeSelectListSharded(statement, metadata, config, defaultDs,
-                (stmt, ds) -> executor.executeQuery(conn, stmt, metadata, includes, dialect, config, ds));
+                                                List<IncludeSpec> includes, com.javaorm.core.executor.ExecutionContext ctx) {
+        return executeSelectListSharded(statement, metadata, ctx.getConfig(), ctx.getDataSource(),
+                (stmt, ds) -> ctx.getSqlExecutor().executeQuery(conn, stmt, metadata, includes, ctx.withDataSource(ds)));
     }
 
     public static <DTO> List<DTO> executeSelectDtoList(Connection conn, SelectStatement statement, Class<DTO> dtoClass,
-                                                       EntityMetadata metadata, Dialect dialect, OrmConfig config,
-                                                       DataSource defaultDs, SqlExecutor executor) {
-        return executeSelectListSharded(statement, metadata, config, defaultDs,
-                (stmt, ds) -> executor.executeDtoQuery(conn, stmt, dtoClass, dialect, config, ds));
+                                                       EntityMetadata metadata, com.javaorm.core.executor.ExecutionContext ctx) {
+        return executeSelectListSharded(statement, metadata, ctx.getConfig(), ctx.getDataSource(),
+                (stmt, ds) -> ctx.getSqlExecutor().executeDtoQuery(conn, stmt, dtoClass, ctx.withDataSource(ds)));
     }
 
     public static List<Map<String, Object>> executeSelectMaps(Connection conn, SelectStatement statement,
-                                                              EntityMetadata metadata, Dialect dialect, OrmConfig config,
-                                                              DataSource defaultDs, SqlExecutor executor) {
-        return executeSelectListSharded(statement, metadata, config, defaultDs,
-                (stmt, ds) -> executor.executeMaps(conn, stmt, dialect, config, ds));
+                                                              EntityMetadata metadata, com.javaorm.core.executor.ExecutionContext ctx) {
+        return executeSelectListSharded(statement, metadata, ctx.getConfig(), ctx.getDataSource(),
+                (stmt, ds) -> ctx.getSqlExecutor().executeMaps(conn, stmt, ctx.withDataSource(ds)));
     }
 
     @SuppressWarnings("unchecked")
     public static <V> V executeSelectScalar(Connection conn, SelectStatement statement, Class<V> targetType,
-                                            EntityMetadata metadata, Dialect dialect, OrmConfig config,
-                                            DataSource defaultDs, SqlExecutor executor) {
+                                            EntityMetadata metadata, com.javaorm.core.executor.ExecutionContext ctx) {
         List<String> dataSources = determineTargetDataSources(statement, metadata);
         List<String> tables = determineTargetTables(statement, metadata);
+        OrmConfig config = ctx.getConfig();
+        DataSource defaultDs = ctx.getDataSource();
+        SqlExecutor executor = ctx.getSqlExecutor();
 
         if (dataSources.size() == 1 && tables.size() == 1) {
             statement.setRootTableName(tables.get(0));
             DataSource ds = resolveDataSource(dataSources.get(0), config, defaultDs);
-            return executor.executeScalar(conn, statement, targetType, dialect, config, ds);
+            return executor.executeScalar(conn, statement, targetType, ctx.withDataSource(ds));
         }
 
         long sum = 0;
@@ -554,9 +553,10 @@ public class ShardingHandler {
         V firstVal = null;
         for (String dsName : dataSources) {
             DataSource ds = resolveDataSource(dsName, config, defaultDs);
+            com.javaorm.core.executor.ExecutionContext dsCtx = ctx.withDataSource(ds);
             for (String table : tables) {
                 SelectStatement copy = statement.copyWithTableName(table);
-                V val = executor.executeScalar(conn, copy, targetType, dialect, config, ds);
+                V val = executor.executeScalar(conn, copy, targetType, dsCtx);
                 if (val != null) {
                     hasValue = true;
                     if (firstVal == null) firstVal = val;
@@ -576,29 +576,32 @@ public class ShardingHandler {
     }
 
     public static <V> List<V> executeSelectScalarList(Connection conn, SelectStatement statement, Class<V> targetType,
-                                                      EntityMetadata metadata, Dialect dialect, OrmConfig config,
-                                                      DataSource defaultDs, SqlExecutor executor) {
-        return executeSelectListSharded(statement, metadata, config, defaultDs,
-                (stmt, ds) -> executor.executeScalarList(conn, stmt, targetType, dialect, config, ds));
+                                                      EntityMetadata metadata, com.javaorm.core.executor.ExecutionContext ctx) {
+        return executeSelectListSharded(statement, metadata, ctx.getConfig(), ctx.getDataSource(),
+                (stmt, ds) -> ctx.getSqlExecutor().executeScalarList(conn, stmt, targetType, ctx.withDataSource(ds)));
     }
 
     public static long executeSelectCount(Connection conn, SelectStatement statement, EntityMetadata metadata,
-                                          Dialect dialect, OrmConfig config, DataSource defaultDs, SqlExecutor executor) {
+                                          com.javaorm.core.executor.ExecutionContext ctx) {
         List<String> dataSources = determineTargetDataSources(statement, metadata);
         List<String> tables = determineTargetTables(statement, metadata);
+        OrmConfig config = ctx.getConfig();
+        DataSource defaultDs = ctx.getDataSource();
+        SqlExecutor executor = ctx.getSqlExecutor();
 
         if (dataSources.size() == 1 && tables.size() == 1) {
             statement.setRootTableName(tables.get(0));
             DataSource ds = resolveDataSource(dataSources.get(0), config, defaultDs);
-            return executor.executeCount(conn, statement, dialect, config, ds);
+            return executor.executeCount(conn, statement, ctx.withDataSource(ds));
         }
 
         long total = 0;
         for (String dsName : dataSources) {
             DataSource ds = resolveDataSource(dsName, config, defaultDs);
+            com.javaorm.core.executor.ExecutionContext dsCtx = ctx.withDataSource(ds);
             for (String table : tables) {
                 SelectStatement copy = statement.copyWithTableName(table);
-                total += executor.executeCount(conn, copy, dialect, config, ds);
+                total += executor.executeCount(conn, copy, dsCtx);
             }
         }
         return total;
@@ -629,49 +632,47 @@ public class ShardingHandler {
     public static int executeUpdate(Connection conn, UpdateStatement statement, EntityMetadata metadata,
                                     TableRouter<?> routerOverride, DataSourceRouter<?> dsRouterOverride,
                                     String dsOverride, Boolean allowFullScanOverride,
-                                    Dialect dialect, OrmConfig config, DataSource defaultDs, SqlExecutor executor) {
+                                    com.javaorm.core.executor.ExecutionContext ctx) {
         List<String> dataSources = determineTargetDataSources(statement, metadata, dsRouterOverride, dsOverride, allowFullScanOverride);
         List<String> tables = determineTargetTables(statement, metadata, routerOverride, allowFullScanOverride);
-        return executeMutationSharded(dataSources, tables, config, defaultDs, (table, ds, isSingle) -> {
+        return executeMutationSharded(dataSources, tables, ctx.getConfig(), ctx.getDataSource(), (table, ds, isSingle) -> {
             UpdateStatement targetStmt = isSingle ? statement : statement.copyWithTableName(table);
             if (isSingle) targetStmt.setTableName(table);
-            SqlAndParams sqlAndParams = dialect.buildUpdate(targetStmt);
-            return executor.executeUpdate(conn, sqlAndParams, "UPDATE", dialect, config, ds);
+            SqlAndParams sqlAndParams = ctx.getDialect().buildUpdate(targetStmt);
+            return ctx.getSqlExecutor().executeUpdate(conn, sqlAndParams, "UPDATE", ctx.withDataSource(ds));
         });
     }
 
     public static int executeDelete(Connection conn, DeleteStatement statement, EntityMetadata metadata,
                                     TableRouter<?> routerOverride, DataSourceRouter<?> dsRouterOverride,
                                     String dsOverride, Boolean allowFullScanOverride,
-                                    Dialect dialect, OrmConfig config, DataSource defaultDs, SqlExecutor executor) {
+                                    com.javaorm.core.executor.ExecutionContext ctx) {
         List<String> dataSources = determineTargetDataSources(statement, metadata, dsRouterOverride, dsOverride, allowFullScanOverride);
         List<String> tables = determineTargetTables(statement, metadata, routerOverride, allowFullScanOverride);
-        return executeMutationSharded(dataSources, tables, config, defaultDs, (table, ds, isSingle) -> {
+        return executeMutationSharded(dataSources, tables, ctx.getConfig(), ctx.getDataSource(), (table, ds, isSingle) -> {
             DeleteStatement targetStmt = isSingle ? statement : statement.copyWithTableName(table);
             if (isSingle) targetStmt.setTableName(table);
-            SqlAndParams sqlAndParams = dialect.buildDelete(targetStmt);
-            return executor.executeUpdate(conn, sqlAndParams, "DELETE", dialect, config, ds);
+            SqlAndParams sqlAndParams = ctx.getDialect().buildDelete(targetStmt);
+            return ctx.getSqlExecutor().executeUpdate(conn, sqlAndParams, "DELETE", ctx.withDataSource(ds));
         });
     }
 
     public static int executeInsert(Connection conn, InsertStatement statement, EntityMetadata metadata,
                                     boolean returnKeys, Object entity,
                                     TableRouter<?> routerOverride, DataSourceRouter<?> dsRouterOverride,
-                                    String dsOverride, Dialect dialect, OrmConfig config,
-                                    DataSource defaultDs, SqlExecutor executor) {
+                                    String dsOverride, com.javaorm.core.executor.ExecutionContext ctx) {
         DataSource targetDs = routeSingleEntityStatement(statement, metadata, entity,
-                routerOverride, dsRouterOverride, dsOverride, config, defaultDs);
-        return executor.executeInsert(conn, statement, metadata, returnKeys, entity, dialect, config, targetDs);
+                routerOverride, dsRouterOverride, dsOverride, ctx.getConfig(), ctx.getDataSource());
+        return ctx.getSqlExecutor().executeInsert(conn, statement, metadata, returnKeys, entity, ctx.withDataSource(targetDs));
     }
 
     public static int executeUpsert(Connection conn, UpsertStatement statement, EntityMetadata metadata,
                                     boolean returnKeys, Object entity,
                                     TableRouter<?> routerOverride, DataSourceRouter<?> dsRouterOverride,
-                                    String dsOverride, Dialect dialect, OrmConfig config,
-                                    DataSource defaultDs, SqlExecutor executor) {
+                                    String dsOverride, com.javaorm.core.executor.ExecutionContext ctx) {
         DataSource targetDs = routeSingleEntityStatement(statement, metadata, entity,
-                routerOverride, dsRouterOverride, dsOverride, config, defaultDs);
-        return executor.executeUpsert(conn, statement, metadata, returnKeys, entity, dialect, config, targetDs);
+                routerOverride, dsRouterOverride, dsOverride, ctx.getConfig(), ctx.getDataSource());
+        return ctx.getSqlExecutor().executeUpsert(conn, statement, metadata, returnKeys, entity, ctx.withDataSource(targetDs));
     }
 
     @SuppressWarnings("unchecked")

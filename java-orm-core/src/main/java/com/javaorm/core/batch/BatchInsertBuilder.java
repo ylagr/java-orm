@@ -282,7 +282,7 @@ public class BatchInsertBuilder<T> {
         String finalSql = sql.toString();
         BatchSupport.logSql(log, env, "Batch Insert", finalSql, params);
         boolean returnKeys = metadata.getIdColumn() != null && metadata.getIdColumn().isGenerated();
-        return env.getSqlExecutor().executeBatchInsert(
+        return env.getExecutionContext().getSqlExecutor().executeBatchInsert(
                 null, finalSql, Collections.singletonList(params), chunk, metadata, returnKeys, true, dialect, config, ds
         );
     }
@@ -328,7 +328,7 @@ public class BatchInsertBuilder<T> {
         }
 
         boolean returnKeys = metadata.getIdColumn() != null && metadata.getIdColumn().isGenerated();
-        return env.getSqlExecutor().executeBatchInsert(
+        return env.getExecutionContext().getSqlExecutor().executeBatchInsert(
                 null, finalSql, batchParams, chunk, metadata, returnKeys, false, dialect, config, ds
         );
     }

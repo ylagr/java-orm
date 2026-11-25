@@ -81,15 +81,6 @@ public class SqlEnv {
         return this;
     }
 
-    private final com.javaorm.core.executor.SqlExecutor defaultSqlExecutor = new com.javaorm.core.executor.DefaultJdbcExecutor();
-
-    public com.javaorm.core.executor.SqlExecutor getSqlExecutor() {
-        if (config != null && config.getSqlExecutor() != null) {
-            return config.getSqlExecutor();
-        }
-        return defaultSqlExecutor;
-    }
-
     public Boolean getPrintSqlOverride() {
         return printSqlOverride;
     }
@@ -98,11 +89,8 @@ public class SqlEnv {
         return printSqlOverride != null ? printSqlOverride : (config != null && config.isPrintSql());
     }
 
-    public OrmConfig getEffectiveConfig() {
-        if (printSqlOverride == null) {
-            return config;
-        }
-        return config != null ? config.withPrintSql(printSqlOverride) : new OrmConfig().setPrintSql(printSqlOverride);
+    public com.javaorm.core.executor.ExecutionContext getExecutionContext() {
+        return new com.javaorm.core.executor.ExecutionContext(dataSource, dialect, config, printSqlOverride);
     }
 
     public String nextAlias() {
@@ -588,171 +576,6 @@ public class SqlEnv {
             return new SqlExecution<>(this, ub, null);
         }
         return toExecution();
-    }
-
-    // ========== 6. 执行引擎方法（底层调度与生命周期管理） ==========
-
-    public void logSql(SqlAndParams sqlAndParams, String prefix) {
-        if (shouldPrintSql() && sqlAndParams != null) {
-            String p = (prefix != null && !prefix.isEmpty()) ? "[" + prefix + "] " : "";
-            log.info("==> {}Preparing:  {}", p, sqlAndParams.getSql());
-            log.info("==> {}Parameters: {}", p, sqlAndParams.getParams());
-        }
-    }
-
-    public int executeSqlAndParams(SqlAndParams sqlAndParams, String prefix) {
-        logSql(sqlAndParams, prefix);
-        return getSqlExecutor().executeUpdate(null, sqlAndParams, prefix, dialect, getEffectiveConfig(), dataSource);
-    }
-
-    public int[] executeBatchUpdate(String sql, List<List<Object>> batchParams) {
-        return getSqlExecutor().executeBatchUpdate(null, sql, batchParams, dialect, getEffectiveConfig(), dataSource);
-    }
-
-    public int executeUpdate(UpdateStatement statement) {
-        return executeUpdate(statement, null, null);
-    }
-
-    public int executeUpdate(UpdateStatement statement, com.javaorm.core.sharding.TableRouter<?> routerOverride, Boolean allowFullScanOverride) {
-        if (statement.getSetValues().isEmpty()) {
-            return 0;
-        }
-        Class<?> entityClass = statement.getEntityClass();
-        EntityMetadata metadata = entityClass != null ? (config != null ? config.getMetadata(entityClass) : EntityMetadataManager.get(entityClass, config)) : null;
-        com.javaorm.core.sharding.TableRouter<?> effRouter = routerOverride != null ? routerOverride : statement.getShardingRouter();
-        com.javaorm.core.sharding.DataSourceRouter<?> effDsRouter = statement.getDataSourceRouter();
-        String effDsOverride = statement.getTargetDataSource();
-        Boolean effAllowFullScan = allowFullScanOverride != null ? allowFullScanOverride : statement.getAllowFullShardingScan();
-
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter, effDsRouter, effDsOverride)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeUpdate(null, statement, metadata, effRouter, effDsRouter, effDsOverride, effAllowFullScan, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
-        }
-        SqlAndParams sqlAndParams = dialect.buildUpdate(statement);
-        logSql(sqlAndParams, "UPDATE");
-        return getSqlExecutor().executeUpdate(null, sqlAndParams, "UPDATE", dialect, getEffectiveConfig(), dataSource);
-    }
-
-    public int executeDelete(DeleteStatement statement) {
-        return executeDelete(statement, null, null);
-    }
-
-    public int executeDelete(DeleteStatement statement, com.javaorm.core.sharding.TableRouter<?> routerOverride, Boolean allowFullScanOverride) {
-        Class<?> entityClass = statement.getEntityClass();
-        EntityMetadata metadata = entityClass != null ? (config != null ? config.getMetadata(entityClass) : EntityMetadataManager.get(entityClass, config)) : null;
-        com.javaorm.core.sharding.TableRouter<?> effRouter = routerOverride != null ? routerOverride : statement.getShardingRouter();
-        com.javaorm.core.sharding.DataSourceRouter<?> effDsRouter = statement.getDataSourceRouter();
-        String effDsOverride = statement.getTargetDataSource();
-        Boolean effAllowFullScan = allowFullScanOverride != null ? allowFullScanOverride : statement.getAllowFullShardingScan();
-
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter, effDsRouter, effDsOverride)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeDelete(null, statement, metadata, effRouter, effDsRouter, effDsOverride, effAllowFullScan, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
-        }
-        SqlAndParams sqlAndParams = dialect.buildDelete(statement);
-        logSql(sqlAndParams, "DELETE");
-        return getSqlExecutor().executeUpdate(null, sqlAndParams, "DELETE", dialect, getEffectiveConfig(), dataSource);
-    }
-
-    public int executeLogicDelete(EntityMetadata metadata, Class<?> entityClass, List<Condition> whereConditions) {
-        return executeLogicDelete(metadata, entityClass, whereConditions, null, null);
-    }
-
-    public int executeLogicDelete(EntityMetadata metadata, Class<?> entityClass, List<Condition> whereConditions,
-                                  com.javaorm.core.sharding.TableRouter<?> routerOverride, Boolean allowFullScanOverride) {
-        ColumnMetadata ld = metadata.getLogicDeleteColumn();
-        UpdateStatement updateStmt = new UpdateStatement(entityClass, metadata.getTableName());
-        updateStmt.addSet(ld.getColumnName(), ld.getLogicDeleteDeletedValue());
-
-        for (Condition c : whereConditions) {
-            updateStmt.addWhereCondition(c);
-        }
-        updateStmt.addSystemCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
-        if (metadata.hasTenant()) {
-            ColumnMetadata tc = metadata.getTenantColumn();
-            Object tenantId = config != null ? config.getCurrentTenantId() : com.javaorm.core.tenant.TenantContext.getTenantId();
-            if (tenantId != null) {
-                updateStmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
-            } else if (config != null && config.isTenantStrict()) {
-                throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
-            }
-        }
-
-        return executeUpdate(updateStmt, routerOverride, allowFullScanOverride);
-    }
-
-    public int executeInsert(Connection conn, com.javaorm.core.ast.InsertStatement statement, EntityMetadata metadata,
-                             boolean returnKeys, Object entity, com.javaorm.core.sharding.TableRouter<?> routerOverride) {
-        com.javaorm.core.sharding.TableRouter<?> effRouter = routerOverride != null ? routerOverride : (statement != null ? statement.getShardingRouter() : null);
-        com.javaorm.core.sharding.DataSourceRouter<?> effDsRouter = statement != null ? statement.getDataSourceRouter() : null;
-        String effDsOverride = statement != null ? statement.getTargetDataSource() : null;
-
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter, effDsRouter, effDsOverride)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeInsert(conn, statement, metadata, returnKeys, entity, effRouter, effDsRouter, effDsOverride, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
-        }
-        return getSqlExecutor().executeInsert(conn, statement, metadata, returnKeys, entity, dialect, getEffectiveConfig(), dataSource);
-    }
-
-    public int executeUpsert(Connection conn, com.javaorm.core.ast.UpsertStatement statement, EntityMetadata metadata,
-                             boolean returnKeys, Object entity, com.javaorm.core.sharding.TableRouter<?> routerOverride) {
-        com.javaorm.core.sharding.TableRouter<?> effRouter = routerOverride != null ? routerOverride : (statement != null ? statement.getShardingRouter() : null);
-        com.javaorm.core.sharding.DataSourceRouter<?> effDsRouter = statement != null ? statement.getDataSourceRouter() : null;
-        String effDsOverride = statement != null ? statement.getTargetDataSource() : null;
-
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter, effDsRouter, effDsOverride)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeUpsert(conn, statement, metadata, returnKeys, entity, effRouter, effDsRouter, effDsOverride, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
-        }
-        return getSqlExecutor().executeUpsert(conn, statement, metadata, returnKeys, entity, dialect, getEffectiveConfig(), dataSource);
-    }
-
-    public <R> List<R> executeSelectList(Connection conn, SelectStatement statement, EntityMetadata metadata, List<IncludeSpec> includes) {
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(statement, metadata)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeSelectList(conn, statement, metadata, includes, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
-        }
-        return getSqlExecutor().executeQuery(conn, statement, metadata, includes, dialect, getEffectiveConfig(), dataSource);
-    }
-
-    public <DTO> List<DTO> executeSelectDtoList(Connection conn, SelectStatement statement, Class<DTO> dtoClass) {
-        Class<?> rootClass = statement.getRootEntityClass();
-        EntityMetadata metadata = rootClass != null ? (config != null ? config.getMetadata(rootClass) : EntityMetadataManager.get(rootClass, config)) : null;
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(statement, metadata)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeSelectDtoList(conn, statement, dtoClass, metadata, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
-        }
-        return getSqlExecutor().executeDtoQuery(conn, statement, dtoClass, dialect, getEffectiveConfig(), dataSource);
-    }
-
-    public List<Map<String, Object>> executeSelectMaps(Connection conn, SelectStatement statement) {
-        Class<?> rootClass = statement.getRootEntityClass();
-        EntityMetadata metadata = rootClass != null ? (config != null ? config.getMetadata(rootClass) : EntityMetadataManager.get(rootClass, config)) : null;
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(statement, metadata)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeSelectMaps(conn, statement, metadata, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
-        }
-        return getSqlExecutor().executeMaps(conn, statement, dialect, getEffectiveConfig(), dataSource);
-    }
-
-    public <V> V executeSelectScalar(Connection conn, SelectStatement statement, Class<V> targetType) {
-        Class<?> rootClass = statement.getRootEntityClass();
-        EntityMetadata metadata = rootClass != null ? (config != null ? config.getMetadata(rootClass) : EntityMetadataManager.get(rootClass, config)) : null;
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(statement, metadata)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeSelectScalar(conn, statement, targetType, metadata, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
-        }
-        return getSqlExecutor().executeScalar(conn, statement, targetType, dialect, getEffectiveConfig(), dataSource);
-    }
-
-    public <V> List<V> executeSelectScalarList(Connection conn, SelectStatement statement, Class<V> targetType) {
-        Class<?> rootClass = statement.getRootEntityClass();
-        EntityMetadata metadata = rootClass != null ? (config != null ? config.getMetadata(rootClass) : EntityMetadataManager.get(rootClass, config)) : null;
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(statement, metadata)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeSelectScalarList(conn, statement, targetType, metadata, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
-        }
-        return getSqlExecutor().executeScalarList(conn, statement, targetType, dialect, getEffectiveConfig(), dataSource);
-    }
-
-    public long executeSelectCount(Connection conn, SelectStatement statement, Dialect targetDialect, Class<?> rootEntityClass) {
-        Dialect effDialect = targetDialect != null ? targetDialect : dialect;
-        EntityMetadata metadata = rootEntityClass != null ? (config != null ? config.getMetadata(rootEntityClass) : EntityMetadataManager.get(rootEntityClass, config)) : null;
-        if (com.javaorm.core.sharding.ShardingHandler.isSharding(statement, metadata)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeSelectCount(conn, statement, metadata, effDialect, getEffectiveConfig(), dataSource, getSqlExecutor());
-        }
-        return getSqlExecutor().executeCount(conn, statement, effDialect, getEffectiveConfig(), dataSource);
     }
 
     public void resolveExpression(SqlExpression<?> expr, SelectStatement statement) {

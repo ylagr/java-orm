@@ -304,8 +304,8 @@ public class SelectBuilder<T> implements Query<T> {
         return this;
     }
 
-    public OrmConfig getEffectiveConfig() {
-        return env.getEffectiveConfig();
+    public com.javaorm.core.executor.ExecutionContext getExecutionContext() {
+        return env.getExecutionContext().withDialect(getDialect());
     }
 
     public SelectBuilder<T> setDialect(Dialect dialect) {
@@ -1348,12 +1348,12 @@ public class SelectBuilder<T> implements Query<T> {
             return (List<R>) toList();
         }
         if (ColumnMetadata.isScalarType(targetClass)) {
-            return env.executeSelectScalarList(null, statement, targetClass);
+            return getExecutionContext().executeSelectScalarList(null, statement, targetClass);
         }
         if (Map.class.isAssignableFrom(targetClass)) {
-            return (List<R>) env.executeSelectMaps(null, statement);
+            return (List<R>) getExecutionContext().executeSelectMaps(null, statement);
         }
-        return env.executeSelectDtoList(null, statement, targetClass);
+        return getExecutionContext().executeSelectDtoList(null, statement, targetClass);
     }
 
     public List<T> toList(Connection conn) {
@@ -1382,9 +1382,9 @@ public class SelectBuilder<T> implements Query<T> {
             }
         }
         if (resultDtoClass != null && !autoInclude) {
-            return (List<T>) env.executeSelectDtoList(conn, statement, resultDtoClass);
+            return (List<T>) getExecutionContext().executeSelectDtoList(conn, statement, resultDtoClass);
         }
-        List<T> resultList = env.executeSelectList(conn, statement, rootMetadata, includes);
+        List<T> resultList = getExecutionContext().executeSelectList(conn, statement, rootMetadata, includes);
         if (tracking && getConfig() != null && getConfig().getTrackManager() != null && resultList != null) {
             for (T item : resultList) {
                 if (item != null) {
@@ -1396,7 +1396,7 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public List<Map<String, Object>> listMaps() {
-        return env.executeSelectMaps(null, statement);
+        return getExecutionContext().executeSelectMaps(null, statement);
     }
 
     public List<Map<String, Object>> maps() {
@@ -1415,11 +1415,11 @@ public class SelectBuilder<T> implements Query<T> {
 
     public <V> V fetchOne(Class<V> targetType) {
         statement.setLimit(1);
-        return env.executeSelectScalar(null, statement, targetType);
+        return getExecutionContext().executeSelectScalar(null, statement, targetType);
     }
 
     public <V> List<V> fetchList(Class<V> targetType) {
-        return env.executeSelectScalarList(null, statement, targetType);
+        return getExecutionContext().executeSelectScalarList(null, statement, targetType);
     }
 
     @SuppressWarnings("unchecked")
@@ -1457,7 +1457,7 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public long count() {
-        return env.executeSelectCount(null, statement, getDialect(), rootEntityClass);
+        return getExecutionContext().executeSelectCount(null, statement, getDialect(), rootEntityClass);
     }
 
     public boolean any() {

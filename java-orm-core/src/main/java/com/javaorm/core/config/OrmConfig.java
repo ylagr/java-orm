@@ -45,16 +45,6 @@ public class OrmConfig {
         this.batchKeepOrder = other.batchKeepOrder;
     }
 
-    /**
-     * 返回一个仅覆盖 printSql 开关的配置视图（相同则直接复用当前实例）。
-     */
-    public OrmConfig withPrintSql(boolean printSql) {
-        if (this.printSql == printSql) {
-            return this;
-        }
-        return new OrmConfig(this).setPrintSql(printSql);
-    }
-
     private NameConversion nameConversion = new UnderlinedNameConversion();
     private boolean customNameConversion = false;
     private boolean printSql = false;

@@ -157,10 +157,10 @@ public class WhereBuilder<T> implements Query<T> {
             return executeSupplier.getAsInt();
         }
         if (env != null && statement instanceof UpdateStatement) {
-            return env.executeUpdate((UpdateStatement) statement);
+            return env.getExecutionContext().executeUpdate((UpdateStatement) statement);
         }
         if (env != null && statement instanceof DeleteStatement) {
-            return env.executeDelete((DeleteStatement) statement);
+            return env.getExecutionContext().executeDelete((DeleteStatement) statement);
         }
         throw new UnsupportedOperationException("execute() is only available on UPDATE and DELETE operations");
     }
@@ -2970,7 +2970,7 @@ public class WhereBuilder<T> implements Query<T> {
             return (List<E>) rootQuery.list();
         }
         if (env != null && statement instanceof SelectStatement) {
-            return (List<E>) env.executeSelectList(null, (SelectStatement) statement, null, null);
+            return (List<E>) env.getExecutionContext().executeSelectList(null, (SelectStatement) statement, null, null);
         }
         throw new UnsupportedOperationException("list() is not supported on this builder");
     }
@@ -2980,7 +2980,7 @@ public class WhereBuilder<T> implements Query<T> {
             return rootQuery.listMaps();
         }
         if (env != null && statement instanceof SelectStatement) {
-            return env.executeSelectMaps(null, (SelectStatement) statement);
+            return env.getExecutionContext().executeSelectMaps(null, (SelectStatement) statement);
         }
         throw new UnsupportedOperationException("listMaps() is not supported on this builder");
     }
@@ -3003,7 +3003,7 @@ public class WhereBuilder<T> implements Query<T> {
         }
         if (env != null && statement instanceof SelectStatement) {
             ((SelectStatement) statement).setLimit(1);
-            return env.executeSelectScalar(null, (SelectStatement) statement, targetType);
+            return env.getExecutionContext().executeSelectScalar(null, (SelectStatement) statement, targetType);
         }
         throw new UnsupportedOperationException("fetchOne() is not supported on this builder");
     }
@@ -3013,7 +3013,7 @@ public class WhereBuilder<T> implements Query<T> {
             return rootQuery.fetchList(targetType);
         }
         if (env != null && statement instanceof SelectStatement) {
-            return env.executeSelectScalarList(null, (SelectStatement) statement, targetType);
+            return env.getExecutionContext().executeSelectScalarList(null, (SelectStatement) statement, targetType);
         }
         throw new UnsupportedOperationException("fetchList() is not supported on this builder");
     }
@@ -3087,7 +3087,7 @@ public class WhereBuilder<T> implements Query<T> {
             return rootQuery.count();
         }
         if (env != null && statement instanceof SelectStatement) {
-            return env.executeSelectCount(null, (SelectStatement) statement, env.getDialect(), entityClass);
+            return env.getExecutionContext().executeSelectCount(null, (SelectStatement) statement, env.getDialect(), entityClass);
         }
         throw new UnsupportedOperationException("count() is not supported on this builder");
     }
@@ -3186,15 +3186,15 @@ public class WhereBuilder<T> implements Query<T> {
         if (env != null && statement instanceof SelectStatement) {
             SelectStatement stmt = (SelectStatement) statement;
             if (targetClass == entityClass) {
-                return (List<R>) env.executeSelectList(null, stmt, null, null);
+                return (List<R>) env.getExecutionContext().executeSelectList(null, stmt, null, null);
             }
             if (com.javaorm.core.metadata.ColumnMetadata.isScalarType(targetClass)) {
-                return env.executeSelectScalarList(null, stmt, targetClass);
+                return env.getExecutionContext().executeSelectScalarList(null, stmt, targetClass);
             }
             if (Map.class.isAssignableFrom(targetClass)) {
-                return (List<R>) env.executeSelectMaps(null, stmt);
+                return (List<R>) env.getExecutionContext().executeSelectMaps(null, stmt);
             }
-            return env.executeSelectDtoList(null, stmt, targetClass);
+            return env.getExecutionContext().executeSelectDtoList(null, stmt, targetClass);
         }
         throw new UnsupportedOperationException("toList(Class) is not supported on this builder");
     }

@@ -157,7 +157,7 @@ public class BatchDeleteBuilder<T> {
 
         String finalSql = sql.toString();
         BatchSupport.logSql(log, env, "Batch Delete", finalSql, params);
-        return env.getSqlExecutor().executeUpdate(
+        return env.getExecutionContext().getSqlExecutor().executeUpdate(
                 null,
                 new com.javaorm.core.dialect.SqlAndParams(finalSql, params),
                 ldCol != null ? "UPDATE" : "DELETE",

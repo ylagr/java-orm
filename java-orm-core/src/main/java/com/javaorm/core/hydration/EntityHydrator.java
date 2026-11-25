@@ -25,13 +25,17 @@ public class EntityHydrator {
     private static final Logger log = LoggerFactory.getLogger(EntityHydrator.class);
 
     public static <T> List<T> queryList(Connection conn, SelectStatement stmt, EntityMetadata metadata, Dialect dialect, OrmConfig config) throws Exception {
+        return queryList(conn, stmt, metadata, dialect, config, config != null && config.isPrintSql());
+    }
+
+    public static <T> List<T> queryList(Connection conn, SelectStatement stmt, EntityMetadata metadata, Dialect dialect, OrmConfig config, boolean printSql) throws Exception {
         if (metadata == null) {
             @SuppressWarnings("unchecked")
-            List<T> mapList = (List<T>) (List<?>) queryMaps(conn, stmt, dialect, config);
+            List<T> mapList = (List<T>) (List<?>) queryMaps(conn, stmt, dialect, config, printSql);
             return mapList;
         }
         SqlAndParams sqlAndParams = applyQueryInterceptors(dialect.buildSelect(stmt), metadata, dialect, config);
-        if (config.isPrintSql()) {
+        if (printSql) {
             log.info("==>  Preparing: {}", sqlAndParams.getSql());
             log.info("==> Parameters: {}", sqlAndParams.getParams());
         }
@@ -82,8 +86,12 @@ public class EntityHydrator {
     }
 
     public static <DTO> List<DTO> queryDtoList(Connection conn, SelectStatement stmt, Class<DTO> dtoClass, Dialect dialect, OrmConfig config) throws Exception {
+        return queryDtoList(conn, stmt, dtoClass, dialect, config, config != null && config.isPrintSql());
+    }
+
+    public static <DTO> List<DTO> queryDtoList(Connection conn, SelectStatement stmt, Class<DTO> dtoClass, Dialect dialect, OrmConfig config, boolean printSql) throws Exception {
         SqlAndParams sqlAndParams = dialect.buildSelect(stmt);
-        if (config.isPrintSql()) {
+        if (printSql) {
             log.info("==> [DTO] Preparing: {}", sqlAndParams.getSql());
             log.info("==> [DTO] Parameters: {}", sqlAndParams.getParams());
         }
@@ -141,8 +149,12 @@ public class EntityHydrator {
     }
 
     public static List<Map<String, Object>> queryMaps(Connection conn, SelectStatement stmt, Dialect dialect, OrmConfig config) throws Exception {
+        return queryMaps(conn, stmt, dialect, config, config != null && config.isPrintSql());
+    }
+
+    public static List<Map<String, Object>> queryMaps(Connection conn, SelectStatement stmt, Dialect dialect, OrmConfig config, boolean printSql) throws Exception {
         SqlAndParams sqlAndParams = dialect.buildSelect(stmt);
-        if (config.isPrintSql()) {
+        if (printSql) {
             log.info("==> [Maps] Preparing: {}", sqlAndParams.getSql());
             log.info("==> [Maps] Parameters: {}", sqlAndParams.getParams());
         }
@@ -213,10 +225,14 @@ public class EntityHydrator {
         return sb.toString();
     }
 
-    @SuppressWarnings("unchecked")
     public static <V> V queryScalar(Connection conn, SelectStatement stmt, Class<V> targetType, Dialect dialect, OrmConfig config) throws Exception {
+        return queryScalar(conn, stmt, targetType, dialect, config, config != null && config.isPrintSql());
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <V> V queryScalar(Connection conn, SelectStatement stmt, Class<V> targetType, Dialect dialect, OrmConfig config, boolean printSql) throws Exception {
         SqlAndParams sqlAndParams = dialect.buildSelect(stmt);
-        if (config.isPrintSql()) {
+        if (printSql) {
             log.info("==> [Scalar] Preparing: {}", sqlAndParams.getSql());
             log.info("==> [Scalar] Parameters: {}", sqlAndParams.getParams());
         }
@@ -232,10 +248,14 @@ public class EntityHydrator {
         return null;
     }
 
-    @SuppressWarnings("unchecked")
     public static <V> List<V> queryScalarList(Connection conn, SelectStatement stmt, Class<V> targetType, Dialect dialect, OrmConfig config) throws Exception {
+        return queryScalarList(conn, stmt, targetType, dialect, config, config != null && config.isPrintSql());
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <V> List<V> queryScalarList(Connection conn, SelectStatement stmt, Class<V> targetType, Dialect dialect, OrmConfig config, boolean printSql) throws Exception {
         SqlAndParams sqlAndParams = dialect.buildSelect(stmt);
-        if (config.isPrintSql()) {
+        if (printSql) {
             log.info("==> [ScalarList] Preparing: {}", sqlAndParams.getSql());
             log.info("==> [ScalarList] Parameters: {}", sqlAndParams.getParams());
         }
@@ -253,15 +273,23 @@ public class EntityHydrator {
     }
 
     public static long queryCount(Connection conn, SelectStatement stmt, Dialect dialect, OrmConfig config) throws Exception {
-        return queryCount(conn, dialect.buildSelect(stmt), config, stmt != null && !stmt.getCtes().isEmpty(), dialect);
+        return queryCount(conn, stmt, dialect, config, config != null && config.isPrintSql());
+    }
+
+    public static long queryCount(Connection conn, SelectStatement stmt, Dialect dialect, OrmConfig config, boolean printSql) throws Exception {
+        return queryCount(conn, dialect.buildSelect(stmt), config, stmt != null && !stmt.getCtes().isEmpty(), dialect, printSql);
     }
 
     public static long queryCount(Connection conn, SqlAndParams sqlAndParams, OrmConfig config) throws Exception {
-        return queryCount(conn, sqlAndParams, config, false, null);
+        return queryCount(conn, sqlAndParams, config, false, null, config != null && config.isPrintSql());
     }
 
     public static long queryCount(Connection conn, SqlAndParams sqlAndParams, OrmConfig config, boolean hasCte, Dialect dialect) throws Exception {
-        if (config.isPrintSql()) {
+        return queryCount(conn, sqlAndParams, config, hasCte, dialect, config != null && config.isPrintSql());
+    }
+
+    public static long queryCount(Connection conn, SqlAndParams sqlAndParams, OrmConfig config, boolean hasCte, Dialect dialect, boolean printSql) throws Exception {
+        if (printSql) {
             log.info("==> [Count] Preparing: {}", sqlAndParams.getSql());
             log.info("==> [Count] Parameters: {}", sqlAndParams.getParams());
         }

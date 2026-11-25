@@ -317,28 +317,29 @@ public class Oracle11AndDynamicFeaturesTest {
         // 1. 全局配置为 false，但链式指定 printSql(true)，强制打印
         assertFalse(config.isPrintSql());
         SelectBuilder<Student> q1 = orm.select(Student.class).printSql(true);
-        assertTrue(q1.getEffectiveConfig().isPrintSql());
+        assertTrue(q1.getExecutionContext().isPrintSql());
         List<Student> list1 = q1.where().gt("age", 18).list();
         assertEquals(5, list1.size());
 
         // 2. 链式指定 printSql(false)，强制不打印
         SelectBuilder<Student> q2 = orm.select(Student.class).printSql(false);
-        assertFalse(q2.getEffectiveConfig().isPrintSql());
+        assertFalse(q2.getExecutionContext().isPrintSql());
 
         // 3. 链式指定 printSql()，遵从当前全局配置（当前配置为 false）
         SelectBuilder<Student> q3 = orm.select(Student.class).printSql();
-        assertFalse(q3.getEffectiveConfig().isPrintSql());
+        assertFalse(q3.getExecutionContext().isPrintSql());
 
-        // 4. 将全局配置改为 true，并验证 printSql 覆盖视图不丢失其他全局配置
+        // 4. 将全局配置改为 true，并验证 ExecutionContext 组合视图不丢失且不复制污染全局配置
         config.setPrintSql(true);
         config.setTenantStrict(true);
         config.setBatchKeepOrder(true);
         SelectBuilder<Student> q4 = orm.select(Student.class).printSql();
-        assertTrue(q4.getEffectiveConfig().isPrintSql());
+        assertTrue(q4.getExecutionContext().isPrintSql());
         SelectBuilder<Student> q5 = orm.select(Student.class).printSql(false);
-        assertFalse(q5.getEffectiveConfig().isPrintSql());
-        assertTrue(q5.getEffectiveConfig().isTenantStrict());
-        assertTrue(q5.getEffectiveConfig().isBatchKeepOrder());
+        assertFalse(q5.getExecutionContext().isPrintSql());
+        assertTrue(q5.getExecutionContext().getConfig().isTenantStrict());
+        assertTrue(q5.getExecutionContext().getConfig().isBatchKeepOrder());
+        assertSame(config, q5.getExecutionContext().getConfig());
         config.setTenantStrict(false);
         config.setBatchKeepOrder(false);
 

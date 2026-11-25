@@ -356,6 +356,9 @@ public class UpsertBuilder<T> {
             return 0;
         }
 
-        return env.executeUpsert(null, stmt, metadata, returnKeys, entity, this.shardingRouter);
+        com.javaorm.core.executor.ExecutionContext ctx = printSqlOverride != null
+                ? env.getExecutionContext().withPrintSql(printSqlOverride)
+                : env.getExecutionContext();
+        return ctx.executeUpsert(null, stmt, metadata, returnKeys, entity, this.shardingRouter);
     }
 }

@@ -271,6 +271,6 @@ public class InsertBuilder<T> {
             return 0;
         }
 
-        return env.executeInsert(null, stmt, metadata, returnKeys, entity, this.shardingRouter);
+        return env.getExecutionContext().executeInsert(null, stmt, metadata, returnKeys, entity, this.shardingRouter);
     }
 }

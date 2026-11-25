@@ -250,7 +250,7 @@ public class DtoQuery<DTO, T> {
     public List<DTO> list() {
         SqlEnv effectiveEnv = getEnv();
         if (effectiveEnv != null) {
-            return effectiveEnv.executeSelectDtoList(null, underlyingQuery.getStatement(), dtoClass);
+            return effectiveEnv.getExecutionContext().executeSelectDtoList(null, underlyingQuery.getStatement(), dtoClass);
         }
         throw new IllegalStateException("SqlEnv is not configured for DtoQuery");
     }
