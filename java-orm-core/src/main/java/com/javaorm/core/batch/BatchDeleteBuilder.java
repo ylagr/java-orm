@@ -157,21 +157,13 @@ public class BatchDeleteBuilder<T> {
 
         String finalSql = sql.toString();
         BatchSupport.logSql(log, env, "Batch Delete", finalSql, params);
-
-        Connection conn = null;
-        PreparedStatement ps = null;
-        try {
-            conn = ConnectionUtils.getConnection(ds, config);
-            ps = conn.prepareStatement(finalSql);
-            for (int i = 0; i < params.size(); i++) {
-                ps.setObject(i + 1, params.get(i));
-            }
-            return ps.executeUpdate();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute batch delete on " + tableName, e);
-        } finally {
-            if (ps != null) try { ps.close(); } catch (Exception ignored) {}
-            ConnectionUtils.closeConnection(conn);
-        }
+        return env.getSqlExecutor().executeUpdate(
+                null,
+                new com.javaorm.core.dialect.SqlAndParams(finalSql, params),
+                ldCol != null ? "UPDATE" : "DELETE",
+                dialect,
+                config,
+                ds
+        );
     }
 }

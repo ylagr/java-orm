@@ -57,21 +57,6 @@ public class PageResult<T> implements Page<T> {
         return pageSize;
     }
 
-    public long getTotalPages() {
-        if (pageSize <= 0) {
-            return 0;
-        }
-        return (total + pageSize - 1) / pageSize;
-    }
-
-    public boolean hasNext() {
-        return pageNum < getTotalPages();
-    }
-
-    public boolean hasPrevious() {
-        return pageNum > 1;
-    }
-
     @Override
     public String toString() {
         return "PageResult{" +

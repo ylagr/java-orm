@@ -285,36 +285,23 @@ public class BatchUpsertBuilder<T> {
         String sql = sap.getSql();
         logSql(sql, chunk.size());
 
-        Connection conn = null;
-        PreparedStatement ps = null;
-        try {
-            conn = ConnectionUtils.getConnection(ds, config);
-            ps = conn.prepareStatement(sql);
-
-            for (T entity : chunk) {
-                prepareEntityDefaults(entity, metadata, config);
-
-                int paramIdx = 1;
-                for (ColumnMetadata col : insertCols) {
-                    Object val = col.getValue(entity);
-                    ps.setObject(paramIdx++, col.serializeParam(val));
-                }
-                ps.addBatch();
+        List<List<Object>> batchParams = new ArrayList<>(chunk.size());
+        for (T entity : chunk) {
+            prepareEntityDefaults(entity, metadata, config);
+            List<Object> rowParams = new ArrayList<>(insertCols.size());
+            for (ColumnMetadata col : insertCols) {
+                rowParams.add(col.serializeParam(col.getValue(entity)));
             }
-
-            int[] results = ps.executeBatch();
-            int total = 0;
-            for (int r : results) {
-                if (r >= 0) total += r;
-                else if (r == PreparedStatement.SUCCESS_NO_INFO) total += 1;
-            }
-            return total;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute batch upsert on " + tableName, e);
-        } finally {
-            if (ps != null) try { ps.close(); } catch (Exception ignored) {}
-            ConnectionUtils.closeConnection(conn);
+            batchParams.add(rowParams);
         }
+
+        int[] results = env.getSqlExecutor().executeBatchUpdate(null, sql, batchParams, dialect, config, ds);
+        int total = 0;
+        for (int r : results) {
+            if (r >= 0) total += r;
+            else if (r == PreparedStatement.SUCCESS_NO_INFO) total += 1;
+        }
+        return total;
     }
 
     private void prepareEntityDefaults(T entity, EntityMetadata metadata, OrmConfig config) {

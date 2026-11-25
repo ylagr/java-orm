@@ -255,74 +255,53 @@ public class BatchUpdateBuilder<T> {
         String finalSql = sql.toString();
         logSql(finalSql, chunk.size());
 
-        Connection conn = null;
-        PreparedStatement ps = null;
-        List<Object> nextVersions = new ArrayList<>();
+        List<List<Object>> batchParams = new ArrayList<>(chunk.size());
+        List<Object> nextVersions = new ArrayList<>(chunk.size());
 
-        try {
-            conn = ConnectionUtils.getConnection(ds, config);
-            ps = conn.prepareStatement(finalSql);
-
-            for (T entity : chunk) {
-                int paramIdx = 1;
-                // 1. 设置普通列
-                for (ColumnMetadata col : updateCols) {
-                    Object val = col.getValue(entity);
-                    ps.setObject(paramIdx++, val);
-                }
-
-                // 2. 设置新版本号
-                Object curVersion = null;
-                Object nextVersion = null;
-                if (versionCol != null) {
-                    curVersion = versionCol.getValue(entity);
-                    if (curVersion == null) curVersion = 1;
-                    nextVersion = calculateNextVersion(curVersion, versionCol.getPropertyType());
-                    nextVersions.add(nextVersion);
-                    ps.setObject(paramIdx++, nextVersion);
-                }
-
-                // 3. 设置主键条件
-                Object idVal = idCol.getValue(entity);
-                if (idVal == null) {
-                    throw new IllegalArgumentException("Primary key value is null in batch update for entity: " + entity);
-                }
-                ps.setObject(paramIdx++, idVal);
-
-                // 4. 设置旧版本号条件
-                if (versionCol != null) {
-                    ps.setObject(paramIdx++, curVersion);
-                }
-
-                ps.addBatch();
+        for (T entity : chunk) {
+            List<Object> rowParams = new ArrayList<>();
+            for (ColumnMetadata col : updateCols) {
+                rowParams.add(col.getValue(entity));
             }
 
-            int[] results = ps.executeBatch();
-            int total = 0;
-            for (int row = 0; row < results.length; row++) {
-                int r = results[row];
-                if (versionCol != null) {
-                    if (r == 0) {
-                        T failedEntity = chunk.get(row);
-                        Object idVal = idCol.getValue(failedEntity);
-                        Object verVal = versionCol.getValue(failedEntity);
-                        throw new OptimisticLockException(metadata.getEntityClass(), idVal, verVal);
-                    }
-                    // 回写新版本号
-                    versionCol.setValue(chunk.get(row), nextVersions.get(row));
-                }
-                if (r >= 0) total += r;
-                else if (r == PreparedStatement.SUCCESS_NO_INFO) total += 1;
+            Object curVersion = null;
+            if (versionCol != null) {
+                curVersion = versionCol.getValue(entity);
+                if (curVersion == null) curVersion = 1;
+                Object nextVersion = calculateNextVersion(curVersion, versionCol.getPropertyType());
+                nextVersions.add(nextVersion);
+                rowParams.add(nextVersion);
             }
-            return total;
-        } catch (OptimisticLockException ole) {
-            throw ole;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to execute batch update on " + tableName, e);
-        } finally {
-            if (ps != null) try { ps.close(); } catch (Exception ignored) {}
-            ConnectionUtils.closeConnection(conn);
+
+            Object idVal = idCol.getValue(entity);
+            if (idVal == null) {
+                throw new IllegalArgumentException("Primary key value is null in batch update for entity: " + entity);
+            }
+            rowParams.add(idVal);
+
+            if (versionCol != null) {
+                rowParams.add(curVersion);
+            }
+            batchParams.add(rowParams);
         }
+
+        int[] results = env.getSqlExecutor().executeBatchUpdate(null, finalSql, batchParams, dialect, config, ds);
+        int total = 0;
+        for (int row = 0; row < results.length; row++) {
+            int r = results[row];
+            if (versionCol != null) {
+                if (r == 0) {
+                    T failedEntity = chunk.get(row);
+                    Object idVal = idCol.getValue(failedEntity);
+                    Object verVal = versionCol.getValue(failedEntity);
+                    throw new OptimisticLockException(metadata.getEntityClass(), idVal, verVal);
+                }
+                versionCol.setValue(chunk.get(row), nextVersions.get(row));
+            }
+            if (r >= 0) total += r;
+            else if (r == PreparedStatement.SUCCESS_NO_INFO) total += 1;
+        }
+        return total;
     }
 
     private Object calculateNextVersion(Object curVersion, Class<?> propType) {
