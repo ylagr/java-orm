@@ -18,7 +18,7 @@ public class EasyQueryDmlTest extends EasyQueryBaseTest {
     public void testInsertSingleAndBatch() {
         // 1. 单条实体插入
         Topic t100 = new Topic("100", 88, "Inserted Title", LocalDateTime.now());
-        int rows = orm.insert(t100).executeRows();
+        int rows = orm.insert(t100).exec();
         assertEquals(1, rows);
 
         Topic q100 = orm.select(Topic.class).whereById("100").firstOrNull();
@@ -34,7 +34,7 @@ public class EasyQueryDmlTest extends EasyQueryBaseTest {
         // 3. 批量插入 insert(Collection)
         Topic t102 = new Topic("102", 102, "Batch 102", LocalDateTime.now());
         Topic t103 = new Topic("103", 103, "Batch 103", LocalDateTime.now());
-        int batchRows = orm.insert(Arrays.asList(t102, t103)).exec();
+        int batchRows = orm.insertBatch(Arrays.asList(t102, t103)).exec();
         assertEquals(2, batchRows);
 
         List<Topic> batchList = orm.select(Topic.class).whereByIds("102", "103").toList();
@@ -63,7 +63,7 @@ public class EasyQueryDmlTest extends EasyQueryBaseTest {
                 .set(proxy.getTitle(), "Expression Updated")
                 .set(proxy.getStars(), 666)
                 .whereById("2")
-                .executeRows();
+                .exec();
         assertEquals(1, exprRows);
 
         Topic q2 = orm.select(Topic.class).whereById("2").firstOrNull();
@@ -75,7 +75,7 @@ public class EasyQueryDmlTest extends EasyQueryBaseTest {
         int batchExprRows = orm.update(Topic.class)
                 .set(proxy.getStars(), 888)
                 .where(w -> w.in(proxy.getId(), Arrays.asList("3", "4")))
-                .executeRows();
+                .exec();
         assertEquals(2, batchExprRows);
 
         Topic q3 = orm.select(Topic.class).whereById("3").firstOrNull();
@@ -97,7 +97,7 @@ public class EasyQueryDmlTest extends EasyQueryBaseTest {
         // 2. 批量条件逻辑删除
         int condDelRows = orm.delete(Topic.class)
                 .where(w -> w.eq(proxy.getId(), "2"))
-                .executeRows();
+                .exec();
         assertEquals(1, condDelRows);
 
         Topic q2 = orm.select(Topic.class).whereById("2").firstOrNull();

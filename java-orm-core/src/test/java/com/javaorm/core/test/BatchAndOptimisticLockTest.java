@@ -421,8 +421,8 @@ public class BatchAndOptimisticLockTest {
         item51.setId(51L);
         item51.setPrice(555.0);
 
-        // 验证即使直接调用 orm.insert(list)，也会继承全局的 batchKeepOrder = true
-        int rows = orderedOrm.insert(Arrays.asList(item50, item51)).exec();
+        // 验证即使直接调用 orm.insertBatch(list)，也会继承全局的 batchKeepOrder = true
+        int rows = orderedOrm.insertBatch(Arrays.asList(item50, item51)).exec();
         assertEquals(2, rows);
 
         Item db50 = orderedOrm.select(Item.class).where().eq(Item::getId, 50L).firstOrNull();

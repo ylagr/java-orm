@@ -172,27 +172,27 @@ public class UpdateBuilder<T> {
     }
 
     public SqlAndParams toSqlAndParams() {
-        return getDialect().buildUpdate(statement);
+        return toSqlAndParams(null);
     }
 
     public SqlAndParams toSqlAndParams(Dialect customDialect) {
-        return (customDialect != null ? customDialect : getDialect()).buildUpdate(statement);
+        UpdateStatement targetStmt = statement;
+        if (boundEntity != null && statement.getSetValues().isEmpty()) {
+            EntityUpdatePlan<T> plan = prepareEntityUpdate(boundEntity, env, boundSelective, false);
+            if (plan == null) {
+                return new SqlAndParams("", java.util.Collections.emptyList());
+            }
+            targetStmt = plan.statement;
+        }
+        return (customDialect != null ? customDialect : getDialect()).buildUpdate(targetStmt);
     }
 
     public String toSql() {
         return toSqlAndParams().getSql();
     }
 
-    public String toSQL() {
-        return toSql();
-    }
-
     public String toSql(Dialect customDialect) {
-        return (customDialect != null ? customDialect : getDialect()).buildUpdate(statement).getSql();
-    }
-
-    public String toSQL(Dialect customDialect) {
-        return toSql(customDialect);
+        return toSqlAndParams(customDialect).getSql();
     }
 
     @Override
@@ -439,14 +439,35 @@ public class UpdateBuilder<T> {
         return updateEntity(entity, new SqlEnv(dataSource, dialect, config), selective);
     }
 
-    public static <E> int updateEntity(E entity, SqlEnv env, boolean selective) {
-        if (entity == null) return 0;
+    private static final class EntityUpdatePlan<E> {
+        final Class<E> entityClass;
+        final Object idVal;
+        final UpdateStatement statement;
+        final ColumnMetadata versionCol;
+        final Object currentVersion;
+        final Object nextVersion;
+        final com.javaorm.core.track.EntitySnapshot snapshot;
+
+        EntityUpdatePlan(Class<E> entityClass, Object idVal, UpdateStatement statement,
+                         ColumnMetadata versionCol, Object currentVersion, Object nextVersion,
+                         com.javaorm.core.track.EntitySnapshot snapshot) {
+            this.entityClass = entityClass;
+            this.idVal = idVal;
+            this.statement = statement;
+            this.versionCol = versionCol;
+            this.currentVersion = currentVersion;
+            this.nextVersion = nextVersion;
+            this.snapshot = snapshot;
+        }
+    }
+
+    private static <E> EntityUpdatePlan<E> prepareEntityUpdate(E entity, SqlEnv env, boolean selective, boolean triggerAutoFill) {
+        if (entity == null) return null;
         @SuppressWarnings("unchecked")
         Class<E> clazz = (Class<E>) entity.getClass();
         EntityMetadata meta = EntityMetadataManager.get(clazz, env.getConfig());
 
-        // 自动触发 AutoFillHandler.updateFill
-        if (env.getConfig() != null && env.getConfig().getAutoFillHandler() != null) {
+        if (triggerAutoFill && env.getConfig() != null && env.getConfig().getAutoFillHandler() != null) {
             env.getConfig().getAutoFillHandler().updateFill(entity, meta);
         }
 
@@ -464,11 +485,8 @@ public class UpdateBuilder<T> {
         com.javaorm.core.track.EntitySnapshot snapshot = trackManager != null ? trackManager.getSnapshot(entity) : null;
         java.util.Set<String> dirtyColumns = snapshot != null ? snapshot.getDirtyColumnNames() : null;
 
-        if (snapshot != null) {
-            // 如果处于追踪状态，但没有任何字段被修改：直接返回 0，跳过任何网络 IO 与 SQL 执行
-            if (dirtyColumns == null || dirtyColumns.isEmpty()) {
-                return 0;
-            }
+        if (snapshot != null && (dirtyColumns == null || dirtyColumns.isEmpty())) {
+            return null;
         }
 
         UpdateBuilder<E> builder = new UpdateBuilder<>(env, clazz);
@@ -477,25 +495,17 @@ public class UpdateBuilder<T> {
         Object nextVersion = null;
 
         for (ColumnMetadata col : meta.getColumns()) {
-            if (col.isPrimaryKey() || col.isIgnored()) {
+            if (col.isPrimaryKey() || col.isIgnored() || col.isVersion()) {
                 continue;
             }
-            if (col.isVersion()) {
-                continue; // 版本号由专门的乐观锁逻辑处理
-            }
             if (snapshot != null) {
-                // 快照模式下，只更新发生了变脏的列
                 if (!dirtyColumns.contains(col.getColumnName())) {
                     continue;
                 }
-            } else if (selective) {
-                Object val = col.getValue(entity);
-                if (val == null) {
-                    continue;
-                }
+            } else if (selective && col.getValue(entity) == null) {
+                continue;
             }
-            Object val = col.getValue(entity);
-            builder.statement.addSet(col.getColumnName(), val);
+            builder.statement.addSet(col.getColumnName(), col.getValue(entity));
         }
 
         if (versionCol != null) {
@@ -504,8 +514,7 @@ public class UpdateBuilder<T> {
                 currentVersion = 1;
             }
             if (currentVersion instanceof Number) {
-                long cv = ((Number) currentVersion).longValue();
-                long nv = cv + 1;
+                long nv = ((Number) currentVersion).longValue() + 1;
                 Class<?> propType = versionCol.getPropertyType();
                 if (propType == Integer.class || propType == int.class) {
                     nextVersion = (int) nv;
@@ -529,16 +538,23 @@ public class UpdateBuilder<T> {
         }
 
         builder.statement.addWhereCondition(new BinaryCondition(null, meta.getIdColumn().getColumnName(), SqlOperator.EQ, idVal));
-        int affected = builder.execute();
-        if (versionCol != null) {
-            if (affected == 0) {
-                throw new com.javaorm.core.exception.OptimisticLockException(clazz, idVal, currentVersion);
-            }
-            versionCol.setValue(entity, nextVersion);
+        return new EntityUpdatePlan<>(clazz, idVal, builder.statement, versionCol, currentVersion, nextVersion, snapshot);
+    }
+
+    public static <E> int updateEntity(E entity, SqlEnv env, boolean selective) {
+        EntityUpdatePlan<E> plan = prepareEntityUpdate(entity, env, selective, true);
+        if (plan == null || plan.statement.getSetValues().isEmpty()) {
+            return 0;
         }
-        // 更新成功后，自动同步刷新快照，以便后续继续修改与更新
-        if (snapshot != null && affected > 0) {
-            snapshot.updateSnapshot();
+        int affected = env.executeUpdate(plan.statement);
+        if (plan.versionCol != null) {
+            if (affected == 0) {
+                throw new com.javaorm.core.exception.OptimisticLockException(plan.entityClass, plan.idVal, plan.currentVersion);
+            }
+            plan.versionCol.setValue(entity, plan.nextVersion);
+        }
+        if (plan.snapshot != null && affected > 0) {
+            plan.snapshot.updateSnapshot();
         }
         return affected;
     }

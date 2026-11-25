@@ -165,10 +165,6 @@ public class WhereBuilder<T> implements Query<T> {
         throw new UnsupportedOperationException("execute() is only available on UPDATE and DELETE operations");
     }
 
-    public int executeRows() {
-        return execute();
-    }
-
     public int exec() {
         return execute();
     }

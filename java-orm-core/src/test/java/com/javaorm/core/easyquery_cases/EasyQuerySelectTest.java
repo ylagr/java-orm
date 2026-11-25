@@ -23,7 +23,7 @@ public class EasyQuerySelectTest extends EasyQueryBaseTest {
         assertEquals(6, list.size()); // 7 条中 1 条被逻辑删除
 
         // 2. 校验 SQL 结构
-        String sql = orm.select(Topic.class).toSQL();
+        String sql = orm.select(Topic.class).toSql();
         assertTrue("SQL 必须包含 t_topic: " + sql, sql.contains("\"t_topic\""));
         assertTrue("SQL 必须包含逻辑删除条件: " + sql, sql.contains("\"is_deleted\" = ?"));
     }

@@ -32,7 +32,7 @@ public class EasyQueryJoinTest extends EasyQueryBaseTest {
         String sql = orm.select(BlogEntity.class)
                 .leftJoin(Topic.class, (w, blog, topic) -> w.eq(blog.getTopicId(), topic.getId()))
                 .where(w -> w.ge(b.getStar(), 10))
-                .toSQL();
+                .toSql();
 
         assertTrue("SQL 必须包含 LEFT JOIN: " + sql, sql.contains("LEFT JOIN"));
         assertTrue("SQL 必须包含 t_topic: " + sql, sql.contains("\"t_topic\""));
@@ -51,7 +51,7 @@ public class EasyQueryJoinTest extends EasyQueryBaseTest {
 
         String sql = orm.select(BlogEntity.class)
                 .innerJoin(Topic.class, (w, blog, topic) -> w.eq(blog.getTopicId(), topic.getId()))
-                .toSQL();
+                .toSql();
 
         assertTrue("SQL 必须包含 INNER JOIN: " + sql, sql.contains("INNER JOIN"));
     }
@@ -60,7 +60,7 @@ public class EasyQueryJoinTest extends EasyQueryBaseTest {
     public void testRightJoin2Tables() {
         String sql = orm.select(BlogEntity.class)
                 .rightJoin(Topic.class, (w, blog, topic) -> w.eq(blog.getTopicId(), topic.getId()))
-                .toSQL();
+                .toSql();
 
         assertTrue("SQL 必须包含 RIGHT JOIN: " + sql, sql.contains("RIGHT JOIN"));
     }

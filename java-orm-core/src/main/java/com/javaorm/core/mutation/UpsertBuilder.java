@@ -82,20 +82,7 @@ public class UpsertBuilder<T> {
      * 通过强类型 Getter 代理指定冲突判定的属性
      */
     public UpsertBuilder<T> onConflict(Consumer<T> proxyAction) {
-        if (proxyAction != null && entityClass != null) {
-            T proxy = ProxyFactory.getProxy(entityClass);
-            proxyAction.accept(proxy);
-            PropertyPath path = RecordingContext.finishCurrent(entityClass);
-            if (path == null) {
-                path = RecordingContext.finish(entityClass);
-            }
-            if (path != null) {
-                String resolved = resolveColumnName(path.getTerminalProperty());
-                if (!this.conflictColumns.contains(resolved)) {
-                    this.conflictColumns.add(resolved);
-                }
-            }
-        }
+        addResolvedColumns(this.conflictColumns, proxyAction);
         return this;
     }
 
@@ -120,21 +107,17 @@ public class UpsertBuilder<T> {
      * 通过强类型 Getter 代理显式指定发生冲突时仅更新的属性
      */
     public UpsertBuilder<T> updateColumns(Consumer<T> proxyAction) {
-        if (proxyAction != null && entityClass != null) {
-            T proxy = ProxyFactory.getProxy(entityClass);
-            proxyAction.accept(proxy);
-            PropertyPath path = RecordingContext.finishCurrent(entityClass);
-            if (path == null) {
-                path = RecordingContext.finish(entityClass);
-            }
-            if (path != null) {
-                String resolved = resolveColumnName(path.getTerminalProperty());
-                if (!this.updateColumns.contains(resolved)) {
-                    this.updateColumns.add(resolved);
-                }
+        addResolvedColumns(this.updateColumns, proxyAction);
+        return this;
+    }
+
+    private void addResolvedColumns(List<String> target, Consumer<T> proxyAction) {
+        for (PropertyPath path : RecordingContext.recordPaths(entityClass, proxyAction)) {
+            String resolved = resolveColumnName(path.getTerminalProperty());
+            if (!target.contains(resolved)) {
+                target.add(resolved);
             }
         }
-        return this;
     }
 
     /**
@@ -353,14 +336,6 @@ public class UpsertBuilder<T> {
 
     public String toSql(Dialect targetDialect) {
         return toSqlAndParams(targetDialect).getSql();
-    }
-
-    public int executeRows() {
-        return execute(true);
-    }
-
-    public int executeRows(boolean returnKeys) {
-        return execute(returnKeys);
     }
 
     public int exec() {

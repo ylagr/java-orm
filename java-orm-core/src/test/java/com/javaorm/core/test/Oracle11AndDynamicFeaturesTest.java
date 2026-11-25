@@ -352,6 +352,15 @@ public class Oracle11AndDynamicFeaturesTest {
 
         int dCount = orm.delete(Student.class).where().eq("id", 9999).printSql(true).execute();
         assertEquals(0, dCount);
+
+        // 7. orm.update(entity).toSql() 应在未执行前正确渲染 SET 与 WHERE id = ?
+        Student preview = new Student();
+        preview.setId(1L);
+        preview.setAge(26);
+        String previewSql = orm.update(preview).toSql();
+        assertTrue(previewSql.contains("UPDATE \"t_student\" SET \"age\" = ?"));
+        assertTrue(previewSql.contains("WHERE"));
+        assertTrue(previewSql.contains("\"id\" = ?"));
     }
 
     @Test

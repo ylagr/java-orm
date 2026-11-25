@@ -304,7 +304,7 @@ public class UpsertAndPessimisticLockTest {
         u2.setUserName("New 302");
         u2.setBalance(200.0);
 
-        int affected = orm.insertOrUpdate(Arrays.asList(u1, u2)).exec();
+        int affected = orm.insertOrUpdateBatch(Arrays.asList(u1, u2)).exec();
         assertTrue(affected >= 2);
 
         UpsertAccount db1 = orm.findById(UpsertAccount.class, 301L);

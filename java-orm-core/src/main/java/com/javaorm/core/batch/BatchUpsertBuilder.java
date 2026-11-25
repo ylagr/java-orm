@@ -79,21 +79,7 @@ public class BatchUpsertBuilder<T> {
     }
 
     public BatchUpsertBuilder<T> onConflict(Consumer<T> proxyAction) {
-        Class<T> entityClass = getEntityClass();
-        if (proxyAction != null && entityClass != null) {
-            T proxy = ProxyFactory.getProxy(entityClass);
-            proxyAction.accept(proxy);
-            PropertyPath path = RecordingContext.finishCurrent(entityClass);
-            if (path == null) {
-                path = RecordingContext.finish(entityClass);
-            }
-            if (path != null) {
-                String resolved = resolveColumnName(path.getTerminalProperty());
-                if (!this.conflictColumns.contains(resolved)) {
-                    this.conflictColumns.add(resolved);
-                }
-            }
-        }
+        addResolvedColumns(this.conflictColumns, proxyAction);
         return this;
     }
 
@@ -112,22 +98,17 @@ public class BatchUpsertBuilder<T> {
     }
 
     public BatchUpsertBuilder<T> updateColumns(Consumer<T> proxyAction) {
-        Class<T> entityClass = getEntityClass();
-        if (proxyAction != null && entityClass != null) {
-            T proxy = ProxyFactory.getProxy(entityClass);
-            proxyAction.accept(proxy);
-            PropertyPath path = RecordingContext.finishCurrent(entityClass);
-            if (path == null) {
-                path = RecordingContext.finish(entityClass);
-            }
-            if (path != null) {
-                String resolved = resolveColumnName(path.getTerminalProperty());
-                if (!this.updateColumns.contains(resolved)) {
-                    this.updateColumns.add(resolved);
-                }
+        addResolvedColumns(this.updateColumns, proxyAction);
+        return this;
+    }
+
+    private void addResolvedColumns(List<String> target, Consumer<T> proxyAction) {
+        for (PropertyPath path : RecordingContext.recordPaths(getEntityClass(), proxyAction)) {
+            String resolved = resolveColumnName(path.getTerminalProperty());
+            if (!target.contains(resolved)) {
+                target.add(resolved);
             }
         }
-        return this;
     }
 
     public BatchUpsertBuilder<T> ignoreColumns(String... columns) {

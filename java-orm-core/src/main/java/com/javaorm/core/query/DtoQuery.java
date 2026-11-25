@@ -328,7 +328,7 @@ public class DtoQuery<DTO, T> {
     }
 
     public String toSQL() {
-        return underlyingQuery.toSQL();
+        return underlyingQuery.toSql();
     }
 
     public String toSql(Dialect customDialect) {
@@ -336,7 +336,7 @@ public class DtoQuery<DTO, T> {
     }
 
     public String toSQL(Dialect customDialect) {
-        return underlyingQuery.toSQL(customDialect);
+        return underlyingQuery.toSql(customDialect);
     }
 
     public DTO single() {

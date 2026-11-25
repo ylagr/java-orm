@@ -54,12 +54,12 @@ public class EasyQueryDmlParityTest {
         Topic newTopic = new Topic("100", 99, "Inserted Topic", LocalDateTime.now());
 
         // 1. toSQL check
-        String sql = orm.insert(newTopic).toSQL();
+        String sql = orm.insert(newTopic).toSql();
         assertTrue("Insert SQL must contain INSERT INTO: " + sql, sql.startsWith("INSERT INTO"));
         assertTrue("Must quote table name: " + sql, sql.contains("\"t_topic\""));
 
         // 2. executeRows
-        int rows = orm.insert(newTopic).executeRows();
+        int rows = orm.insert(newTopic).exec();
         assertEquals(1, rows);
 
         Topic query = orm.select(Topic.class).whereById("100").firstOrNull();
@@ -70,7 +70,7 @@ public class EasyQueryDmlParityTest {
         // 3. Batch insert
         Topic t1 = new Topic("101", 10, "Batch 1", LocalDateTime.now());
         Topic t2 = new Topic("102", 20, "Batch 2", LocalDateTime.now());
-        int batchRows = orm.insert(Arrays.asList(t1, t2)).exec();
+        int batchRows = orm.insertBatch(Arrays.asList(t1, t2)).exec();
         assertEquals(2, batchRows);
 
         List<Topic> batchQuery = orm.select(Topic.class).whereByIds("101", "102").toList();
@@ -86,7 +86,7 @@ public class EasyQueryDmlParityTest {
                 .set(proxy.getTitle(), "Updated Title 1")
                 .set(proxy.getStars(), 88)
                 .whereById("1")
-                .toSQL();
+                .toSql();
         assertTrue(sql.contains("UPDATE \"t_topic\" SET"));
         assertTrue(sql.contains("\"title\" = ?"));
         assertTrue(sql.contains("\"stars\" = ?"));
@@ -95,7 +95,7 @@ public class EasyQueryDmlParityTest {
                 .set(proxy.getTitle(), "Updated Title 1")
                 .set(proxy.getStars(), 88)
                 .whereById("1")
-                .executeRows();
+                .exec();
         assertEquals(1, rows);
 
         Topic query = orm.select(Topic.class).whereById("1").firstOrNull();
@@ -105,7 +105,7 @@ public class EasyQueryDmlParityTest {
 
         // 2. Entity-level updatable
         query.setTitle("Entity Updated");
-        int entityRows = orm.update(query).executeRows();
+        int entityRows = orm.update(query).exec();
         assertEquals(1, entityRows);
 
         Topic updated = orm.select(Topic.class).whereById("1").firstOrNull();
@@ -116,13 +116,13 @@ public class EasyQueryDmlParityTest {
         String mysqlSql = orm.update(Topic.class)
                 .set(proxy.getTitle(), "Dialect Title")
                 .whereById("1")
-                .toSQL(new MySQLDialect());
+                .toSql(new MySQLDialect());
         assertTrue("MySQL must use backticks: " + mysqlSql, mysqlSql.contains("`t_topic`"));
 
         String pgSql = orm.update(Topic.class)
                 .set(proxy.getTitle(), "Dialect Title")
                 .whereById("1")
-                .toSQL(new PostgreSQLDialect());
+                .toSql(new PostgreSQLDialect());
         assertTrue("PostgreSQL must use double quotes: " + pgSql, pgSql.contains("\"t_topic\""));
     }
 
@@ -133,11 +133,11 @@ public class EasyQueryDmlParityTest {
         // 1. Logic delete: should rewrite to UPDATE t_topic SET is_deleted = 1
         String logicDeleteSql = orm.delete(Topic.class)
                 .whereById("1")
-                .toSQL();
+                .toSql();
         assertTrue("Logic delete must rewrite to UPDATE: " + logicDeleteSql, logicDeleteSql.startsWith("UPDATE"));
         assertTrue("Must set is_deleted: " + logicDeleteSql, logicDeleteSql.contains("\"is_deleted\" = ?"));
 
-        int rows = orm.delete(Topic.class).whereById("1").executeRows();
+        int rows = orm.delete(Topic.class).whereById("1").exec();
         assertEquals(1, rows);
 
         // Verify normal query cannot find it anymore
@@ -153,13 +153,13 @@ public class EasyQueryDmlParityTest {
         String physicalSql = orm.delete(Topic.class)
                 .disableLogicDelete()
                 .whereById("1")
-                .toSQL();
+                .toSql();
         assertTrue("Physical delete must use DELETE FROM: " + physicalSql, physicalSql.startsWith("DELETE FROM"));
 
         int physicalRows = orm.delete(Topic.class)
                 .disableLogicDelete()
                 .whereById("1")
-                .executeRows();
+                .exec();
         assertEquals(1, physicalRows);
 
         // Record completely removed
@@ -169,7 +169,7 @@ public class EasyQueryDmlParityTest {
         // 3. Entity-level deletable and batch deletable
         Topic t2 = orm.select(Topic.class).whereById("2").firstOrNull();
         assertNotNull(t2);
-        int delRows = orm.delete(t2).executeRows();
+        int delRows = orm.delete(t2).exec();
         assertEquals(1, delRows);
 
         assertNull(orm.select(Topic.class).whereById("2").firstOrNull());

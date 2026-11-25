@@ -241,29 +241,13 @@ public class InsertBuilder<T> {
         return toSqlAndParams().getSql();
     }
 
-    public String toSQL() {
-        return toSql();
-    }
-
     public String toSql(Dialect targetDialect) {
         return toSqlAndParams(targetDialect).getSql();
-    }
-
-    public String toSQL(Dialect targetDialect) {
-        return toSql(targetDialect);
     }
 
     @Override
     public String toString() {
         return toSql();
-    }
-
-    public int executeRows() {
-        return execute(true);
-    }
-
-    public int executeRows(boolean returnKeys) {
-        return execute(returnKeys);
     }
 
     public int exec() {

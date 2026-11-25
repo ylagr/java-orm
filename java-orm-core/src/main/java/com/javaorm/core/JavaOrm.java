@@ -315,13 +315,6 @@ public class JavaOrm {
     }
 
     /**
-     * 开启批量实体插入构建器（需调用 .exec() 或 .execute() 执行）
-     */
-    public <T> com.javaorm.core.batch.BatchInsertBuilder<T> insert(java.util.Collection<T> entities) {
-        return insertBatch(entities);
-    }
-
-    /**
      * 开启批处理插入构建器（支持自定义 batchSize、多值/JDBC Batch 模式）
      */
     public <T> com.javaorm.core.batch.BatchInsertBuilder<T> insertBatch(java.util.Collection<T> entities) {
@@ -336,13 +329,6 @@ public class JavaOrm {
     }
 
     /**
-     * 开启批量实体 UPSERT 构建器（需调用 .exec() 或 .execute() 执行）
-     */
-    public <T> com.javaorm.core.batch.BatchUpsertBuilder<T> insertOrUpdate(java.util.Collection<T> entities) {
-        return insertOrUpdateBatch(entities);
-    }
-
-    /**
      * 开启批量 UPSERT 构建器（支持自定义 batchSize、onConflict、updateColumns、ignoreColumns 等）
      */
     public <T> com.javaorm.core.batch.BatchUpsertBuilder<T> insertOrUpdateBatch(java.util.Collection<T> entities) {
@@ -354,13 +340,6 @@ public class JavaOrm {
      */
     public <T> UpdateBuilder<T> update(T entity) {
         return UpdateBuilder.forEntity(env(), entity, true);
-    }
-
-    /**
-     * 开启批量实体更新构建器（需调用 .exec() 或 .execute() 执行）
-     */
-    public <T> com.javaorm.core.batch.BatchUpdateBuilder<T> update(java.util.Collection<T> entities) {
-        return updateBatch(entities);
     }
 
     /**
@@ -402,13 +381,6 @@ public class JavaOrm {
             throw new IllegalArgumentException("Primary key value is null for delete");
         }
         return delete(clazz).whereById(idVal);
-    }
-
-    /**
-     * 开启批量实体删除构建器（需调用 .exec() 或 .execute() 执行）
-     */
-    public <T> com.javaorm.core.batch.BatchDeleteBuilder<T> delete(java.util.Collection<T> entities) {
-        return deleteBatch(entities);
     }
 
     /**
@@ -660,13 +632,6 @@ public class JavaOrm {
             consumer.accept(this.config.getMasterSlaveManager());
         }
         return this;
-    }
-
-    /**
-     * 读写分离配置别名（readWrite）
-     */
-    public JavaOrm readWrite(Consumer<com.javaorm.core.datasource.MasterSlaveManager> consumer) {
-        return masterSlave(consumer);
     }
 
     /**

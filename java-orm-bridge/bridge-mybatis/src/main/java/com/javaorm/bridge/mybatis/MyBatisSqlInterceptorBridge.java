@@ -21,6 +21,8 @@ import org.apache.ibatis.reflection.SystemMetaObject;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.ResultHandler;
 import org.apache.ibatis.session.RowBounds;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -47,6 +49,7 @@ import java.util.Properties;
 })
 public class MyBatisSqlInterceptorBridge implements SqlInterceptor, Interceptor {
 
+    private static final Logger log = LoggerFactory.getLogger(MyBatisSqlInterceptorBridge.class);
     private static final Configuration DEFAULT_CONFIGURATION = new Configuration();
     private static final Method PREPARE_METHOD;
     private static final Method EXECUTOR_QUERY_METHOD;
@@ -163,7 +166,8 @@ public class MyBatisSqlInterceptorBridge implements SqlInterceptor, Interceptor 
                             new Object[]{ms, sqlAndParams.getParams()}));
                 }
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            log.debug("MyBatis interceptor {} skipped in JavaORM bridge: {}", mybatisInterceptor.getClass().getName(), t.getMessage());
             return sqlAndParams;
         }
 

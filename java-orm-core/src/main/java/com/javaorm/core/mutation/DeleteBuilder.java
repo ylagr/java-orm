@@ -295,10 +295,6 @@ public class DeleteBuilder<T> {
         return whereByIds(ids);
     }
 
-    public int executeRows() {
-        return execute();
-    }
-
     public int exec() {
         return execute();
     }
