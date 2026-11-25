@@ -465,4 +465,39 @@ public class ShardingTableTest {
 
         assertEquals("t_single_config", customExecutor.lastPhysicalTable);
     }
+
+    @Test
+    public void testShardedUpsert() {
+        ShardedOrder order = new ShardedOrder();
+        order.setId(901L);
+        order.setOrderId(101L); // -> t_order_1
+        order.setOrderNo("ORD-UPSERT-1");
+        order.setAmount(100.0);
+
+        // 1. 首次 insertOrUpdate 应路由至 t_order_1 并插入成功
+        int inserted = orm.insertOrUpdate(order).exec();
+        assertEquals(1, inserted);
+
+        ShardedOrder loaded = orm.select(ShardedOrder.class)
+                .where().eq(o -> o.getOrderId(), 101L)
+                .eq(o -> o.getId(), 901L)
+                .first();
+        assertNotNull(loaded);
+        assertEquals("ORD-UPSERT-1", loaded.getOrderNo());
+        assertEquals(100.0, loaded.getAmount(), 0.001);
+
+        // 2. 主键冲突再次 insertOrUpdate 应执行 UPSERT 更新而非普通 INSERT 报错
+        order.setOrderNo("ORD-UPSERT-UPDATED");
+        order.setAmount(250.5);
+        int updated = orm.insertOrUpdate(order).exec();
+        assertEquals(1, updated);
+
+        ShardedOrder reloaded = orm.select(ShardedOrder.class)
+                .where().eq(o -> o.getOrderId(), 101L)
+                .eq(o -> o.getId(), 901L)
+                .first();
+        assertNotNull(reloaded);
+        assertEquals("ORD-UPSERT-UPDATED", reloaded.getOrderNo());
+        assertEquals(250.5, reloaded.getAmount(), 0.001);
+    }
 }

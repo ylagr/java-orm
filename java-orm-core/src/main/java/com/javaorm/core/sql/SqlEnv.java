@@ -698,7 +698,7 @@ public class SqlEnv {
         String effDsOverride = statement != null ? statement.getTargetDataSource() : null;
 
         if (com.javaorm.core.sharding.ShardingHandler.isSharding(metadata, effRouter, effDsRouter, effDsOverride)) {
-            return com.javaorm.core.sharding.ShardingHandler.executeInsert(conn, statement, metadata, returnKeys, entity, effRouter, effDsRouter, effDsOverride, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
+            return com.javaorm.core.sharding.ShardingHandler.executeUpsert(conn, statement, metadata, returnKeys, entity, effRouter, effDsRouter, effDsOverride, dialect, getEffectiveConfig(), dataSource, getSqlExecutor());
         }
         return getSqlExecutor().executeUpsert(conn, statement, metadata, returnKeys, entity, dialect, getEffectiveConfig(), dataSource);
     }

@@ -484,82 +484,56 @@ public class ShardingHandler {
 
     // ========== 核心执行与归并方法 ==========
 
-    public static <R> List<R> executeSelectList(Connection conn, SelectStatement statement, EntityMetadata metadata,
-                                                List<IncludeSpec> includes, Dialect dialect, OrmConfig config,
-                                                DataSource defaultDs, SqlExecutor executor) {
+    @FunctionalInterface
+    private interface SelectListPartitionExecutor<T> {
+        List<T> execute(SelectStatement stmt, DataSource ds);
+    }
+
+    private static <T> List<T> executeSelectListSharded(SelectStatement statement, EntityMetadata metadata,
+                                                      OrmConfig config, DataSource defaultDs,
+                                                      SelectListPartitionExecutor<T> partitionExecutor) {
         List<String> dataSources = determineTargetDataSources(statement, metadata);
         List<String> tables = determineTargetTables(statement, metadata);
 
         if (dataSources.size() == 1 && tables.size() == 1) {
             statement.setRootTableName(tables.get(0));
             DataSource ds = resolveDataSource(dataSources.get(0), config, defaultDs);
-            return executor.executeQuery(conn, statement, metadata, includes, dialect, config, ds);
+            return partitionExecutor.execute(statement, ds);
         }
 
-        List<R> merged = new ArrayList<>();
+        List<T> merged = new ArrayList<>();
         for (String dsName : dataSources) {
             DataSource ds = resolveDataSource(dsName, config, defaultDs);
             for (String table : tables) {
                 SelectStatement copy = statement.copyWithTableName(table);
-                List<R> part = executor.executeQuery(conn, copy, metadata, includes, dialect, config, ds);
+                List<T> part = partitionExecutor.execute(copy, ds);
                 if (part != null && !part.isEmpty()) {
                     merged.addAll(part);
                 }
             }
         }
         return applyPagination(merged, statement);
+    }
+
+    public static <R> List<R> executeSelectList(Connection conn, SelectStatement statement, EntityMetadata metadata,
+                                                List<IncludeSpec> includes, Dialect dialect, OrmConfig config,
+                                                DataSource defaultDs, SqlExecutor executor) {
+        return executeSelectListSharded(statement, metadata, config, defaultDs,
+                (stmt, ds) -> executor.executeQuery(conn, stmt, metadata, includes, dialect, config, ds));
     }
 
     public static <DTO> List<DTO> executeSelectDtoList(Connection conn, SelectStatement statement, Class<DTO> dtoClass,
                                                        EntityMetadata metadata, Dialect dialect, OrmConfig config,
                                                        DataSource defaultDs, SqlExecutor executor) {
-        List<String> dataSources = determineTargetDataSources(statement, metadata);
-        List<String> tables = determineTargetTables(statement, metadata);
-
-        if (dataSources.size() == 1 && tables.size() == 1) {
-            statement.setRootTableName(tables.get(0));
-            DataSource ds = resolveDataSource(dataSources.get(0), config, defaultDs);
-            return executor.executeDtoQuery(conn, statement, dtoClass, dialect, config, ds);
-        }
-
-        List<DTO> merged = new ArrayList<>();
-        for (String dsName : dataSources) {
-            DataSource ds = resolveDataSource(dsName, config, defaultDs);
-            for (String table : tables) {
-                SelectStatement copy = statement.copyWithTableName(table);
-                List<DTO> part = executor.executeDtoQuery(conn, copy, dtoClass, dialect, config, ds);
-                if (part != null && !part.isEmpty()) {
-                    merged.addAll(part);
-                }
-            }
-        }
-        return applyPagination(merged, statement);
+        return executeSelectListSharded(statement, metadata, config, defaultDs,
+                (stmt, ds) -> executor.executeDtoQuery(conn, stmt, dtoClass, dialect, config, ds));
     }
 
     public static List<Map<String, Object>> executeSelectMaps(Connection conn, SelectStatement statement,
                                                               EntityMetadata metadata, Dialect dialect, OrmConfig config,
                                                               DataSource defaultDs, SqlExecutor executor) {
-        List<String> dataSources = determineTargetDataSources(statement, metadata);
-        List<String> tables = determineTargetTables(statement, metadata);
-
-        if (dataSources.size() == 1 && tables.size() == 1) {
-            statement.setRootTableName(tables.get(0));
-            DataSource ds = resolveDataSource(dataSources.get(0), config, defaultDs);
-            return executor.executeMaps(conn, statement, dialect, config, ds);
-        }
-
-        List<Map<String, Object>> merged = new ArrayList<>();
-        for (String dsName : dataSources) {
-            DataSource ds = resolveDataSource(dsName, config, defaultDs);
-            for (String table : tables) {
-                SelectStatement copy = statement.copyWithTableName(table);
-                List<Map<String, Object>> part = executor.executeMaps(conn, copy, dialect, config, ds);
-                if (part != null && !part.isEmpty()) {
-                    merged.addAll(part);
-                }
-            }
-        }
-        return applyPagination(merged, statement);
+        return executeSelectListSharded(statement, metadata, config, defaultDs,
+                (stmt, ds) -> executor.executeMaps(conn, stmt, dialect, config, ds));
     }
 
     @SuppressWarnings("unchecked")
@@ -604,27 +578,8 @@ public class ShardingHandler {
     public static <V> List<V> executeSelectScalarList(Connection conn, SelectStatement statement, Class<V> targetType,
                                                       EntityMetadata metadata, Dialect dialect, OrmConfig config,
                                                       DataSource defaultDs, SqlExecutor executor) {
-        List<String> dataSources = determineTargetDataSources(statement, metadata);
-        List<String> tables = determineTargetTables(statement, metadata);
-
-        if (dataSources.size() == 1 && tables.size() == 1) {
-            statement.setRootTableName(tables.get(0));
-            DataSource ds = resolveDataSource(dataSources.get(0), config, defaultDs);
-            return executor.executeScalarList(conn, statement, targetType, dialect, config, ds);
-        }
-
-        List<V> merged = new ArrayList<>();
-        for (String dsName : dataSources) {
-            DataSource ds = resolveDataSource(dsName, config, defaultDs);
-            for (String table : tables) {
-                SelectStatement copy = statement.copyWithTableName(table);
-                List<V> part = executor.executeScalarList(conn, copy, targetType, dialect, config, ds);
-                if (part != null && !part.isEmpty()) {
-                    merged.addAll(part);
-                }
-            }
-        }
-        return applyPagination(merged, statement);
+        return executeSelectListSharded(statement, metadata, config, defaultDs,
+                (stmt, ds) -> executor.executeScalarList(conn, stmt, targetType, dialect, config, ds));
     }
 
     public static long executeSelectCount(Connection conn, SelectStatement statement, EntityMetadata metadata,
@@ -649,30 +604,40 @@ public class ShardingHandler {
         return total;
     }
 
+    @FunctionalInterface
+    private interface TablePartitionMutation {
+        int execute(String tableName, DataSource ds, boolean isSingle);
+    }
+
+    private static int executeMutationSharded(List<String> dataSources, List<String> tables,
+                                              OrmConfig config, DataSource defaultDs,
+                                              TablePartitionMutation mutation) {
+        if (dataSources.size() == 1 && tables.size() == 1) {
+            DataSource ds = resolveDataSource(dataSources.get(0), config, defaultDs);
+            return mutation.execute(tables.get(0), ds, true);
+        }
+        int affected = 0;
+        for (String dsName : dataSources) {
+            DataSource ds = resolveDataSource(dsName, config, defaultDs);
+            for (String table : tables) {
+                affected += mutation.execute(table, ds, false);
+            }
+        }
+        return affected;
+    }
+
     public static int executeUpdate(Connection conn, UpdateStatement statement, EntityMetadata metadata,
                                     TableRouter<?> routerOverride, DataSourceRouter<?> dsRouterOverride,
                                     String dsOverride, Boolean allowFullScanOverride,
                                     Dialect dialect, OrmConfig config, DataSource defaultDs, SqlExecutor executor) {
         List<String> dataSources = determineTargetDataSources(statement, metadata, dsRouterOverride, dsOverride, allowFullScanOverride);
         List<String> tables = determineTargetTables(statement, metadata, routerOverride, allowFullScanOverride);
-
-        if (dataSources.size() == 1 && tables.size() == 1) {
-            statement.setTableName(tables.get(0));
-            DataSource ds = resolveDataSource(dataSources.get(0), config, defaultDs);
-            SqlAndParams sqlAndParams = dialect.buildUpdate(statement);
+        return executeMutationSharded(dataSources, tables, config, defaultDs, (table, ds, isSingle) -> {
+            UpdateStatement targetStmt = isSingle ? statement : statement.copyWithTableName(table);
+            if (isSingle) targetStmt.setTableName(table);
+            SqlAndParams sqlAndParams = dialect.buildUpdate(targetStmt);
             return executor.executeUpdate(conn, sqlAndParams, "UPDATE", dialect, config, ds);
-        }
-
-        int affected = 0;
-        for (String dsName : dataSources) {
-            DataSource ds = resolveDataSource(dsName, config, defaultDs);
-            for (String table : tables) {
-                UpdateStatement copy = statement.copyWithTableName(table);
-                SqlAndParams sqlAndParams = dialect.buildUpdate(copy);
-                affected += executor.executeUpdate(conn, sqlAndParams, "UPDATE", dialect, config, ds);
-            }
-        }
-        return affected;
+        });
     }
 
     public static int executeDelete(Connection conn, DeleteStatement statement, EntityMetadata metadata,
@@ -681,42 +646,44 @@ public class ShardingHandler {
                                     Dialect dialect, OrmConfig config, DataSource defaultDs, SqlExecutor executor) {
         List<String> dataSources = determineTargetDataSources(statement, metadata, dsRouterOverride, dsOverride, allowFullScanOverride);
         List<String> tables = determineTargetTables(statement, metadata, routerOverride, allowFullScanOverride);
-
-        if (dataSources.size() == 1 && tables.size() == 1) {
-            statement.setTableName(tables.get(0));
-            DataSource ds = resolveDataSource(dataSources.get(0), config, defaultDs);
-            SqlAndParams sqlAndParams = dialect.buildDelete(statement);
+        return executeMutationSharded(dataSources, tables, config, defaultDs, (table, ds, isSingle) -> {
+            DeleteStatement targetStmt = isSingle ? statement : statement.copyWithTableName(table);
+            if (isSingle) targetStmt.setTableName(table);
+            SqlAndParams sqlAndParams = dialect.buildDelete(targetStmt);
             return executor.executeUpdate(conn, sqlAndParams, "DELETE", dialect, config, ds);
-        }
-
-        int affected = 0;
-        for (String dsName : dataSources) {
-            DataSource ds = resolveDataSource(dsName, config, defaultDs);
-            for (String table : tables) {
-                DeleteStatement copy = statement.copyWithTableName(table);
-                SqlAndParams sqlAndParams = dialect.buildDelete(copy);
-                affected += executor.executeUpdate(conn, sqlAndParams, "DELETE", dialect, config, ds);
-            }
-        }
-        return affected;
+        });
     }
 
-    @SuppressWarnings("unchecked")
     public static int executeInsert(Connection conn, InsertStatement statement, EntityMetadata metadata,
                                     boolean returnKeys, Object entity,
                                     TableRouter<?> routerOverride, DataSourceRouter<?> dsRouterOverride,
                                     String dsOverride, Dialect dialect, OrmConfig config,
                                     DataSource defaultDs, SqlExecutor executor) {
+        DataSource targetDs = routeSingleEntityStatement(statement, metadata, entity,
+                routerOverride, dsRouterOverride, dsOverride, config, defaultDs);
+        return executor.executeInsert(conn, statement, metadata, returnKeys, entity, dialect, config, targetDs);
+    }
+
+    public static int executeUpsert(Connection conn, UpsertStatement statement, EntityMetadata metadata,
+                                    boolean returnKeys, Object entity,
+                                    TableRouter<?> routerOverride, DataSourceRouter<?> dsRouterOverride,
+                                    String dsOverride, Dialect dialect, OrmConfig config,
+                                    DataSource defaultDs, SqlExecutor executor) {
+        DataSource targetDs = routeSingleEntityStatement(statement, metadata, entity,
+                routerOverride, dsRouterOverride, dsOverride, config, defaultDs);
+        return executor.executeUpsert(conn, statement, metadata, returnKeys, entity, dialect, config, targetDs);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static DataSource routeSingleEntityStatement(InsertStatement statement, EntityMetadata metadata, Object entity,
+                                                         TableRouter<?> routerOverride, DataSourceRouter<?> dsRouterOverride,
+                                                         String dsOverride, OrmConfig config, DataSource defaultDs) {
         TableRouter<Object> tableRouter = (TableRouter<Object>) resolveTableRouter(metadata, routerOverride);
         DataSourceRouter<Object> dsRouter = (DataSourceRouter<Object>) resolveDataSourceRouter(metadata, dsRouterOverride);
 
         ColumnMetadata shardingCol = metadata != null ? metadata.getShardingColumn() : null;
-        Object shardingValue = null;
-        if (shardingCol != null && entity != null) {
-            shardingValue = shardingCol.getValue(entity);
-        }
+        Object shardingValue = (shardingCol != null && entity != null) ? shardingCol.getValue(entity) : null;
 
-        // 1. 确定物理数据源
         String targetDsName = null;
         if (dsOverride != null && !dsOverride.isEmpty()) {
             targetDsName = dsOverride;
@@ -734,17 +701,14 @@ public class ShardingHandler {
 
         DataSource targetDs = resolveDataSource(targetDsName, config, defaultDs);
 
-        // 2. 确定物理表
         if (tableRouter != null) {
             if (shardingValue == null) {
                 throw new IllegalArgumentException("Sharding key value cannot be null for table routing insert on "
                         + (metadata != null ? metadata.getEntityClass().getName() : "entity"));
             }
-            String targetTable = tableRouter.route(statement.getTableName(), shardingValue);
-            statement.setTableName(targetTable);
+            statement.setTableName(tableRouter.route(statement.getTableName(), shardingValue));
         }
-
-        return executor.executeInsert(conn, statement, metadata, returnKeys, entity, dialect, config, targetDs);
+        return targetDs;
     }
 
     private static <T> List<T> applyPagination(List<T> list, SelectStatement statement) {
