@@ -18,10 +18,11 @@ import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.type.TypeHandler;
 import org.apache.ibatis.type.UnknownTypeHandler;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+
+import static com.javaorm.core.bridge.MetadataBridge.getAnnotation;
 
 /**
  * MyBatis-Plus 元数据桥接器
@@ -34,6 +35,8 @@ import java.lang.reflect.Method;
  * - 优先感知并复用 MyBatis-Plus 官方 {@link TableInfoHelper} 缓存元数据
  */
 public class MyBatisPlusBridge implements MetadataBridge {
+
+    private static final Configuration FALLBACK_CONFIGURATION = new Configuration();
 
     @Override
     public int getOrder() {
@@ -55,7 +58,7 @@ public class MyBatisPlusBridge implements MetadataBridge {
         try {
             if (TableInfoHelper.getTableInfo(entityClass) == null) {
                 TableInfoHelper.initTableInfo(
-                        new org.apache.ibatis.builder.MapperBuilderAssistant(new org.apache.ibatis.session.Configuration(), ""),
+                        new org.apache.ibatis.builder.MapperBuilderAssistant(FALLBACK_CONFIGURATION, ""),
                         entityClass);
             }
         } catch (Throwable ignored) {
@@ -195,7 +198,7 @@ public class MyBatisPlusBridge implements MetadataBridge {
             if (normalVal.isEmpty() || delVal.isEmpty()) {
                 try {
                     com.baomidou.mybatisplus.core.config.GlobalConfig.DbConfig dbConfig =
-                            GlobalConfigUtils.getGlobalConfig(new Configuration()).getDbConfig();
+                            GlobalConfigUtils.getGlobalConfig(FALLBACK_CONFIGURATION).getDbConfig();
                     if (normalVal.isEmpty() && dbConfig.getLogicNotDeleteValue() != null) {
                         normalVal = dbConfig.getLogicNotDeleteValue();
                     }
@@ -234,9 +237,5 @@ public class MyBatisPlusBridge implements MetadataBridge {
         } catch (Throwable t) {
             throw new RuntimeException("Failed to instantiate TypeHandler: " + handlerClass.getName(), t);
         }
-    }
-
-    private <A extends Annotation> A getAnnotation(Field field, Method getter, Class<A> annotationClass) {
-        return MetadataBridge.getAnnotation(field, getter, annotationClass);
     }
 }

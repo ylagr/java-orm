@@ -10,9 +10,10 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import javax.persistence.Version;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+
+import static com.javaorm.core.bridge.MetadataBridge.getAnnotation;
 
 /**
  * JPA (javax.persistence) 元数据桥接器
@@ -111,9 +112,5 @@ public class JpaBridge implements MetadataBridge {
         }
 
         return info;
-    }
-
-    private <A extends Annotation> A getAnnotation(Field field, Method getter, Class<A> annotationClass) {
-        return MetadataBridge.getAnnotation(field, getter, annotationClass);
     }
 }

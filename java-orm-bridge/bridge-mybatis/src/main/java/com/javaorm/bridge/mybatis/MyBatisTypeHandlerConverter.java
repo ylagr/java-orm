@@ -138,9 +138,42 @@ public class MyBatisTypeHandlerConverter<T> implements ValueConverter<T, Object>
                                     ? ((Number) this.currentDbValue).shortValue()
                                     : Short.parseShort(this.currentDbValue.toString().trim());
                         }
+                        if ("getTimestamp".equals(methodName)) {
+                            return toSqlTimestamp(this.currentDbValue);
+                        }
+                        if ("getDate".equals(methodName)) {
+                            return toSqlDate(this.currentDbValue);
+                        }
+                        if ("getTime".equals(methodName)) {
+                            return toSqlTime(this.currentDbValue);
+                        }
                         return defaultValue(method.getReturnType());
                     }
             );
+        }
+
+        private static java.sql.Timestamp toSqlTimestamp(Object val) {
+            if (val instanceof java.sql.Timestamp) return (java.sql.Timestamp) val;
+            if (val instanceof java.util.Date) return new java.sql.Timestamp(((java.util.Date) val).getTime());
+            if (val instanceof java.time.LocalDateTime) return java.sql.Timestamp.valueOf((java.time.LocalDateTime) val);
+            if (val instanceof Number) return new java.sql.Timestamp(((Number) val).longValue());
+            return java.sql.Timestamp.valueOf(val.toString().trim());
+        }
+
+        private static java.sql.Date toSqlDate(Object val) {
+            if (val instanceof java.sql.Date) return (java.sql.Date) val;
+            if (val instanceof java.util.Date) return new java.sql.Date(((java.util.Date) val).getTime());
+            if (val instanceof java.time.LocalDate) return java.sql.Date.valueOf((java.time.LocalDate) val);
+            if (val instanceof Number) return new java.sql.Date(((Number) val).longValue());
+            return java.sql.Date.valueOf(val.toString().trim());
+        }
+
+        private static java.sql.Time toSqlTime(Object val) {
+            if (val instanceof java.sql.Time) return (java.sql.Time) val;
+            if (val instanceof java.util.Date) return new java.sql.Time(((java.util.Date) val).getTime());
+            if (val instanceof java.time.LocalTime) return java.sql.Time.valueOf((java.time.LocalTime) val);
+            if (val instanceof Number) return new java.sql.Time(((Number) val).longValue());
+            return java.sql.Time.valueOf(val.toString().trim());
         }
 
         private static Object defaultValue(Class<?> returnType) {

@@ -13,9 +13,10 @@ import com.javaorm.core.bridge.ColumnInfo;
 import com.javaorm.core.bridge.MetadataBridge;
 import com.javaorm.core.bridge.TableInfo;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+
+import static com.javaorm.core.bridge.MetadataBridge.getAnnotation;
 
 /**
  * EasyQuery 元数据桥接器
@@ -112,9 +113,5 @@ public class EasyQueryBridge implements MetadataBridge {
             return true;
         }
         return null;
-    }
-
-    private <A extends Annotation> A getAnnotation(Field field, Method getter, Class<A> annotationClass) {
-        return MetadataBridge.getAnnotation(field, getter, annotationClass);
     }
 }

@@ -1,7 +1,6 @@
 package com.javaorm.bridge.mp;
 
 import com.javaorm.bridge.mybatis.JavaOrmMyBatisSupport;
-import com.javaorm.bridge.mybatis.MyBatisSqlExecutor;
 import com.javaorm.core.JavaOrm;
 import com.javaorm.core.config.OrmConfig;
 import org.apache.ibatis.session.SqlSession;
@@ -104,18 +103,7 @@ public class MyBatisPlusAdapter {
      * @param sqlSessionFactory MyBatis-Plus / MyBatis 的 SqlSessionFactory
      */
     public static void adapt(OrmConfig config, SqlSessionFactory sqlSessionFactory) {
-        if (config == null || sqlSessionFactory == null) {
-            return;
-        }
-        if (config.getSqlExecutor() == null) {
-            config.setSqlExecutor(new MyBatisSqlExecutor(sqlSessionFactory));
-        }
-        // 自动探测并注册所有 MP 拦截器插件
-        JavaOrmMyBatisSupport.autoRegisterInterceptors(config, sqlSessionFactory.getConfiguration());
-        // 自动桥接 MP MetaObjectHandler 自动填充处理器
-        JavaOrmMyBatisSupport.autoRegisterMetaObjectHandler(config, sqlSessionFactory.getConfiguration());
-        // 自动桥接 MyBatis / MP 全局注册的 TypeHandler
-        JavaOrmMyBatisSupport.autoRegisterTypeHandlers(config, sqlSessionFactory.getConfiguration());
+        JavaOrmMyBatisSupport.adapt(config, sqlSessionFactory);
     }
 
     /**
@@ -125,15 +113,7 @@ public class MyBatisPlusAdapter {
      * @param sqlSession 当前激活的 SqlSession
      */
     public static void adapt(OrmConfig config, SqlSession sqlSession) {
-        if (config == null || sqlSession == null) {
-            return;
-        }
-        if (config.getSqlExecutor() == null) {
-            config.setSqlExecutor(new MyBatisSqlExecutor(sqlSession));
-        }
-        JavaOrmMyBatisSupport.autoRegisterInterceptors(config, sqlSession.getConfiguration());
-        JavaOrmMyBatisSupport.autoRegisterMetaObjectHandler(config, sqlSession.getConfiguration());
-        JavaOrmMyBatisSupport.autoRegisterTypeHandlers(config, sqlSession.getConfiguration());
+        JavaOrmMyBatisSupport.adapt(config, sqlSession);
     }
 
     /**

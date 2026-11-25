@@ -32,18 +32,9 @@ public class JavaOrmMyBatisSupport {
         if (sqlSession == null) {
             throw new IllegalArgumentException("SqlSession must not be null");
         }
-        Configuration configuration = sqlSession.getConfiguration();
-        DataSource dataSource = resolveDataSource(configuration);
-
+        DataSource dataSource = resolveDataSource(sqlSession.getConfiguration());
         OrmConfig config = userConfig != null ? userConfig : new OrmConfig();
-        if (config.getSqlExecutor() == null) {
-            config.setSqlExecutor(new MyBatisSqlExecutor(sqlSession));
-        }
-
-        autoRegisterInterceptors(config, configuration);
-        autoRegisterMetaObjectHandler(config, configuration);
-        autoRegisterTypeHandlers(config, configuration);
-
+        adapt(config, sqlSession);
         return JavaOrm.create(dataSource, config);
     }
 
@@ -55,19 +46,36 @@ public class JavaOrmMyBatisSupport {
         if (sqlSessionFactory == null) {
             throw new IllegalArgumentException("SqlSessionFactory must not be null");
         }
-        Configuration configuration = sqlSessionFactory.getConfiguration();
-        DataSource dataSource = resolveDataSource(configuration);
-
+        DataSource dataSource = resolveDataSource(sqlSessionFactory.getConfiguration());
         OrmConfig config = userConfig != null ? userConfig : new OrmConfig();
+        adapt(config, sqlSessionFactory);
+        return JavaOrm.create(dataSource, config);
+    }
+
+    public static void adapt(OrmConfig config, SqlSessionFactory sqlSessionFactory) {
+        if (config == null || sqlSessionFactory == null) {
+            return;
+        }
         if (config.getSqlExecutor() == null) {
             config.setSqlExecutor(new MyBatisSqlExecutor(sqlSessionFactory));
         }
+        adaptConfiguration(config, sqlSessionFactory.getConfiguration());
+    }
 
+    public static void adapt(OrmConfig config, SqlSession sqlSession) {
+        if (config == null || sqlSession == null) {
+            return;
+        }
+        if (config.getSqlExecutor() == null) {
+            config.setSqlExecutor(new MyBatisSqlExecutor(sqlSession));
+        }
+        adaptConfiguration(config, sqlSession.getConfiguration());
+    }
+
+    private static void adaptConfiguration(OrmConfig config, Configuration configuration) {
         autoRegisterInterceptors(config, configuration);
         autoRegisterMetaObjectHandler(config, configuration);
         autoRegisterTypeHandlers(config, configuration);
-
-        return JavaOrm.create(dataSource, config);
     }
 
     public static void autoRegisterMetaObjectHandler(OrmConfig config, Configuration configuration) {
