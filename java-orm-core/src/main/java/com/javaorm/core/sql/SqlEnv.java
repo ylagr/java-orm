@@ -2,11 +2,8 @@ package com.javaorm.core.sql;
 
 import com.javaorm.core.ast.*;
 import com.javaorm.core.config.OrmConfig;
-import com.javaorm.core.connection.ConnectionUtils;
 import com.javaorm.core.dialect.Dialect;
-import com.javaorm.core.dialect.SqlAndParams;
-import com.javaorm.core.hydration.EntityHydrator;
-import com.javaorm.core.hydration.IncludeProcessor;
+import com.javaorm.core.executor.ExecutionContext;
 import com.javaorm.core.metadata.ColumnMetadata;
 import com.javaorm.core.metadata.EntityMetadata;
 import com.javaorm.core.metadata.EntityMetadataManager;
@@ -37,10 +34,7 @@ public class SqlEnv {
 
     private static final Logger log = LoggerFactory.getLogger(SqlEnv.class);
 
-    private final DataSource dataSource;
-    private final Dialect dialect;
-    private final OrmConfig config;
-    private Boolean printSqlOverride = null;
+    private ExecutionContext executionContext;
 
     private int aliasSequence = 0;
     private final List<SqlTableInfo<?>> registeredTables = new ArrayList<>();
@@ -59,38 +53,36 @@ public class SqlEnv {
     }
 
     public SqlEnv(DataSource dataSource, Dialect dialect, OrmConfig config) {
-        this.dataSource = dataSource;
-        this.dialect = dialect;
-        this.config = config != null ? config : new OrmConfig();
+        this.executionContext = new ExecutionContext(dataSource, dialect, config);
     }
 
     public DataSource getDataSource() {
-        return dataSource;
+        return executionContext.getDataSource();
     }
 
     public Dialect getDialect() {
-        return dialect;
+        return executionContext.getDialect();
     }
 
     public OrmConfig getConfig() {
-        return config;
+        return executionContext.getConfig();
     }
 
     public SqlEnv setPrintSql(Boolean print) {
-        this.printSqlOverride = print;
+        this.executionContext = this.executionContext.withPrintSql(print);
         return this;
     }
 
     public Boolean getPrintSqlOverride() {
-        return printSqlOverride;
+        return executionContext.getPrintSqlOverride();
     }
 
     public boolean shouldPrintSql() {
-        return printSqlOverride != null ? printSqlOverride : (config != null && config.isPrintSql());
+        return executionContext.isPrintSql();
     }
 
-    public com.javaorm.core.executor.ExecutionContext getExecutionContext() {
-        return new com.javaorm.core.executor.ExecutionContext(dataSource, dialect, config, printSqlOverride);
+    public ExecutionContext getExecutionContext() {
+        return executionContext;
     }
 
     public String nextAlias() {
@@ -120,7 +112,7 @@ public class SqlEnv {
         }
         String effectiveAlias = (alias != null && !alias.trim().isEmpty()) ? alias.trim() : nextAlias();
         T proxy = ProxyFactory.createProxy(entityClass, effectiveAlias);
-        EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
+        EntityMetadata meta = EntityMetadataManager.get(entityClass, getConfig());
         String tableName = meta != null ? meta.getTableName() : entityClass.getSimpleName();
 
         SqlTableInfo<T> info = new SqlTableInfo<>(proxy, entityClass, null, effectiveAlias, tableName);
@@ -243,7 +235,7 @@ public class SqlEnv {
             return info;
         }
         String alias = nextAlias();
-        EntityMetadata meta = EntityMetadataManager.get(entityClass, config);
+        EntityMetadata meta = EntityMetadataManager.get(entityClass, getConfig());
         String tableName = meta != null ? meta.getTableName() : entityClass.getSimpleName();
         SqlTableInfo<E> dynamicallyCreated = new SqlTableInfo<>(null, entityClass, null, alias, tableName);
         registerTable(dynamicallyCreated);
@@ -638,19 +630,30 @@ public class SqlEnv {
 
     public String resolveColumnName(PropertyPath path) {
         if (path == null) return null;
+        OrmConfig config = getConfig();
         Class<?> entityClass = path.getRootEntityClass();
         if (path.hasRelations() && entityClass != null) {
-            EntityMetadata currentMeta = config != null ? config.getMetadata(entityClass) : EntityMetadataManager.get(entityClass, config);
+            EntityMetadata currentMeta = config.getMetadata(entityClass);
+            if (currentMeta == null) {
+                currentMeta = EntityMetadataManager.get(entityClass, config);
+            }
             for (String step : path.getRelationSteps()) {
                 com.javaorm.core.metadata.RelationMetadata rel = currentMeta != null ? currentMeta.getRelation(step) : null;
                 if (rel == null) break;
                 entityClass = rel.getTargetEntityClass();
-                currentMeta = config != null ? config.getMetadata(entityClass) : EntityMetadataManager.get(entityClass, config);
+                currentMeta = config.getMetadata(entityClass);
+                if (currentMeta == null) {
+                    currentMeta = EntityMetadataManager.get(entityClass, config);
+                }
             }
         }
-        EntityMetadata meta = (entityClass != null)
-                ? (config != null ? config.getMetadata(entityClass) : EntityMetadataManager.get(entityClass, config))
-                : null;
+        EntityMetadata meta = null;
+        if (entityClass != null) {
+            meta = config.getMetadata(entityClass);
+            if (meta == null) {
+                meta = EntityMetadataManager.get(entityClass, config);
+            }
+        }
         ColumnMetadata col = meta != null ? meta.getColumnByProperty(path.getFullPath()) : null;
         if (col == null && meta != null) {
             col = meta.getColumnByProperty(path.getTerminalProperty());
@@ -658,6 +661,6 @@ public class SqlEnv {
         if (col != null) {
             return col.getColumnName();
         }
-        return config != null ? config.getNameConversion().convert(path.getTerminalProperty()) : path.getTerminalProperty();
+        return config.getNameConversion().convert(path.getTerminalProperty());
     }
 }
