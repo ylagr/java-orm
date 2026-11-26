@@ -55,16 +55,35 @@ public abstract class AbstractBatchBuilder<T, SELF extends AbstractBatchBuilder<
     public abstract int execute();
 
     protected Map<PhysicalTarget, List<T>> groupByPhysicalTarget(Collection<T> items, EntityMetadata metadata) {
-        return groupByPhysicalTarget(items, metadata, Function.identity());
+        return groupByPhysicalTarget(items, metadata, Function.identity(), null, null, null);
+    }
+
+    protected <V> Map<PhysicalTarget, List<V>> groupByPhysicalTarget(Collection<T> items,
+                                                                     EntityMetadata metadata,
+                                                                     Function<T, V> valueExtractor) {
+        return groupByPhysicalTarget(items, metadata, valueExtractor, null, null, null);
     }
 
     @SuppressWarnings("unchecked")
     protected <V> Map<PhysicalTarget, List<V>> groupByPhysicalTarget(Collection<T> items,
                                                                      EntityMetadata metadata,
-                                                                     Function<T, V> valueExtractor) {
+                                                                     Function<T, V> valueExtractor,
+                                                                     TableRouter<?> tableRouterOverride,
+                                                                     DataSourceRouter<?> dsRouterOverride,
+                                                                     String targetDataSourceOverride) {
         Map<PhysicalTarget, List<V>> map = new LinkedHashMap<>();
-        if (!metadata.isSharding()) {
-            PhysicalTarget defaultTarget = new PhysicalTarget(metadata.getShardingDataSource(), metadata.getTableName());
+        DataSourceRouter<Object> dsRouter = dsRouterOverride != null
+                ? (DataSourceRouter<Object>) dsRouterOverride
+                : (DataSourceRouter<Object>) metadata.getShardingDataSourceRouter();
+        TableRouter<Object> tableRouter = tableRouterOverride != null
+                ? (TableRouter<Object>) tableRouterOverride
+                : (TableRouter<Object>) metadata.getShardingRouter();
+        String baseDsName = (targetDataSourceOverride != null && !targetDataSourceOverride.isEmpty())
+                ? targetDataSourceOverride
+                : metadata.getShardingDataSource();
+
+        if (dsRouter == null && tableRouter == null) {
+            PhysicalTarget defaultTarget = new PhysicalTarget(baseDsName, metadata.getTableName());
             List<V> list = new ArrayList<>(items.size());
             for (T e : items) {
                 list.add(valueExtractor.apply(e));
@@ -73,13 +92,14 @@ public abstract class AbstractBatchBuilder<T, SELF extends AbstractBatchBuilder<
             return map;
         }
 
-        DataSourceRouter<Object> dsRouter = (DataSourceRouter<Object>) metadata.getShardingDataSourceRouter();
-        TableRouter<Object> tableRouter = (TableRouter<Object>) metadata.getShardingRouter();
         ColumnMetadata shardingCol = metadata.getShardingColumn();
+        if (shardingCol == null) {
+            shardingCol = metadata.getIdColumn();
+        }
 
         for (T entity : items) {
             Object shardingVal = shardingCol != null ? shardingCol.getValue(entity) : null;
-            String dsName = metadata.getShardingDataSource();
+            String dsName = baseDsName;
             if (dsRouter != null) {
                 if (shardingVal == null) {
                     throw new IllegalArgumentException("Sharding key value cannot be null for entity: " + entity);

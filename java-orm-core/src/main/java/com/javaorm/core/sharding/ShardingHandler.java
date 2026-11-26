@@ -107,6 +107,14 @@ public class ShardingHandler {
         return metadata != null && metadata.isAllowFullShardingScan();
     }
 
+    private static ColumnMetadata resolveShardingColumn(EntityMetadata metadata) {
+        if (metadata == null) {
+            return null;
+        }
+        ColumnMetadata col = metadata.getShardingColumn();
+        return col != null ? col : metadata.getIdColumn();
+    }
+
     /**
      * 根据 WHERE 条件计算目标数据源名称列表（针对 SELECT）
      */
@@ -118,9 +126,8 @@ public class ShardingHandler {
         DataSourceRouter<Object> router = (DataSourceRouter<Object>) resolveDataSourceRouter(statement, metadata);
         if (router != null) {
             boolean allowFullScan = resolveAllowFullScan(statement, metadata);
-            ColumnMetadata shardingCol = metadata != null ? metadata.getShardingColumn() : null;
             return routeDataSourcesByConditions(statement.getRootEntityClass(), statement.getRootTableAlias(),
-                    statement.getWhereConditions(), shardingCol, router, allowFullScan);
+                    statement.getWhereConditions(), resolveShardingColumn(metadata), router, allowFullScan);
         }
         if (metadata != null && metadata.getShardingDataSource() != null && !metadata.getShardingDataSource().isEmpty()) {
             return Collections.singletonList(metadata.getShardingDataSource());
@@ -144,9 +151,8 @@ public class ShardingHandler {
         DataSourceRouter<Object> router = (DataSourceRouter<Object>) (dsRouterOverride != null ? dsRouterOverride : resolveDataSourceRouter(metadata, statement != null ? statement.getDataSourceRouter() : null));
         if (router != null) {
             boolean allowFullScan = resolveAllowFullScan(metadata, allowFullScanOverride);
-            ColumnMetadata shardingCol = metadata != null ? metadata.getShardingColumn() : null;
             return routeDataSourcesByConditions(statement.getEntityClass(), null,
-                    statement.getWhereConditions(), shardingCol, router, allowFullScan);
+                    statement.getWhereConditions(), resolveShardingColumn(metadata), router, allowFullScan);
         }
         if (metadata != null && metadata.getShardingDataSource() != null && !metadata.getShardingDataSource().isEmpty()) {
             return Collections.singletonList(metadata.getShardingDataSource());
@@ -170,9 +176,8 @@ public class ShardingHandler {
         DataSourceRouter<Object> router = (DataSourceRouter<Object>) (dsRouterOverride != null ? dsRouterOverride : resolveDataSourceRouter(metadata, statement != null ? statement.getDataSourceRouter() : null));
         if (router != null) {
             boolean allowFullScan = resolveAllowFullScan(metadata, allowFullScanOverride);
-            ColumnMetadata shardingCol = metadata != null ? metadata.getShardingColumn() : null;
             return routeDataSourcesByConditions(statement.getEntityClass(), null,
-                    statement.getWhereConditions(), shardingCol, router, allowFullScan);
+                    statement.getWhereConditions(), resolveShardingColumn(metadata), router, allowFullScan);
         }
         if (metadata != null && metadata.getShardingDataSource() != null && !metadata.getShardingDataSource().isEmpty()) {
             return Collections.singletonList(metadata.getShardingDataSource());
@@ -190,11 +195,10 @@ public class ShardingHandler {
             return Collections.singletonList(statement.getRootTableName());
         }
         boolean allowFullScan = resolveAllowFullScan(statement, metadata);
-        ColumnMetadata shardingCol = metadata != null ? metadata.getShardingColumn() : null;
         String logicTableName = statement.getRootTableName();
 
         return routeByConditions(logicTableName, statement.getRootEntityClass(), statement.getRootTableAlias(),
-                statement.getWhereConditions(), shardingCol, router, allowFullScan);
+                statement.getWhereConditions(), resolveShardingColumn(metadata), router, allowFullScan);
     }
 
     /**
@@ -208,11 +212,10 @@ public class ShardingHandler {
             return Collections.singletonList(statement.getTableName());
         }
         boolean allowFullScan = resolveAllowFullScan(metadata, allowFullScanOverride);
-        ColumnMetadata shardingCol = metadata != null ? metadata.getShardingColumn() : null;
         String logicTableName = statement.getTableName();
 
         return routeByConditions(logicTableName, statement.getEntityClass(), null,
-                statement.getWhereConditions(), shardingCol, router, allowFullScan);
+                statement.getWhereConditions(), resolveShardingColumn(metadata), router, allowFullScan);
     }
 
     /**
@@ -226,11 +229,10 @@ public class ShardingHandler {
             return Collections.singletonList(statement.getTableName());
         }
         boolean allowFullScan = resolveAllowFullScan(metadata, allowFullScanOverride);
-        ColumnMetadata shardingCol = metadata != null ? metadata.getShardingColumn() : null;
         String logicTableName = statement.getTableName();
 
         return routeByConditions(logicTableName, statement.getEntityClass(), null,
-                statement.getWhereConditions(), shardingCol, router, allowFullScan);
+                statement.getWhereConditions(), resolveShardingColumn(metadata), router, allowFullScan);
     }
 
     private static List<String> routeDataSourcesByConditions(Class<?> entityClass, String rootAlias,
@@ -682,7 +684,7 @@ public class ShardingHandler {
         TableRouter<Object> tableRouter = (TableRouter<Object>) resolveTableRouter(metadata, routerOverride);
         DataSourceRouter<Object> dsRouter = (DataSourceRouter<Object>) resolveDataSourceRouter(metadata, dsRouterOverride);
 
-        ColumnMetadata shardingCol = metadata != null ? metadata.getShardingColumn() : null;
+        ColumnMetadata shardingCol = resolveShardingColumn(metadata);
         Object shardingValue = (shardingCol != null && entity != null) ? shardingCol.getValue(entity) : null;
 
         String targetDsName = null;

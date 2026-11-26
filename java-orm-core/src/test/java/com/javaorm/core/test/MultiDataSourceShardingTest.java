@@ -16,7 +16,9 @@ import org.sqlite.SQLiteDataSource;
 
 import java.io.File;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.*;
@@ -129,6 +131,32 @@ public class MultiDataSourceShardingTest {
         }
     }
 
+    /**
+     * 场景 4: 无 @JoSharding 注解实体，通过 DSL 链式 .dataSource(router).sharding(router) 进行双库双表路由
+     */
+    @JoTable(name = "t_item")
+    public static class PlainShardedItem {
+        @JoId
+        private Long itemId;
+        private String itemName;
+
+        public Long getItemId() {
+            return itemId;
+        }
+
+        public void setItemId(Long itemId) {
+            this.itemId = itemId;
+        }
+
+        public String getItemName() {
+            return itemName;
+        }
+
+        public void setItemName(String itemName) {
+            this.itemName = itemName;
+        }
+    }
+
     @Before
     public void setUp() throws Exception {
         new File("target").mkdirs();
@@ -165,6 +193,8 @@ public class MultiDataSourceShardingTest {
                 s.execute("CREATE TABLE t_user (user_id INTEGER PRIMARY KEY, username TEXT)");
                 s.execute("CREATE TABLE t_trade_0 (id INTEGER PRIMARY KEY, trade_id INTEGER, amount REAL)");
                 s.execute("CREATE TABLE t_trade_1 (id INTEGER PRIMARY KEY, trade_id INTEGER, amount REAL)");
+                s.execute("CREATE TABLE t_item_0 (item_id INTEGER PRIMARY KEY, item_name TEXT)");
+                s.execute("CREATE TABLE t_item_1 (item_id INTEGER PRIMARY KEY, item_name TEXT)");
             }
         }
 
@@ -309,5 +339,89 @@ public class MultiDataSourceShardingTest {
                 .firstOrNull();
         assertNotNull(report);
         assertEquals("Master Report", report.getTitle());
+    }
+
+    @Test
+    public void testTwoDatabaseSingleAndBatchUpsertWithChainOverride() throws Exception {
+        ModDataSourceRouter dsRouter = new ModDataSourceRouter();
+        ModTableRouter tableRouter = new ModTableRouter(2);
+
+        // 1. 单条 insertOrUpdate（无注解实体，通过链式 dataSource + sharding 路由到双库双表）
+        PlainShardedItem even = new PlainShardedItem();
+        even.setItemId(10L); // 10 % 2 = 0 -> ds_0, t_item_0
+        even.setItemName("Even_V1");
+        assertEquals(1, orm.insertOrUpdate(even).dataSource(dsRouter).sharding(tableRouter).exec());
+
+        PlainShardedItem odd = new PlainShardedItem();
+        odd.setItemId(11L); // 11 % 2 = 1 -> ds_1, t_item_1
+        odd.setItemName("Odd_V1");
+        assertEquals(1, orm.insertOrUpdate(odd).dataSource(dsRouter).sharding(tableRouter).exec());
+
+        // 冲突更新
+        even.setItemName("Even_V2");
+        assertEquals(1, orm.insertOrUpdate(even).dataSource(dsRouter).sharding(tableRouter).exec());
+
+        // 2. 批量 insertOrUpdateBatch（同时跨 ds_0 和 ds_1，验证既覆盖旧行又插入新行）
+        PlainShardedItem oddUpdate = new PlainShardedItem();
+        oddUpdate.setItemId(11L);
+        oddUpdate.setItemName("Odd_V2");
+
+        PlainShardedItem evenBatchNew = new PlainShardedItem();
+        evenBatchNew.setItemId(20L); // ds_0, t_item_0
+        evenBatchNew.setItemName("Even_20");
+
+        PlainShardedItem oddBatchNew = new PlainShardedItem();
+        oddBatchNew.setItemId(21L); // ds_1, t_item_1
+        oddBatchNew.setItemName("Odd_21");
+
+        int batchAffected = orm.insertOrUpdateBatch(Arrays.asList(oddUpdate, evenBatchNew, oddBatchNew))
+                .dataSource(dsRouter)
+                .sharding(tableRouter)
+                .exec();
+        assertEquals(3, batchAffected);
+
+        // 3. 直连 ds_0 与 ds_1 物理库验证真实落表隔离（确保没有写错库/写错表）
+        assertEquals(2, countRows(ds0, "t_item_0"));
+        assertEquals(0, countRows(ds0, "t_item_1"));
+        assertEquals(0, countRows(ds1, "t_item_0"));
+        assertEquals(2, countRows(ds1, "t_item_1"));
+
+        assertEquals("Even_V2", queryText(ds0, "SELECT item_name FROM t_item_0 WHERE item_id = 10"));
+        assertEquals("Even_20", queryText(ds0, "SELECT item_name FROM t_item_0 WHERE item_id = 20"));
+        assertEquals("Odd_V2", queryText(ds1, "SELECT item_name FROM t_item_1 WHERE item_id = 11"));
+        assertEquals("Odd_21", queryText(ds1, "SELECT item_name FROM t_item_1 WHERE item_id = 21"));
+
+        // 4. 注解分库分表实体（ShardedTrade）批量 Upsert 验证
+        ShardedTrade tr0 = new ShardedTrade();
+        tr0.setId(100L);
+        tr0.setTradeId(300L); // ds_0, t_trade_0
+        tr0.setAmount(12.5);
+
+        ShardedTrade tr1 = new ShardedTrade();
+        tr1.setId(101L);
+        tr1.setTradeId(301L); // ds_1, t_trade_1
+        tr1.setAmount(25.0);
+
+        assertEquals(2, orm.insertOrUpdateBatch(Arrays.asList(tr0, tr1)).exec());
+        assertEquals(1, countRows(ds0, "t_trade_0"));
+        assertEquals(0, countRows(ds1, "t_trade_0"));
+        assertEquals(0, countRows(ds0, "t_trade_1"));
+        assertEquals(1, countRows(ds1, "t_trade_1"));
+    }
+
+    private int countRows(SQLiteDataSource ds, String tableName) throws Exception {
+        try (Connection c = ds.getConnection();
+             Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery("SELECT COUNT(1) FROM " + tableName)) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
+
+    private String queryText(SQLiteDataSource ds, String sql) throws Exception {
+        try (Connection c = ds.getConnection();
+             Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery(sql)) {
+            return rs.next() ? rs.getString(1) : null;
+        }
     }
 }

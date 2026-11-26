@@ -129,29 +129,35 @@ public class BatchUpsertBuilder<T> extends AbstractBatchBuilder<T, BatchUpsertBu
         Class<T> entityClass = (Class<T>) first.getClass();
         EntityMetadata metadata = EntityMetadataManager.get(entityClass, env.getConfig());
 
-        // 分组处理分库分表
-        Map<PhysicalTarget, List<T>> groups = groupByPhysicalTarget(entities, metadata);
+        // 分组处理分库分表（支持链式覆盖实体注解路由）
+        Map<PhysicalTarget, List<T>> groups = groupByPhysicalTarget(
+                entities, metadata, java.util.function.Function.identity(),
+                shardingRouter, dataSourceRouter, targetDataSource);
+        com.javaorm.core.executor.ExecutionContext baseCtx = printSqlOverride != null
+                ? env.getExecutionContext().withPrintSql(printSqlOverride)
+                : env.getExecutionContext();
         int totalAffected = 0;
 
         for (Map.Entry<PhysicalTarget, List<T>> entry : groups.entrySet()) {
             PhysicalTarget target = entry.getKey();
             List<T> targetEntities = entry.getValue();
             DataSource ds = resolveDataSource(target.dataSourceName);
+            com.javaorm.core.executor.ExecutionContext dsCtx = baseCtx.withDataSource(ds);
 
             for (int i = 0; i < targetEntities.size(); i += batchSize) {
                 int end = Math.min(i + batchSize, targetEntities.size());
                 List<T> chunk = targetEntities.subList(i, end);
-                totalAffected += executeChunk(chunk, metadata, target.tableName, ds);
+                totalAffected += executeChunk(chunk, metadata, target.tableName, dsCtx);
             }
         }
 
         return totalAffected;
     }
 
-    private int executeChunk(List<T> chunk, EntityMetadata metadata, String tableName, DataSource ds) {
+    private int executeChunk(List<T> chunk, EntityMetadata metadata, String tableName, com.javaorm.core.executor.ExecutionContext ctx) {
         if (chunk.isEmpty()) return 0;
-        Dialect dialect = env.getDialect();
-        OrmConfig config = env.getConfig();
+        Dialect dialect = ctx.getDialect();
+        OrmConfig config = ctx.getConfig();
         Class<T> entityClass = getEntityClass();
 
         // 收集参与待插入/更新的列
@@ -180,7 +186,9 @@ public class BatchUpsertBuilder<T> extends AbstractBatchBuilder<T, BatchUpsertBu
 
         SqlAndParams sap = dialect.buildUpsert(templateStmt);
         String sql = sap.getSql();
-        logSql(sql, chunk.size());
+        if (ctx.isPrintSql()) {
+            log.info("==>  Preparing Batch UPSERT ({} entities): {}", chunk.size(), sql);
+        }
 
         List<List<Object>> batchParams = new ArrayList<>(chunk.size());
         for (T entity : chunk) {
@@ -192,7 +200,7 @@ public class BatchUpsertBuilder<T> extends AbstractBatchBuilder<T, BatchUpsertBu
             batchParams.add(rowParams);
         }
 
-        int[] results = env.getExecutionContext().getSqlExecutor().executeBatchUpdate(null, sql, batchParams, dialect, config, ds);
+        int[] results = ctx.getSqlExecutor().executeBatchUpdate(null, sql, batchParams, ctx);
         return sumBatchResults(results);
     }
 
@@ -227,13 +235,6 @@ public class BatchUpsertBuilder<T> extends AbstractBatchBuilder<T, BatchUpsertBu
                     col.setValue(entity, 1);
                 }
             }
-        }
-    }
-
-    private void logSql(String sql, int count) {
-        boolean shouldLog = printSqlOverride != null ? printSqlOverride : env.shouldPrintSql();
-        if (shouldLog) {
-            log.info("==>  Preparing Batch UPSERT ({} entities): {}", count, sql);
         }
     }
 }
