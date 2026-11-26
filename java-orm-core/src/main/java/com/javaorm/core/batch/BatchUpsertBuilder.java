@@ -33,13 +33,10 @@ import java.util.function.Consumer;
  *
  * @param <T> 实体类型
  */
-public class BatchUpsertBuilder<T> {
+public class BatchUpsertBuilder<T> extends AbstractBatchBuilder<T, BatchUpsertBuilder<T>> {
 
     private static final Logger log = LoggerFactory.getLogger(BatchUpsertBuilder.class);
 
-    private final SqlEnv env;
-    private final Collection<T> entities;
-    private int batchSize = 500;
     private Boolean printSqlOverride = null;
 
     private final List<String> conflictColumns = new ArrayList<>();
@@ -52,16 +49,7 @@ public class BatchUpsertBuilder<T> {
     private DataSourceRouter<?> dataSourceRouter;
 
     public BatchUpsertBuilder(SqlEnv env, Collection<T> entities) {
-        this.env = env != null ? env : new SqlEnv(null, null, null);
-        this.entities = entities;
-    }
-
-    public BatchUpsertBuilder<T> batchSize(int batchSize) {
-        if (batchSize <= 0) {
-            throw new IllegalArgumentException("batchSize must be greater than 0");
-        }
-        this.batchSize = batchSize;
-        return this;
+        super(env, entities);
     }
 
     public BatchUpsertBuilder<T> onConflict(String... columns) {
@@ -182,10 +170,7 @@ public class BatchUpsertBuilder<T> {
                 || lower.equals("gmt_create") || lower.equals("create_by") || lower.equals("createby") || lower.equals("creator");
     }
 
-    public int exec() {
-        return execute();
-    }
-
+    @Override
     public int execute() {
         if (entities == null || entities.isEmpty()) {
             return 0;
@@ -198,13 +183,13 @@ public class BatchUpsertBuilder<T> {
         EntityMetadata metadata = EntityMetadataManager.get(entityClass, env.getConfig());
 
         // 分组处理分库分表
-        Map<BatchSupport.PhysicalTarget, List<T>> groups = BatchSupport.groupByPhysicalTarget(entities, metadata);
+        Map<PhysicalTarget, List<T>> groups = groupByPhysicalTarget(entities, metadata);
         int totalAffected = 0;
 
-        for (Map.Entry<BatchSupport.PhysicalTarget, List<T>> entry : groups.entrySet()) {
-            BatchSupport.PhysicalTarget target = entry.getKey();
+        for (Map.Entry<PhysicalTarget, List<T>> entry : groups.entrySet()) {
+            PhysicalTarget target = entry.getKey();
             List<T> targetEntities = entry.getValue();
-            DataSource ds = BatchSupport.resolveDataSource(env, target.dataSourceName);
+            DataSource ds = resolveDataSource(target.dataSourceName);
 
             for (int i = 0; i < targetEntities.size(); i += batchSize) {
                 int end = Math.min(i + batchSize, targetEntities.size());
@@ -296,12 +281,7 @@ public class BatchUpsertBuilder<T> {
         }
 
         int[] results = env.getExecutionContext().getSqlExecutor().executeBatchUpdate(null, sql, batchParams, dialect, config, ds);
-        int total = 0;
-        for (int r : results) {
-            if (r >= 0) total += r;
-            else if (r == PreparedStatement.SUCCESS_NO_INFO) total += 1;
-        }
-        return total;
+        return sumBatchResults(results);
     }
 
     private void prepareEntityDefaults(T entity, EntityMetadata metadata, OrmConfig config) {

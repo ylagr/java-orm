@@ -23,26 +23,21 @@ import java.util.*;
  * 2. 逻辑删除自动兼容：若实体配置了 @JoLogicDelete，自动转为批量 UPDATE 逻辑删除。
  * 3. 分库分表感知分组。
  */
-public class BatchDeleteBuilder<T> {
+public class BatchDeleteBuilder<T> extends AbstractBatchBuilder<T, BatchDeleteBuilder<T>> {
 
     private static final Logger log = LoggerFactory.getLogger(BatchDeleteBuilder.class);
 
-    private final SqlEnv env;
     private final Class<T> entityClass;
-    private final Collection<T> entities;
     private final Collection<?> ids;
-    private int batchSize = 500;
 
     public BatchDeleteBuilder(SqlEnv env, Class<T> entityClass, Collection<?> ids) {
-        this.env = env != null ? env : new SqlEnv(null, null, null);
+        super(env, null);
         this.entityClass = entityClass;
-        this.entities = null;
         this.ids = ids;
     }
 
     public BatchDeleteBuilder(SqlEnv env, Collection<T> entities) {
-        this.env = env != null ? env : new SqlEnv(null, null, null);
-        this.entities = entities;
+        super(env, entities);
         if (entities != null && !entities.isEmpty()) {
             @SuppressWarnings("unchecked")
             Class<T> clazz = (Class<T>) entities.iterator().next().getClass();
@@ -53,18 +48,7 @@ public class BatchDeleteBuilder<T> {
         this.ids = null;
     }
 
-    public BatchDeleteBuilder<T> batchSize(int batchSize) {
-        if (batchSize <= 0) {
-            throw new IllegalArgumentException("batchSize must be greater than 0");
-        }
-        this.batchSize = batchSize;
-        return this;
-    }
-
-    public int exec() {
-        return execute();
-    }
-
+    @Override
     public int execute() {
         if (entityClass == null) return 0;
         EntityMetadata metadata = EntityMetadataManager.get(entityClass, env.getConfig());
@@ -76,12 +60,12 @@ public class BatchDeleteBuilder<T> {
         // 1. 如果传入的是实体列表
         if (entities != null) {
             if (entities.isEmpty()) return 0;
-            Map<BatchSupport.PhysicalTarget, List<Object>> groups = BatchSupport.groupByPhysicalTarget(entities, metadata, idCol::getValue);
+            Map<PhysicalTarget, List<Object>> groups = groupByPhysicalTarget(entities, metadata, idCol::getValue);
             int total = 0;
-            for (Map.Entry<BatchSupport.PhysicalTarget, List<Object>> entry : groups.entrySet()) {
-                BatchSupport.PhysicalTarget target = entry.getKey();
+            for (Map.Entry<PhysicalTarget, List<Object>> entry : groups.entrySet()) {
+                PhysicalTarget target = entry.getKey();
                 List<Object> idList = entry.getValue();
-                DataSource ds = BatchSupport.resolveDataSource(env, target.dataSourceName);
+                DataSource ds = resolveDataSource(target.dataSourceName);
                 total += deleteIdChunks(idList, metadata, target.tableName, ds);
             }
             return total;
@@ -92,7 +76,7 @@ public class BatchDeleteBuilder<T> {
             if (ids.isEmpty()) return 0;
             List<Object> idList = new ArrayList<>(ids);
             // 非分片实体直接单表删除；分片实体且未指定具体分片键时广播全分片或默认库表
-            DataSource ds = BatchSupport.resolveDataSource(env, metadata.getShardingDataSource());
+            DataSource ds = resolveDataSource(metadata.getShardingDataSource());
             return deleteIdChunks(idList, metadata, metadata.getTableName(), ds);
         }
 
@@ -156,7 +140,7 @@ public class BatchDeleteBuilder<T> {
         }
 
         String finalSql = sql.toString();
-        BatchSupport.logSql(log, env, "Batch Delete", finalSql, params);
+        logSql(log, "Batch Delete", finalSql, params);
         return env.getExecutionContext().getSqlExecutor().executeUpdate(
                 null,
                 new com.javaorm.core.dialect.SqlAndParams(finalSql, params),

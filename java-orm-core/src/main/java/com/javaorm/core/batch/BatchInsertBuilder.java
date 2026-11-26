@@ -29,31 +29,19 @@ import java.util.*;
  * 5. 严格保持顺序插入选项（keepOrder）：在按原始顺序处理的同时剔除 null 字段，相邻相同字段结构的记录自动批处理。
  * 6. 分库分表感知：自动按照计算出的物理数据源与物理表进行分组（Grouping），并在各物理节点上独立批量执行。
  */
-public class BatchInsertBuilder<T> {
+public class BatchInsertBuilder<T> extends AbstractBatchBuilder<T, BatchInsertBuilder<T>> {
 
     private static final Logger log = LoggerFactory.getLogger(BatchInsertBuilder.class);
 
-    private final SqlEnv env;
-    private final Collection<T> entities;
-    private int batchSize = 500;
     private boolean useJdbcBatch = true;
     private boolean selective = true;
     private boolean keepOrder = false;
 
     public BatchInsertBuilder(SqlEnv env, Collection<T> entities) {
-        this.env = env != null ? env : new SqlEnv(null, null, null);
-        this.entities = entities;
+        super(env, entities);
         if (this.env.getConfig() != null) {
             this.keepOrder = this.env.getConfig().isBatchKeepOrder();
         }
-    }
-
-    public BatchInsertBuilder<T> batchSize(int batchSize) {
-        if (batchSize <= 0) {
-            throw new IllegalArgumentException("batchSize must be greater than 0");
-        }
-        this.batchSize = batchSize;
-        return this;
     }
 
     /**
@@ -96,10 +84,7 @@ public class BatchInsertBuilder<T> {
         return this;
     }
 
-    public int exec() {
-        return execute();
-    }
-
+    @Override
     public int execute() {
         if (entities == null || entities.isEmpty()) {
             return 0;
@@ -112,14 +97,14 @@ public class BatchInsertBuilder<T> {
         EntityMetadata metadata = EntityMetadataManager.get(entityClass, env.getConfig());
 
         // 1. 分组：若启用分库/分表，按 (目标数据源, 物理表) 进行实体分组
-        Map<BatchSupport.PhysicalTarget, List<T>> groups = BatchSupport.groupByPhysicalTarget(entities, metadata);
+        Map<PhysicalTarget, List<T>> groups = groupByPhysicalTarget(entities, metadata);
 
         int totalAffected = 0;
-        for (Map.Entry<BatchSupport.PhysicalTarget, List<T>> entry : groups.entrySet()) {
-            BatchSupport.PhysicalTarget target = entry.getKey();
+        for (Map.Entry<PhysicalTarget, List<T>> entry : groups.entrySet()) {
+            PhysicalTarget target = entry.getKey();
             List<T> targetEntities = entry.getValue();
 
-            DataSource ds = BatchSupport.resolveDataSource(env, target.dataSourceName);
+            DataSource ds = resolveDataSource(target.dataSourceName);
             totalAffected += executeTargetEntities(targetEntities, metadata, target.tableName, ds);
         }
 
@@ -218,16 +203,6 @@ public class BatchInsertBuilder<T> {
         return cols;
     }
 
-    private String computeFingerprint(List<ColumnMetadata> cols) {
-        if (cols == null || cols.isEmpty()) return "";
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < cols.size(); i++) {
-            if (i > 0) sb.append(',');
-            sb.append(cols.get(i).getColumnName());
-        }
-        return sb.toString();
-    }
-
     private int executeChunk(List<T> chunk, EntityMetadata metadata, String tableName, DataSource ds, List<ColumnMetadata> insertCols) {
         if (chunk.isEmpty()) return 0;
         Dialect dialect = env.getDialect();
@@ -280,7 +255,7 @@ public class BatchInsertBuilder<T> {
         }
 
         String finalSql = sql.toString();
-        BatchSupport.logSql(log, env, "Batch Insert", finalSql, params);
+        logSql(log, "Batch Insert", finalSql, params);
         boolean returnKeys = metadata.getIdColumn() != null && metadata.getIdColumn().isGenerated();
         return env.getExecutionContext().getSqlExecutor().executeBatchInsert(
                 null, finalSql, Collections.singletonList(params), chunk, metadata, returnKeys, true, dialect, config, ds
@@ -316,7 +291,7 @@ public class BatchInsertBuilder<T> {
         }
 
         String finalSql = sql.toString();
-        BatchSupport.logSql(log, env, "Batch Insert", finalSql, Collections.singletonList("batch size: " + chunk.size()));
+        logSql(log, "Batch Insert", finalSql, Collections.singletonList("batch size: " + chunk.size()));
 
         List<List<Object>> batchParams = new ArrayList<>(chunk.size());
         for (T entity : chunk) {

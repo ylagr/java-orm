@@ -30,30 +30,18 @@ import java.util.*;
  * 6. 实体快照变脏检测（Dirty Checking）联动：若实体被 TrackManager 追踪，仅更新脏字段。
  * 7. 分库分表感知分组。
  */
-public class BatchUpdateBuilder<T> {
+public class BatchUpdateBuilder<T> extends AbstractBatchBuilder<T, BatchUpdateBuilder<T>> {
 
     private static final Logger log = LoggerFactory.getLogger(BatchUpdateBuilder.class);
 
-    private final SqlEnv env;
-    private final Collection<T> entities;
-    private int batchSize = 500;
     private boolean selective = true;
     private boolean keepOrder = false;
 
     public BatchUpdateBuilder(SqlEnv env, Collection<T> entities) {
-        this.env = env != null ? env : new SqlEnv(null, null, null);
-        this.entities = entities;
+        super(env, entities);
         if (this.env.getConfig() != null) {
             this.keepOrder = this.env.getConfig().isBatchKeepOrder();
         }
-    }
-
-    public BatchUpdateBuilder<T> batchSize(int batchSize) {
-        if (batchSize <= 0) {
-            throw new IllegalArgumentException("batchSize must be greater than 0");
-        }
-        this.batchSize = batchSize;
-        return this;
     }
 
     /**
@@ -79,10 +67,7 @@ public class BatchUpdateBuilder<T> {
         return this;
     }
 
-    public int exec() {
-        return execute();
-    }
-
+    @Override
     public int execute() {
         if (entities == null || entities.isEmpty()) {
             return 0;
@@ -99,13 +84,13 @@ public class BatchUpdateBuilder<T> {
         }
 
         // 分组处理分库分表
-        Map<BatchSupport.PhysicalTarget, List<T>> groups = BatchSupport.groupByPhysicalTarget(entities, metadata);
+        Map<PhysicalTarget, List<T>> groups = groupByPhysicalTarget(entities, metadata);
         int totalAffected = 0;
 
-        for (Map.Entry<BatchSupport.PhysicalTarget, List<T>> entry : groups.entrySet()) {
-            BatchSupport.PhysicalTarget target = entry.getKey();
+        for (Map.Entry<PhysicalTarget, List<T>> entry : groups.entrySet()) {
+            PhysicalTarget target = entry.getKey();
             List<T> targetEntities = entry.getValue();
-            DataSource ds = BatchSupport.resolveDataSource(env, target.dataSourceName);
+            DataSource ds = resolveDataSource(target.dataSourceName);
             totalAffected += executeTargetEntities(targetEntities, metadata, target.tableName, ds);
         }
 
@@ -214,16 +199,6 @@ public class BatchUpdateBuilder<T> {
             }
         }
         return cols;
-    }
-
-    private String computeFingerprint(List<ColumnMetadata> cols) {
-        if (cols == null || cols.isEmpty()) return "";
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < cols.size(); i++) {
-            if (i > 0) sb.append(',');
-            sb.append(cols.get(i).getColumnName());
-        }
-        return sb.toString();
     }
 
     private int executeChunk(List<T> chunk, EntityMetadata metadata, String tableName, DataSource ds, List<ColumnMetadata> updateCols) {

@@ -9,6 +9,7 @@ import com.javaorm.core.sql.SqlEnv;
 import org.slf4j.Logger;
 
 import javax.sql.DataSource;
+import java.sql.PreparedStatement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -18,26 +19,54 @@ import java.util.Objects;
 import java.util.function.Function;
 
 /**
- * 批处理构建器公共组件：统一分库分表路由分组、数据源解析与 SQL 日志打印。
+ * 批处理构建器抽象基类（统一批大小配置、分库分表物理节点分组、数据源解析、列指纹计算与日志）。
+ *
+ * @param <T>    实体类型
+ * @param <SELF> 具体构建器自引用类型
  */
-final class BatchSupport {
+public abstract class AbstractBatchBuilder<T, SELF extends AbstractBatchBuilder<T, SELF>> {
 
-    private BatchSupport() {
-    }
+    protected final SqlEnv env;
+    protected final Collection<T> entities;
+    protected int batchSize = 500;
 
-    static <T> Map<PhysicalTarget, List<T>> groupByPhysicalTarget(Collection<T> entities, EntityMetadata metadata) {
-        return groupByPhysicalTarget(entities, metadata, Function.identity());
+    protected AbstractBatchBuilder(SqlEnv env, Collection<T> entities) {
+        this.env = env != null ? env : new SqlEnv(null, null, null);
+        this.entities = entities;
     }
 
     @SuppressWarnings("unchecked")
-    static <T, V> Map<PhysicalTarget, List<V>> groupByPhysicalTarget(Collection<T> entities,
+    protected final SELF self() {
+        return (SELF) this;
+    }
+
+    public SELF batchSize(int batchSize) {
+        if (batchSize <= 0) {
+            throw new IllegalArgumentException("batchSize must be greater than 0");
+        }
+        this.batchSize = batchSize;
+        return self();
+    }
+
+    public int exec() {
+        return execute();
+    }
+
+    public abstract int execute();
+
+    protected Map<PhysicalTarget, List<T>> groupByPhysicalTarget(Collection<T> items, EntityMetadata metadata) {
+        return groupByPhysicalTarget(items, metadata, Function.identity());
+    }
+
+    @SuppressWarnings("unchecked")
+    protected <V> Map<PhysicalTarget, List<V>> groupByPhysicalTarget(Collection<T> items,
                                                                      EntityMetadata metadata,
                                                                      Function<T, V> valueExtractor) {
         Map<PhysicalTarget, List<V>> map = new LinkedHashMap<>();
         if (!metadata.isSharding()) {
             PhysicalTarget defaultTarget = new PhysicalTarget(metadata.getShardingDataSource(), metadata.getTableName());
-            List<V> list = new ArrayList<>(entities.size());
-            for (T e : entities) {
+            List<V> list = new ArrayList<>(items.size());
+            for (T e : items) {
                 list.add(valueExtractor.apply(e));
             }
             map.put(defaultTarget, list);
@@ -48,7 +77,7 @@ final class BatchSupport {
         TableRouter<Object> tableRouter = (TableRouter<Object>) metadata.getShardingRouter();
         ColumnMetadata shardingCol = metadata.getShardingColumn();
 
-        for (T entity : entities) {
+        for (T entity : items) {
             Object shardingVal = shardingCol != null ? shardingCol.getValue(entity) : null;
             String dsName = metadata.getShardingDataSource();
             if (dsRouter != null) {
@@ -73,7 +102,7 @@ final class BatchSupport {
         return map;
     }
 
-    static DataSource resolveDataSource(SqlEnv env, String dsName) {
+    protected DataSource resolveDataSource(String dsName) {
         OrmConfig config = env.getConfig();
         if (config != null && config.getDataSourceManager() != null) {
             return config.getDataSourceManager().getDataSource(dsName);
@@ -81,7 +110,7 @@ final class BatchSupport {
         return env.getDataSource();
     }
 
-    static void logSql(Logger log, SqlEnv env, String actionLabel, String sql, List<Object> params) {
+    protected void logSql(Logger log, String actionLabel, String sql, List<Object> params) {
         if (env.shouldPrintSql()) {
             log.info("==>  Preparing {}: {}", actionLabel, sql);
             if (params != null && params.size() <= 20) {
@@ -92,7 +121,33 @@ final class BatchSupport {
         }
     }
 
-    static final class PhysicalTarget {
+    protected static String computeFingerprint(List<ColumnMetadata> cols) {
+        if (cols == null || cols.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < cols.size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append(cols.get(i).getColumnName());
+        }
+        return sb.toString();
+    }
+
+    protected static int sumBatchResults(int[] results) {
+        int total = 0;
+        for (int r : results) {
+            if (r >= 0) {
+                total += r;
+            } else if (r == PreparedStatement.SUCCESS_NO_INFO) {
+                total += 1;
+            }
+        }
+        return total;
+    }
+
+    protected static final class PhysicalTarget {
         final String dataSourceName;
         final String tableName;
 
