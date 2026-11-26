@@ -24,19 +24,17 @@ import javax.sql.DataSource;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-public class UpdateBuilder<T> {
+public class UpdateBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuilder<UpdateBuilder<T>> {
 
     private static final Logger log = LoggerFactory.getLogger(UpdateBuilder.class);
 
-    private final SqlEnv env;
     private final Class<T> entityClass;
     private final EntityMetadata metadata;
-    private Boolean printSqlOverride = null;
     private final UpdateStatement statement;
     private final SelectBuilder<T> queryHelper;
 
     public UpdateBuilder(SqlEnv env, Class<T> entityClass) {
-        this.env = env != null ? env : new SqlEnv(null, null, null);
+        super(env);
         this.entityClass = entityClass;
         this.metadata = EntityMetadataManager.get(entityClass, this.env.getConfig());
         this.statement = new UpdateStatement(entityClass, metadata != null ? metadata.getTableName() : null);
@@ -67,82 +65,32 @@ public class UpdateBuilder<T> {
         this(new SqlEnv(dataSource, dialect, config), entityClass);
     }
 
-    public UpdateBuilder<T> sharding(com.javaorm.core.sharding.TableRouter<?> router) {
+    @Override
+    protected void applyTableRouter(com.javaorm.core.sharding.TableRouter<?> router) {
         if (statement != null) {
             statement.setShardingRouter(router);
         }
-        return this;
     }
 
-    public UpdateBuilder<T> sharding(Class<? extends com.javaorm.core.sharding.TableRouter<?>> routerClass) {
-        if (routerClass != null) {
-            try {
-                sharding(routerClass.getDeclaredConstructor().newInstance());
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate router " + routerClass.getName(), e);
-            }
-        }
-        return this;
-    }
-
-    public UpdateBuilder<T> tableRouter(com.javaorm.core.sharding.TableRouter<?> router) {
-        return sharding(router);
-    }
-
-    public UpdateBuilder<T> tableRouter(Class<? extends com.javaorm.core.sharding.TableRouter<?>> routerClass) {
-        return sharding(routerClass);
-    }
-
-    public UpdateBuilder<T> dataSource(String name) {
+    @Override
+    protected void applyTargetDataSource(String name) {
         if (statement != null) {
             statement.setTargetDataSource(name);
         }
-        return this;
     }
 
-    public UpdateBuilder<T> dataSource(com.javaorm.core.sharding.DataSourceRouter<?> router) {
+    @Override
+    protected void applyDataSourceRouter(com.javaorm.core.sharding.DataSourceRouter<?> router) {
         if (statement != null) {
             statement.setDataSourceRouter(router);
         }
-        return this;
     }
 
-    public UpdateBuilder<T> dataSource(Class<? extends com.javaorm.core.sharding.DataSourceRouter<?>> routerClass) {
-        if (routerClass != null) {
-            try {
-                dataSource(routerClass.getDeclaredConstructor().newInstance());
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate DataSourceRouter " + routerClass.getName(), e);
-            }
-        }
-        return this;
-    }
-
-    public UpdateBuilder<T> sharding(com.javaorm.core.sharding.DataSourceRouter<?> router) {
-        return dataSource(router);
-    }
-
-    public UpdateBuilder<T> allowFullShardingScan(boolean allow) {
+    @Override
+    protected void applyAllowFullShardingScan(boolean allow) {
         if (statement != null) {
             statement.setAllowFullShardingScan(allow);
         }
-        return this;
-    }
-
-    public SqlEnv getEnv() {
-        return env;
-    }
-
-    public DataSource getDataSource() {
-        return env.getDataSource();
-    }
-
-    public Dialect getDialect() {
-        return env.getDialect();
-    }
-
-    public OrmConfig getConfig() {
-        return env.getConfig();
     }
 
     public EntityMetadata getMetadata() {
@@ -159,16 +107,6 @@ public class UpdateBuilder<T> {
 
     public T proxy() {
         return ProxyFactory.getProxy(entityClass);
-    }
-
-    public UpdateBuilder<T> printSql() {
-        this.printSqlOverride = getConfig() != null ? getConfig().isPrintSql() : false;
-        return this;
-    }
-
-    public UpdateBuilder<T> printSql(boolean print) {
-        this.printSqlOverride = print;
-        return this;
     }
 
     public SqlAndParams toSqlAndParams() {

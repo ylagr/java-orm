@@ -24,20 +24,18 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-public class DeleteBuilder<T> {
+public class DeleteBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuilder<DeleteBuilder<T>> {
 
     private static final Logger log = LoggerFactory.getLogger(DeleteBuilder.class);
 
-    private final SqlEnv env;
     private final Class<T> entityClass;
     private final EntityMetadata metadata;
-    private Boolean printSqlOverride = null;
     private final DeleteStatement statement;
     private boolean logicDeleteDisabled = false;
     private final SelectBuilder<T> queryHelper;
 
     public DeleteBuilder(SqlEnv env, Class<T> entityClass) {
-        this.env = env != null ? env : new SqlEnv(null, null, null);
+        super(env);
         this.entityClass = entityClass;
         this.metadata = EntityMetadataManager.get(entityClass, this.env.getConfig());
         this.statement = new DeleteStatement(entityClass, metadata != null ? metadata.getTableName() : null);
@@ -51,86 +49,36 @@ public class DeleteBuilder<T> {
         this(new SqlEnv(dataSource, dialect, config), entityClass);
     }
 
-    public DeleteBuilder<T> sharding(com.javaorm.core.sharding.TableRouter<?> router) {
+    @Override
+    protected void applyTableRouter(com.javaorm.core.sharding.TableRouter<?> router) {
         if (statement != null) {
             statement.setShardingRouter(router);
         }
-        return this;
     }
 
-    public DeleteBuilder<T> sharding(Class<? extends com.javaorm.core.sharding.TableRouter<?>> routerClass) {
-        if (routerClass != null) {
-            try {
-                sharding(routerClass.getDeclaredConstructor().newInstance());
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate router " + routerClass.getName(), e);
-            }
-        }
-        return this;
-    }
-
-    public DeleteBuilder<T> tableRouter(com.javaorm.core.sharding.TableRouter<?> router) {
-        return sharding(router);
-    }
-
-    public DeleteBuilder<T> tableRouter(Class<? extends com.javaorm.core.sharding.TableRouter<?>> routerClass) {
-        return sharding(routerClass);
-    }
-
-    public DeleteBuilder<T> dataSource(String name) {
+    @Override
+    protected void applyTargetDataSource(String name) {
         if (statement != null) {
             statement.setTargetDataSource(name);
         }
-        return this;
     }
 
-    public DeleteBuilder<T> dataSource(com.javaorm.core.sharding.DataSourceRouter<?> router) {
+    @Override
+    protected void applyDataSourceRouter(com.javaorm.core.sharding.DataSourceRouter<?> router) {
         if (statement != null) {
             statement.setDataSourceRouter(router);
         }
-        return this;
     }
 
-    public DeleteBuilder<T> dataSource(Class<? extends com.javaorm.core.sharding.DataSourceRouter<?>> routerClass) {
-        if (routerClass != null) {
-            try {
-                dataSource(routerClass.getDeclaredConstructor().newInstance());
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate DataSourceRouter " + routerClass.getName(), e);
-            }
-        }
-        return this;
-    }
-
-    public DeleteBuilder<T> sharding(com.javaorm.core.sharding.DataSourceRouter<?> router) {
-        return dataSource(router);
-    }
-
-    public DeleteBuilder<T> allowFullShardingScan(boolean allow) {
+    @Override
+    protected void applyAllowFullShardingScan(boolean allow) {
         if (statement != null) {
             statement.setAllowFullShardingScan(allow);
         }
-        return this;
-    }
-
-    public SqlEnv getEnv() {
-        return env;
     }
 
     public DeleteStatement getStatement() {
         return statement;
-    }
-
-    public DataSource getDataSource() {
-        return env.getDataSource();
-    }
-
-    public Dialect getDialect() {
-        return env.getDialect();
-    }
-
-    public OrmConfig getConfig() {
-        return env.getConfig();
     }
 
     public EntityMetadata getMetadata() {
@@ -147,18 +95,6 @@ public class DeleteBuilder<T> {
 
     public T proxy() {
         return ProxyFactory.getProxy(entityClass);
-    }
-
-    public DeleteBuilder<T> printSql() {
-        this.printSqlOverride = env.getConfig().isPrintSql();
-        env.setPrintSql(this.printSqlOverride);
-        return this;
-    }
-
-    public DeleteBuilder<T> printSql(boolean print) {
-        this.printSqlOverride = print;
-        env.setPrintSql(print);
-        return this;
     }
 
     public DeleteBuilder<T> disableLogicDelete() {

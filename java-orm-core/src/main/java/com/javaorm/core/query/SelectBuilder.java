@@ -12,6 +12,7 @@ import com.javaorm.core.proxy.PropertyPath;
 import com.javaorm.core.proxy.ProxyFactory;
 import com.javaorm.core.proxy.RecordingContext;
 
+import com.javaorm.core.sql.AbstractStatementBuilder;
 import com.javaorm.core.sql.SqlEnv;
 
 import javax.sql.DataSource;
@@ -24,9 +25,8 @@ import java.util.function.Function;
 /**
  * 核心 Fluent 查询构建器。
  */
-public class SelectBuilder<T> implements Query<T> {
+public class SelectBuilder<T> extends AbstractStatementBuilder<SelectBuilder<T>> implements Query<T> {
 
-    private final SqlEnv env;
     private final Class<T> rootEntityClass;
     private final EntityMetadata rootMetadata;
     private Cte<T> rootCte;
@@ -93,10 +93,6 @@ public class SelectBuilder<T> implements Query<T> {
         RecordingContext.clearAliases();
     }
 
-    public SqlEnv getEnv() {
-        return env;
-    }
-
     @Override
     @SuppressWarnings("unchecked")
     public Class<T> getResultClass() {
@@ -106,16 +102,9 @@ public class SelectBuilder<T> implements Query<T> {
         return rootEntityClass;
     }
 
-    public DataSource getDataSource() {
-        return env.getDataSource();
-    }
-
+    @Override
     public Dialect getDialect() {
         return dialectOverride != null ? dialectOverride : env.getDialect();
-    }
-
-    public OrmConfig getConfig() {
-        return env.getConfig();
     }
 
     public SelectBuilder(SqlEnv env, Class<T> rootEntityClass) {
@@ -123,7 +112,7 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public SelectBuilder(SqlEnv env, Class<T> rootEntityClass, boolean allocateAlias) {
-        this.env = env != null ? env : new SqlEnv(null, null, null);
+        super(env);
         this.rootEntityClass = rootEntityClass;
         this.rootMetadata = this.env.getConfig() != null ? this.env.getConfig().getMetadata(rootEntityClass) : EntityMetadataManager.get(rootEntityClass, this.env.getConfig());
 
@@ -142,7 +131,7 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public SelectBuilder(SqlEnv env, Class<T> rootEntityClass, String rootAlias) {
-        this.env = env != null ? env : new SqlEnv(null, null, null);
+        super(env);
         this.rootEntityClass = rootEntityClass;
         this.rootMetadata = this.env.getConfig() != null ? this.env.getConfig().getMetadata(rootEntityClass) : EntityMetadataManager.get(rootEntityClass, this.env.getConfig());
 
@@ -167,10 +156,10 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public SelectBuilder(SqlEnv env, Cte<T> cte) {
+        super(env);
         if (cte == null) {
             throw new IllegalArgumentException("CTE must not be null");
         }
-        this.env = env != null ? env : new SqlEnv(null, null, null);
         this.rootCte = cte;
         this.rootEntityClass = cte.getEntityClass();
         this.rootMetadata = rootEntityClass != null ? EntityMetadataManager.get(rootEntityClass, this.env.getConfig()) : null;
@@ -195,66 +184,32 @@ public class SelectBuilder<T> implements Query<T> {
         this(new SqlEnv(dataSource, dialect, config), rootEntityClass, rootAlias);
     }
 
-    public SelectBuilder<T> sharding(com.javaorm.core.sharding.TableRouter<?> router) {
+    @Override
+    protected void applyTableRouter(com.javaorm.core.sharding.TableRouter<?> router) {
         if (statement != null) {
             statement.setShardingRouter(router);
         }
-        return this;
     }
 
-    public SelectBuilder<T> sharding(Class<? extends com.javaorm.core.sharding.TableRouter<?>> routerClass) {
-        if (routerClass != null) {
-            try {
-                sharding(routerClass.getDeclaredConstructor().newInstance());
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate router " + routerClass.getName(), e);
-            }
-        }
-        return this;
-    }
-
-    public SelectBuilder<T> tableRouter(com.javaorm.core.sharding.TableRouter<?> router) {
-        return sharding(router);
-    }
-
-    public SelectBuilder<T> tableRouter(Class<? extends com.javaorm.core.sharding.TableRouter<?>> routerClass) {
-        return sharding(routerClass);
-    }
-
-    public SelectBuilder<T> dataSource(String name) {
+    @Override
+    protected void applyTargetDataSource(String name) {
         if (statement != null) {
             statement.setTargetDataSource(name);
         }
-        return this;
     }
 
-    public SelectBuilder<T> dataSource(com.javaorm.core.sharding.DataSourceRouter<?> router) {
+    @Override
+    protected void applyDataSourceRouter(com.javaorm.core.sharding.DataSourceRouter<?> router) {
         if (statement != null) {
             statement.setDataSourceRouter(router);
         }
-        return this;
     }
 
-    public SelectBuilder<T> dataSource(Class<? extends com.javaorm.core.sharding.DataSourceRouter<?>> routerClass) {
-        if (routerClass != null) {
-            try {
-                dataSource(routerClass.getDeclaredConstructor().newInstance());
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate DataSourceRouter " + routerClass.getName(), e);
-            }
-        }
-        return this;
-    }
-
-    public SelectBuilder<T> sharding(com.javaorm.core.sharding.DataSourceRouter<?> router) {
-        return dataSource(router);
-    }
-
-    public SelectBuilder<T> allowFullShardingScan(boolean allow) {
+    @Override
+    protected void applyAllowFullShardingScan(boolean allow) {
         if (statement != null) {
             statement.setAllowFullShardingScan(allow);
         }
-        return this;
     }
 
     public SelectBuilder(Cte<T> cte, DataSource dataSource, Dialect dialect, OrmConfig config) {
@@ -288,24 +243,9 @@ public class SelectBuilder<T> implements Query<T> {
         return rootEntityClass;
     }
 
-    /**
-     * 链式配置：本次执行按照当前全局配置决定是否打印 SQL
-     */
-    public SelectBuilder<T> printSql() {
-        env.setPrintSql(env.getConfig() != null && env.getConfig().isPrintSql());
-        return this;
-    }
-
-    /**
-     * 链式配置：本次执行强制指定是否打印 SQL（忽略全局配置）
-     */
-    public SelectBuilder<T> printSql(boolean print) {
-        env.setPrintSql(print);
-        return this;
-    }
-
+    @Override
     public com.javaorm.core.executor.ExecutionContext getExecutionContext() {
-        return env.getExecutionContext().withDialect(getDialect());
+        return super.getExecutionContext().withDialect(getDialect());
     }
 
     public SelectBuilder<T> setDialect(Dialect dialect) {

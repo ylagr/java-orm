@@ -30,11 +30,10 @@ import java.util.function.Consumer;
  *
  * @param <T> 实体类型
  */
-public class UpsertBuilder<T> {
+public class UpsertBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuilder<UpsertBuilder<T>> {
 
     private static final Logger log = LoggerFactory.getLogger(UpsertBuilder.class);
 
-    private final SqlEnv env;
     private final T entity;
     private final Class<T> entityClass;
     private final EntityMetadata metadata;
@@ -43,7 +42,6 @@ public class UpsertBuilder<T> {
     private final List<String> updateColumns = new ArrayList<>();
     private final Set<String> ignoreColumns = new HashSet<>();
     private boolean doNothing = false;
-    private Boolean printSqlOverride = null;
 
     private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
     private String targetDataSource;
@@ -51,7 +49,7 @@ public class UpsertBuilder<T> {
 
     @SuppressWarnings("unchecked")
     public UpsertBuilder(SqlEnv env, T entity) {
-        this.env = env != null ? env : new SqlEnv(null, null, null);
+        super(env);
         this.entity = entity;
         this.entityClass = entity != null ? (Class<T>) entity.getClass() : null;
         this.metadata = entityClass != null ? EntityMetadataManager.get(entityClass, this.env.getConfig()) : null;
@@ -142,45 +140,19 @@ public class UpsertBuilder<T> {
         return this;
     }
 
-    public UpsertBuilder<T> printSql() {
-        this.printSqlOverride = getConfig() != null ? getConfig().isPrintSql() : false;
-        return this;
-    }
-
-    public UpsertBuilder<T> printSql(boolean print) {
-        this.printSqlOverride = print;
-        return this;
-    }
-
-    public UpsertBuilder<T> sharding(com.javaorm.core.sharding.TableRouter<?> router) {
+    @Override
+    protected void applyTableRouter(com.javaorm.core.sharding.TableRouter<?> router) {
         this.shardingRouter = router;
-        return this;
     }
 
-    public UpsertBuilder<T> dataSource(String name) {
+    @Override
+    protected void applyTargetDataSource(String name) {
         this.targetDataSource = name;
-        return this;
     }
 
-    public UpsertBuilder<T> dataSource(com.javaorm.core.sharding.DataSourceRouter<?> router) {
+    @Override
+    protected void applyDataSourceRouter(com.javaorm.core.sharding.DataSourceRouter<?> router) {
         this.dataSourceRouter = router;
-        return this;
-    }
-
-    public SqlEnv getEnv() {
-        return env;
-    }
-
-    public DataSource getDataSource() {
-        return env.getDataSource();
-    }
-
-    public Dialect getDialect() {
-        return env.getDialect();
-    }
-
-    public OrmConfig getConfig() {
-        return env.getConfig();
     }
 
     public T getEntity() {
