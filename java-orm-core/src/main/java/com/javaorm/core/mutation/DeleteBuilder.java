@@ -70,11 +70,11 @@ public class DeleteBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
         }
     }
 
-    @Override
-    protected void applyAllowFullShardingScan(boolean allow) {
+    public DeleteBuilder<T> allowFullShardingScan(boolean allow) {
         if (statement != null) {
             statement.setAllowFullShardingScan(allow);
         }
+        return this;
     }
 
     public DeleteStatement getStatement() {

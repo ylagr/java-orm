@@ -39,10 +39,7 @@ public class BatchUpsertBuilder<T> extends AbstractBatchBuilder<T, BatchUpsertBu
 
     private Boolean printSqlOverride = null;
 
-    private final List<String> conflictColumns = new ArrayList<>();
-    private final List<String> updateColumns = new ArrayList<>();
-    private final Set<String> ignoreColumns = new HashSet<>();
-    private boolean doNothing = false;
+    private final com.javaorm.core.mutation.UpsertSpec<T> spec = new com.javaorm.core.mutation.UpsertSpec<>();
 
     private TableRouter<?> shardingRouter;
     private String targetDataSource;
@@ -53,65 +50,32 @@ public class BatchUpsertBuilder<T> extends AbstractBatchBuilder<T, BatchUpsertBu
     }
 
     public BatchUpsertBuilder<T> onConflict(String... columns) {
-        if (columns != null) {
-            for (String col : columns) {
-                if (col != null && !col.trim().isEmpty()) {
-                    String resolved = resolveColumnName(col.trim());
-                    if (!this.conflictColumns.contains(resolved)) {
-                        this.conflictColumns.add(resolved);
-                    }
-                }
-            }
-        }
+        spec.addConflictColumns(resolveEntityMetadata(), columns);
         return this;
     }
 
     public BatchUpsertBuilder<T> onConflict(Consumer<T> proxyAction) {
-        addResolvedColumns(this.conflictColumns, proxyAction);
+        spec.addConflictColumns(getEntityClass(), resolveEntityMetadata(), proxyAction);
         return this;
     }
 
     public BatchUpsertBuilder<T> updateColumns(String... columns) {
-        if (columns != null) {
-            for (String col : columns) {
-                if (col != null && !col.trim().isEmpty()) {
-                    String resolved = resolveColumnName(col.trim());
-                    if (!this.updateColumns.contains(resolved)) {
-                        this.updateColumns.add(resolved);
-                    }
-                }
-            }
-        }
+        spec.addUpdateColumns(resolveEntityMetadata(), columns);
         return this;
     }
 
     public BatchUpsertBuilder<T> updateColumns(Consumer<T> proxyAction) {
-        addResolvedColumns(this.updateColumns, proxyAction);
+        spec.addUpdateColumns(getEntityClass(), resolveEntityMetadata(), proxyAction);
         return this;
     }
 
-    private void addResolvedColumns(List<String> target, Consumer<T> proxyAction) {
-        for (PropertyPath path : RecordingContext.recordPaths(getEntityClass(), proxyAction)) {
-            String resolved = resolveColumnName(path.getTerminalProperty());
-            if (!target.contains(resolved)) {
-                target.add(resolved);
-            }
-        }
-    }
-
     public BatchUpsertBuilder<T> ignoreColumns(String... columns) {
-        if (columns != null) {
-            for (String col : columns) {
-                if (col != null && !col.trim().isEmpty()) {
-                    this.ignoreColumns.add(resolveColumnName(col.trim()));
-                }
-            }
-        }
+        spec.addIgnoreColumns(resolveEntityMetadata(), columns);
         return this;
     }
 
     public BatchUpsertBuilder<T> doNothing() {
-        this.doNothing = true;
+        spec.setDoNothing(true);
         return this;
     }
 
@@ -148,26 +112,9 @@ public class BatchUpsertBuilder<T> extends AbstractBatchBuilder<T, BatchUpsertBu
         return null;
     }
 
-    private String resolveColumnName(String propertyOrColumn) {
+    private EntityMetadata resolveEntityMetadata() {
         Class<T> entityClass = getEntityClass();
-        if (entityClass == null) return propertyOrColumn;
-        EntityMetadata metadata = EntityMetadataManager.get(entityClass, env.getConfig());
-        ColumnMetadata col = metadata.getColumnByProperty(propertyOrColumn);
-        if (col != null) {
-            return col.getColumnName();
-        }
-        col = metadata.getColumnByDbName(propertyOrColumn);
-        if (col != null) {
-            return col.getColumnName();
-        }
-        return propertyOrColumn;
-    }
-
-    private boolean isDefaultCreationAuditColumn(String colName) {
-        if (colName == null) return false;
-        String lower = colName.toLowerCase();
-        return lower.equals("create_time") || lower.equals("createtime") || lower.equals("created_at")
-                || lower.equals("gmt_create") || lower.equals("create_by") || lower.equals("createby") || lower.equals("creator");
+        return entityClass != null ? EntityMetadataManager.get(entityClass, env.getConfig()) : null;
     }
 
     @Override
@@ -209,61 +156,26 @@ public class BatchUpsertBuilder<T> extends AbstractBatchBuilder<T, BatchUpsertBu
 
         // 收集参与待插入/更新的列
         List<ColumnMetadata> insertCols = new ArrayList<>();
+        List<String> insertColNames = new ArrayList<>();
         for (ColumnMetadata col : metadata.getColumns()) {
             if (col.isIgnored()) continue;
             // 自增主键且第一条记录为 null/0 且不在冲突列中，则跳过
             if (col.isPrimaryKey()) {
                 Object val = col.getValue(chunk.get(0));
                 if ((val == null || (val instanceof Number && ((Number) val).longValue() == 0))
-                        && !this.conflictColumns.contains(col.getColumnName())) {
+                        && !spec.containsConflictColumn(col.getColumnName())) {
                     continue;
                 }
             }
             insertCols.add(col);
-        }
-
-        // 确定 conflictColumns
-        List<String> finalConflictCols = new ArrayList<>(this.conflictColumns);
-        if (finalConflictCols.isEmpty()) {
-            if (metadata.getIdColumn() != null) {
-                finalConflictCols.add(metadata.getIdColumn().getColumnName());
-            } else if (!metadata.getIndexes().isEmpty()) {
-                for (com.javaorm.core.metadata.IndexMetadata idx : metadata.getIndexes()) {
-                    if (idx.isUnique() && !idx.getColumns().isEmpty()) {
-                        finalConflictCols.addAll(idx.getColumns());
-                        break;
-                    }
-                }
-            }
-        }
-        if (finalConflictCols.isEmpty()) {
-            throw new IllegalStateException("UPSERT requires a primary key or explicit onConflict columns for entity: " + entityClass.getName());
-        }
-
-        // 确定 updateColumns
-        List<String> finalUpdateCols = new ArrayList<>();
-        if (!this.doNothing) {
-            if (!this.updateColumns.isEmpty()) {
-                finalUpdateCols.addAll(this.updateColumns);
-            } else {
-                for (ColumnMetadata col : insertCols) {
-                    String colName = col.getColumnName();
-                    if (finalConflictCols.contains(colName)) continue;
-                    if (metadata.getIdColumn() != null && colName.equalsIgnoreCase(metadata.getIdColumn().getColumnName())) continue;
-                    if (ignoreColumns.contains(colName)) continue;
-                    if (isDefaultCreationAuditColumn(colName)) continue;
-                    finalUpdateCols.add(colName);
-                }
-            }
+            insertColNames.add(col.getColumnName());
         }
 
         // 构建 UpsertStatement 模板获取 SQL
         UpsertStatement templateStmt = new UpsertStatement(entityClass, tableName);
-        templateStmt.setDoNothing(this.doNothing);
-        templateStmt.addConflictColumns(finalConflictCols);
-        templateStmt.addUpdateColumns(finalUpdateCols);
-        for (ColumnMetadata col : insertCols) {
-            templateStmt.addColumnValue(col.getColumnName(), "?"); // 占位
+        spec.applyTo(templateStmt, metadata, entityClass, insertColNames);
+        for (String colName : insertColNames) {
+            templateStmt.addColumnValue(colName, "?"); // 占位
         }
 
         SqlAndParams sap = dialect.buildUpsert(templateStmt);

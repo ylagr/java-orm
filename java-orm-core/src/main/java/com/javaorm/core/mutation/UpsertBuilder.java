@@ -37,11 +37,7 @@ public class UpsertBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
     private final T entity;
     private final Class<T> entityClass;
     private final EntityMetadata metadata;
-
-    private final List<String> conflictColumns = new ArrayList<>();
-    private final List<String> updateColumns = new ArrayList<>();
-    private final Set<String> ignoreColumns = new HashSet<>();
-    private boolean doNothing = false;
+    private final UpsertSpec<T> spec = new UpsertSpec<>();
 
     private com.javaorm.core.sharding.TableRouter<?> shardingRouter;
     private String targetDataSource;
@@ -63,16 +59,7 @@ public class UpsertBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
      * 指定作为冲突判定的列名（如主键或唯一索引列）
      */
     public UpsertBuilder<T> onConflict(String... columns) {
-        if (columns != null) {
-            for (String col : columns) {
-                if (col != null && !col.trim().isEmpty()) {
-                    String resolved = resolveColumnName(col.trim());
-                    if (!this.conflictColumns.contains(resolved)) {
-                        this.conflictColumns.add(resolved);
-                    }
-                }
-            }
-        }
+        spec.addConflictColumns(metadata, columns);
         return this;
     }
 
@@ -80,7 +67,7 @@ public class UpsertBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
      * 通过强类型 Getter 代理指定冲突判定的属性
      */
     public UpsertBuilder<T> onConflict(Consumer<T> proxyAction) {
-        addResolvedColumns(this.conflictColumns, proxyAction);
+        spec.addConflictColumns(entityClass, metadata, proxyAction);
         return this;
     }
 
@@ -88,16 +75,7 @@ public class UpsertBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
      * 显式指定发生冲突时仅更新的列名
      */
     public UpsertBuilder<T> updateColumns(String... columns) {
-        if (columns != null) {
-            for (String col : columns) {
-                if (col != null && !col.trim().isEmpty()) {
-                    String resolved = resolveColumnName(col.trim());
-                    if (!this.updateColumns.contains(resolved)) {
-                        this.updateColumns.add(resolved);
-                    }
-                }
-            }
-        }
+        spec.addUpdateColumns(metadata, columns);
         return this;
     }
 
@@ -105,30 +83,15 @@ public class UpsertBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
      * 通过强类型 Getter 代理显式指定发生冲突时仅更新的属性
      */
     public UpsertBuilder<T> updateColumns(Consumer<T> proxyAction) {
-        addResolvedColumns(this.updateColumns, proxyAction);
+        spec.addUpdateColumns(entityClass, metadata, proxyAction);
         return this;
-    }
-
-    private void addResolvedColumns(List<String> target, Consumer<T> proxyAction) {
-        for (PropertyPath path : RecordingContext.recordPaths(entityClass, proxyAction)) {
-            String resolved = resolveColumnName(path.getTerminalProperty());
-            if (!target.contains(resolved)) {
-                target.add(resolved);
-            }
-        }
     }
 
     /**
      * 忽略更新的列名（例如创建时间、创建人等）
      */
     public UpsertBuilder<T> ignoreColumns(String... columns) {
-        if (columns != null) {
-            for (String col : columns) {
-                if (col != null && !col.trim().isEmpty()) {
-                    this.ignoreColumns.add(resolveColumnName(col.trim()));
-                }
-            }
-        }
+        spec.addIgnoreColumns(metadata, columns);
         return this;
     }
 
@@ -136,7 +99,7 @@ public class UpsertBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
      * 存在冲突时不做任何更新操作（DO NOTHING）
      */
     public UpsertBuilder<T> doNothing() {
-        this.doNothing = true;
+        spec.setDoNothing(true);
         return this;
     }
 
@@ -179,7 +142,6 @@ public class UpsertBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
         if (this.dataSourceRouter != null) {
             stmt.setDataSourceRouter(this.dataSourceRouter);
         }
-        stmt.setDoNothing(this.doNothing);
 
         // 收集所有列和值
         for (ColumnMetadata col : metadata.getColumns()) {
@@ -218,7 +180,7 @@ public class UpsertBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
             Object val = col.getValue(entity);
             // 主键自增为 null 或 0 且未在 conflictColumns 中时，插入时可由数据库生成
             if (col.isPrimaryKey() && (val == null || (val instanceof Number && ((Number) val).longValue() == 0))) {
-                if (this.conflictColumns.contains(col.getColumnName())) {
+                if (spec.containsConflictColumn(col.getColumnName())) {
                     stmt.addColumnValue(col.getColumnName(), col.serializeParam(val));
                 }
                 continue;
@@ -227,67 +189,8 @@ public class UpsertBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
             stmt.addColumnValue(col.getColumnName(), col.serializeParam(val));
         }
 
-        // 解析冲突判定列 conflictColumns
-        List<String> finalConflictCols = new ArrayList<>(this.conflictColumns);
-        if (finalConflictCols.isEmpty()) {
-            if (metadata.getIdColumn() != null) {
-                finalConflictCols.add(metadata.getIdColumn().getColumnName());
-            } else if (!metadata.getIndexes().isEmpty()) {
-                for (com.javaorm.core.metadata.IndexMetadata idx : metadata.getIndexes()) {
-                    if (idx.isUnique() && !idx.getColumns().isEmpty()) {
-                        finalConflictCols.addAll(idx.getColumns());
-                        break;
-                    }
-                }
-            }
-        }
-        if (finalConflictCols.isEmpty()) {
-            throw new IllegalStateException("UPSERT requires a primary key or explicit onConflict columns for entity: " + entityClass.getName());
-        }
-        stmt.addConflictColumns(finalConflictCols);
-
-        // 解析更新列 updateColumns
-        if (!this.doNothing) {
-            List<String> finalUpdateCols = new ArrayList<>(this.updateColumns);
-            if (finalUpdateCols.isEmpty()) {
-                for (String colName : stmt.getColumns()) {
-                    if (finalConflictCols.contains(colName)) {
-                        continue;
-                    }
-                    if (metadata.getIdColumn() != null && colName.equalsIgnoreCase(metadata.getIdColumn().getColumnName())) {
-                        continue;
-                    }
-                    if (ignoreColumns.contains(colName)) {
-                        continue;
-                    }
-                    // 默认跳过常见创建时间/创建人字段
-                    if (isDefaultCreationAuditColumn(colName)) {
-                        continue;
-                    }
-                    finalUpdateCols.add(colName);
-                }
-            }
-            stmt.addUpdateColumns(finalUpdateCols);
-        }
-
+        spec.applyTo(stmt, metadata, entityClass, stmt.getColumns());
         return stmt;
-    }
-
-    private boolean isDefaultCreationAuditColumn(String colName) {
-        if (colName == null) return false;
-        String lower = colName.toLowerCase();
-        return lower.equals("create_time") || lower.equals("createtime") || lower.equals("created_at")
-                || lower.equals("gmt_create") || lower.equals("create_by") || lower.equals("createby") || lower.equals("creator");
-    }
-
-    private String resolveColumnName(String propOrCol) {
-        if (metadata != null) {
-            ColumnMetadata col = metadata.getColumnByProperty(propOrCol);
-            if (col != null) return col.getColumnName();
-            col = metadata.getColumnByDbName(propOrCol);
-            if (col != null) return col.getColumnName();
-        }
-        return propOrCol;
     }
 
     public SqlAndParams toSqlAndParams() {

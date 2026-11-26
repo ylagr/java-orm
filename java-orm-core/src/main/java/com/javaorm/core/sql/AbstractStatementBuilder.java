@@ -108,18 +108,9 @@ public abstract class AbstractStatementBuilder<SELF extends AbstractStatementBui
         return dataSource(router);
     }
 
-    public SELF allowFullShardingScan(boolean allow) {
-        applyAllowFullShardingScan(allow);
-        return self();
-    }
-
     protected abstract void applyTableRouter(TableRouter<?> router);
 
     protected abstract void applyTargetDataSource(String name);
 
     protected abstract void applyDataSourceRouter(DataSourceRouter<?> router);
-
-    protected void applyAllowFullShardingScan(boolean allow) {
-        throw new UnsupportedOperationException("allowFullShardingScan is not supported on " + getClass().getSimpleName());
-    }
 }

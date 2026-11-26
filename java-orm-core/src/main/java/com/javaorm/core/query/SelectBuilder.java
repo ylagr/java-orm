@@ -205,11 +205,11 @@ public class SelectBuilder<T> extends AbstractStatementBuilder<SelectBuilder<T>>
         }
     }
 
-    @Override
-    protected void applyAllowFullShardingScan(boolean allow) {
+    public SelectBuilder<T> allowFullShardingScan(boolean allow) {
         if (statement != null) {
             statement.setAllowFullShardingScan(allow);
         }
+        return this;
     }
 
     public SelectBuilder(Cte<T> cte, DataSource dataSource, Dialect dialect, OrmConfig config) {

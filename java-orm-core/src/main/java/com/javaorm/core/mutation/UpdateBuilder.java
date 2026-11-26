@@ -86,11 +86,11 @@ public class UpdateBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
         }
     }
 
-    @Override
-    protected void applyAllowFullShardingScan(boolean allow) {
+    public UpdateBuilder<T> allowFullShardingScan(boolean allow) {
         if (statement != null) {
             statement.setAllowFullShardingScan(allow);
         }
+        return this;
     }
 
     public EntityMetadata getMetadata() {
