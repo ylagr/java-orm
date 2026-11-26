@@ -806,10 +806,21 @@ public class SelectBuilder<T> implements Query<T> {
         return joinAlias;
     }
 
+    // --- CTE 与实体表连接统一内部实现 ---
+    private <TJoin> JoinBuilder<T, TJoin> joinInternal(TableJoin.JoinType joinType, Cte<TJoin> cte) {
+        String joinAlias = obtainJoinAlias(cte != null ? cte.getEntityClass() : null);
+        return new JoinBuilder<>(this, joinType, cte.getName(), cte.getEntityClass(), joinAlias, cte);
+    }
+
+    private <TJoin> JoinBuilder<T, TJoin> joinInternal(TableJoin.JoinType joinType, Class<TJoin> entityClass) {
+        EntityMetadata meta = EntityMetadataManager.get(entityClass, getConfig());
+        String joinAlias = obtainJoinAlias(entityClass);
+        return new JoinBuilder<>(this, joinType, meta.getTableName(), entityClass, joinAlias, null);
+    }
+
     // --- CTE 连接支持 ---
     public <TJoin> JoinBuilder<T, TJoin> leftJoin(Cte<TJoin> cte) {
-        String joinAlias = obtainJoinAlias(cte != null ? cte.getEntityClass() : null);
-        return new JoinBuilder<>(this, TableJoin.JoinType.LEFT_JOIN, cte.getName(), cte.getEntityClass(), joinAlias, cte);
+        return joinInternal(TableJoin.JoinType.LEFT_JOIN, cte);
     }
 
     public <TJoin> SelectBuilder<T> leftJoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
@@ -817,8 +828,7 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public <TJoin> JoinBuilder<T, TJoin> innerJoin(Cte<TJoin> cte) {
-        String joinAlias = obtainJoinAlias(cte != null ? cte.getEntityClass() : null);
-        return new JoinBuilder<>(this, TableJoin.JoinType.INNER_JOIN, cte.getName(), cte.getEntityClass(), joinAlias, cte);
+        return joinInternal(TableJoin.JoinType.INNER_JOIN, cte);
     }
 
     public <TJoin> SelectBuilder<T> innerJoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
@@ -826,8 +836,7 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public <TJoin> JoinBuilder<T, TJoin> rightJoin(Cte<TJoin> cte) {
-        String joinAlias = obtainJoinAlias(cte != null ? cte.getEntityClass() : null);
-        return new JoinBuilder<>(this, TableJoin.JoinType.RIGHT_JOIN, cte.getName(), cte.getEntityClass(), joinAlias, cte);
+        return joinInternal(TableJoin.JoinType.RIGHT_JOIN, cte);
     }
 
     public <TJoin> SelectBuilder<T> rightJoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
@@ -836,9 +845,7 @@ public class SelectBuilder<T> implements Query<T> {
 
     // --- 实体表连接支持 ---
     public <TJoin> JoinBuilder<T, TJoin> leftJoin(Class<TJoin> entityClass) {
-        EntityMetadata meta = EntityMetadataManager.get(entityClass, getConfig());
-        String joinAlias = obtainJoinAlias(entityClass);
-        return new JoinBuilder<>(this, TableJoin.JoinType.LEFT_JOIN, meta.getTableName(), entityClass, joinAlias, null);
+        return joinInternal(TableJoin.JoinType.LEFT_JOIN, entityClass);
     }
 
     public <TJoin> SelectBuilder<T> leftJoin(Class<TJoin> entityClass, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
@@ -846,9 +853,7 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public <TJoin> JoinBuilder<T, TJoin> innerJoin(Class<TJoin> entityClass) {
-        EntityMetadata meta = EntityMetadataManager.get(entityClass, getConfig());
-        String joinAlias = obtainJoinAlias(entityClass);
-        return new JoinBuilder<>(this, TableJoin.JoinType.INNER_JOIN, meta.getTableName(), entityClass, joinAlias, null);
+        return joinInternal(TableJoin.JoinType.INNER_JOIN, entityClass);
     }
 
     public <TJoin> SelectBuilder<T> innerJoin(Class<TJoin> entityClass, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
@@ -856,9 +861,7 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public <TJoin> JoinBuilder<T, TJoin> rightJoin(Class<TJoin> entityClass) {
-        EntityMetadata meta = EntityMetadataManager.get(entityClass, getConfig());
-        String joinAlias = obtainJoinAlias(entityClass);
-        return new JoinBuilder<>(this, TableJoin.JoinType.RIGHT_JOIN, meta.getTableName(), entityClass, joinAlias, null);
+        return joinInternal(TableJoin.JoinType.RIGHT_JOIN, entityClass);
     }
 
     public <TJoin> SelectBuilder<T> rightJoin(Class<TJoin> entityClass, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
@@ -866,9 +869,7 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public <TJoin> JoinBuilder<T, TJoin> fullJoin(Class<TJoin> entityClass) {
-        EntityMetadata meta = EntityMetadataManager.get(entityClass, getConfig());
-        String joinAlias = obtainJoinAlias(entityClass);
-        return new JoinBuilder<>(this, TableJoin.JoinType.FULL_JOIN, meta.getTableName(), entityClass, joinAlias, null);
+        return joinInternal(TableJoin.JoinType.FULL_JOIN, entityClass);
     }
 
     public <TJoin> SelectBuilder<T> fullJoin(Class<TJoin> entityClass, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
@@ -876,8 +877,7 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public <TJoin> JoinBuilder<T, TJoin> fullJoin(Cte<TJoin> cte) {
-        String joinAlias = obtainJoinAlias(cte != null ? cte.getEntityClass() : null);
-        return new JoinBuilder<>(this, TableJoin.JoinType.FULL_JOIN, cte.getName(), cte.getEntityClass(), joinAlias, cte);
+        return joinInternal(TableJoin.JoinType.FULL_JOIN, cte);
     }
 
     public <TJoin> SelectBuilder<T> fullJoin(Cte<TJoin> cte, TriConsumer<WhereBuilder<TJoin>, T, TJoin> onConsumer) {
@@ -993,55 +993,30 @@ public class SelectBuilder<T> implements Query<T> {
     }
 
     public <E> SelectBuilder<T> includes(Collection<E> relationProxy, BiConsumer<SelectBuilder<E>, E> biConfig) {
-        PropertyPath path = RecordingContext.finish();
-        if (path != null) {
-            includes.add(IncludeSpec.ofBi(path, biConfig));
-        }
-        return this;
+        return include(relationProxy, biConfig);
     }
 
     public <E> SelectBuilder<T> includes(Function<T, Collection<E>> relationGetter) {
-        RecordingContext.start(rootEntityClass);
-        try {
-            T proxy = ProxyFactory.getProxy(rootEntityClass);
-            relationGetter.apply(proxy);
-            PropertyPath path = RecordingContext.finish();
-            if (path != null) {
-                includes.add(new IncludeSpec(path));
-            }
-        } finally {
-            RecordingContext.clearRecording();
+        PropertyPath path = recordPath(relationGetter);
+        if (path != null) {
+            includes.add(new IncludeSpec(path));
         }
         return this;
     }
 
     @SuppressWarnings("unchecked")
     public <E> SelectBuilder<T> includes(Function<T, Collection<E>> relationGetter, Consumer<SelectBuilder<E>> config) {
-        RecordingContext.start(rootEntityClass);
-        try {
-            T proxy = ProxyFactory.getProxy(rootEntityClass);
-            relationGetter.apply(proxy);
-            PropertyPath path = RecordingContext.finish();
-            if (path != null) {
-                includes.add(new IncludeSpec(path, (Consumer<SelectBuilder<?>>) (Consumer<?>) config));
-            }
-        } finally {
-            RecordingContext.clearRecording();
+        PropertyPath path = recordPath(relationGetter);
+        if (path != null) {
+            includes.add(new IncludeSpec(path, (Consumer<SelectBuilder<?>>) (Consumer<?>) config));
         }
         return this;
     }
 
     public <E> SelectBuilder<T> includes(Function<T, Collection<E>> relationGetter, BiConsumer<SelectBuilder<E>, E> biConfig) {
-        RecordingContext.start(rootEntityClass);
-        try {
-            T proxy = ProxyFactory.getProxy(rootEntityClass);
-            relationGetter.apply(proxy);
-            PropertyPath path = RecordingContext.finish();
-            if (path != null) {
-                includes.add(IncludeSpec.ofBi(path, biConfig));
-            }
-        } finally {
-            RecordingContext.clearRecording();
+        PropertyPath path = recordPath(relationGetter);
+        if (path != null) {
+            includes.add(IncludeSpec.ofBi(path, biConfig));
         }
         return this;
     }
@@ -1079,11 +1054,12 @@ public class SelectBuilder<T> implements Query<T> {
         }
     }
 
+    private OrderByBuilder<SelectBuilder<T>> orderByPath(PropertyPath path) {
+        return new OrderByBuilder<>(this, statement, resolveTableAlias(path), resolveColumnName(path));
+    }
+
     public <R> OrderByBuilder<SelectBuilder<T>> orderBy(Function<T, R> propertyGetter) {
-        PropertyPath path = recordPath(propertyGetter);
-        String alias = resolveTableAlias(path);
-        String colName = resolveColumnName(path);
-        return new OrderByBuilder<>(this, statement, alias, colName);
+        return orderByPath(recordPath(propertyGetter));
     }
 
     public <R> OrderByBuilder<SelectBuilder<T>> orderBy(R val) {
@@ -1097,17 +1073,13 @@ public class SelectBuilder<T> implements Query<T> {
             }
             throw new IllegalStateException("No proxy property accessed before calling orderBy(...)");
         }
-        String alias = resolveTableAlias(path);
-        String colName = resolveColumnName(path);
-        return new OrderByBuilder<>(this, statement, alias, colName);
+        return orderByPath(path);
     }
 
     public OrderByBuilder<SelectBuilder<T>> orderBy(String propertyOrColumn) {
         PropertyPath path = RecordingContext.finish();
         if (path != null) {
-            String alias = resolveTableAlias(path);
-            String colName = resolveColumnName(path);
-            return new OrderByBuilder<>(this, statement, alias, colName);
+            return orderByPath(path);
         }
         if (propertyOrColumn == null) {
             throw new IllegalArgumentException("Order by column cannot be null");
