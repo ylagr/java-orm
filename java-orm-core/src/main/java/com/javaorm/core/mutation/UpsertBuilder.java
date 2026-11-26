@@ -328,9 +328,6 @@ public class UpsertBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
             return 0;
         }
 
-        com.javaorm.core.executor.ExecutionContext ctx = printSqlOverride != null
-                ? env.getExecutionContext().withPrintSql(printSqlOverride)
-                : env.getExecutionContext();
-        return ctx.executeUpsert(null, stmt, metadata, returnKeys, entity, this.shardingRouter);
+        return getExecutionContext().executeUpsert(null, stmt, metadata, returnKeys, entity, this.shardingRouter);
     }
 }

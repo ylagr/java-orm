@@ -357,15 +357,10 @@ public class UpdateBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
     }
 
     public int execute() {
-        com.javaorm.core.executor.ExecutionContext ctx = printSqlOverride != null
-                ? env.getExecutionContext().withPrintSql(printSqlOverride)
-                : env.getExecutionContext();
+        com.javaorm.core.executor.ExecutionContext ctx = getExecutionContext();
         if (boundEntity != null && statement.getSetValues().isEmpty()) {
             try {
-                if (printSqlOverride != null) {
-                    env.setPrintSql(printSqlOverride);
-                }
-                return updateEntity(boundEntity, env, boundSelective);
+                return updateEntity(boundEntity, env, ctx, boundSelective);
             } finally {
                 SelectBuilder.resetAliasSeq();
             }
@@ -483,11 +478,15 @@ public class UpdateBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
     }
 
     public static <E> int updateEntity(E entity, SqlEnv env, boolean selective) {
+        return updateEntity(entity, env, env != null ? env.getExecutionContext() : new com.javaorm.core.executor.ExecutionContext(null, null, null), selective);
+    }
+
+    private static <E> int updateEntity(E entity, SqlEnv env, com.javaorm.core.executor.ExecutionContext ctx, boolean selective) {
         EntityUpdatePlan<E> plan = prepareEntityUpdate(entity, env, selective, true);
         if (plan == null || plan.statement.getSetValues().isEmpty()) {
             return 0;
         }
-        int affected = env.getExecutionContext().executeUpdate(plan.statement);
+        int affected = ctx.executeUpdate(plan.statement);
         if (plan.versionCol != null) {
             if (affected == 0) {
                 throw new com.javaorm.core.exception.OptimisticLockException(plan.entityClass, plan.idVal, plan.currentVersion);

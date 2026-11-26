@@ -237,12 +237,11 @@ public class DeleteBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
 
     public int execute() {
         try {
-            com.javaorm.core.executor.ExecutionContext ctx = printSqlOverride != null
-                    ? env.getExecutionContext().withPrintSql(printSqlOverride)
-                    : env.getExecutionContext();
+            com.javaorm.core.executor.ExecutionContext ctx = getExecutionContext();
             // 如果存在逻辑删除，自动重写为 UPDATE t SET is_deleted = 1 WHERE ...
             if (metadata != null && metadata.hasLogicDelete() && !logicDeleteDisabled) {
-                return ctx.executeLogicDelete(metadata, entityClass, statement.getWhereConditions(), statement.getShardingRouter(), statement.getAllowFullShardingScan());
+                com.javaorm.core.ast.UpdateStatement logicDeleteStmt = buildLogicDeleteStatement(ctx.getConfig());
+                return ctx.executeUpdate(logicDeleteStmt, statement.getShardingRouter(), statement.getAllowFullShardingScan());
             }
 
             // 物理删除
@@ -260,6 +259,29 @@ public class DeleteBuilder<T> extends com.javaorm.core.sql.AbstractStatementBuil
         } finally {
             SelectBuilder.resetAliasSeq();
         }
+    }
+
+    private com.javaorm.core.ast.UpdateStatement buildLogicDeleteStatement(OrmConfig config) {
+        ColumnMetadata ld = metadata.getLogicDeleteColumn();
+        com.javaorm.core.ast.UpdateStatement updateStmt = new com.javaorm.core.ast.UpdateStatement(entityClass, metadata.getTableName());
+        updateStmt.addSet(ld.getColumnName(), ld.getLogicDeleteDeletedValue());
+
+        for (Condition c : statement.getWhereConditions()) {
+            updateStmt.addWhereCondition(c);
+        }
+        updateStmt.addSystemCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
+        if (metadata.hasTenant()) {
+            ColumnMetadata tc = metadata.getTenantColumn();
+            Object tenantId = config != null && config.getCurrentTenantId() != null
+                    ? config.getCurrentTenantId()
+                    : com.javaorm.core.tenant.TenantContext.getTenantId();
+            if (tenantId != null) {
+                updateStmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
+            } else if (config != null && config.isTenantStrict()) {
+                throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
+            }
+        }
+        return updateStmt;
     }
 
     public static <E> int deleteEntity(E entity, DataSource dataSource, Dialect dialect, OrmConfig config) {

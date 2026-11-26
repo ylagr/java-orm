@@ -4,15 +4,12 @@ import com.javaorm.core.ast.*;
 import com.javaorm.core.config.OrmConfig;
 import com.javaorm.core.dialect.Dialect;
 import com.javaorm.core.dialect.SqlAndParams;
-import com.javaorm.core.metadata.ColumnMetadata;
 import com.javaorm.core.metadata.EntityMetadata;
 import com.javaorm.core.metadata.EntityMetadataManager;
-import com.javaorm.core.operator.SqlOperator;
 import com.javaorm.core.query.IncludeSpec;
 import com.javaorm.core.sharding.DataSourceRouter;
 import com.javaorm.core.sharding.ShardingHandler;
 import com.javaorm.core.sharding.TableRouter;
-import com.javaorm.core.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,33 +148,6 @@ public final class ExecutionContext {
         SqlAndParams sqlAndParams = dialect.buildDelete(statement);
         logSql(sqlAndParams, "DELETE");
         return getSqlExecutor().executeUpdate(null, sqlAndParams, "DELETE", this);
-    }
-
-    public int executeLogicDelete(EntityMetadata metadata, Class<?> entityClass, List<Condition> whereConditions) {
-        return executeLogicDelete(metadata, entityClass, whereConditions, null, null);
-    }
-
-    public int executeLogicDelete(EntityMetadata metadata, Class<?> entityClass, List<Condition> whereConditions,
-                                  TableRouter<?> routerOverride, Boolean allowFullScanOverride) {
-        ColumnMetadata ld = metadata.getLogicDeleteColumn();
-        UpdateStatement updateStmt = new UpdateStatement(entityClass, metadata.getTableName());
-        updateStmt.addSet(ld.getColumnName(), ld.getLogicDeleteDeletedValue());
-
-        for (Condition c : whereConditions) {
-            updateStmt.addWhereCondition(c);
-        }
-        updateStmt.addSystemCondition(new BinaryCondition(null, ld.getColumnName(), SqlOperator.EQ, ld.getLogicDeleteNormalValue()));
-        if (metadata.hasTenant()) {
-            ColumnMetadata tc = metadata.getTenantColumn();
-            Object tenantId = config.getCurrentTenantId() != null ? config.getCurrentTenantId() : TenantContext.getTenantId();
-            if (tenantId != null) {
-                updateStmt.addSystemCondition(new BinaryCondition(null, tc.getColumnName(), SqlOperator.EQ, tenantId));
-            } else if (config.isTenantStrict()) {
-                throw new IllegalStateException("Tenant context is required for multi-tenant entity: " + entityClass.getName());
-            }
-        }
-
-        return executeUpdate(updateStmt, routerOverride, allowFullScanOverride);
     }
 
     public int executeInsert(Connection conn, InsertStatement statement, EntityMetadata metadata,

@@ -51,13 +51,11 @@ public abstract class AbstractStatementBuilder<SELF extends AbstractStatementBui
     public SELF printSql() {
         OrmConfig cfg = getConfig();
         this.printSqlOverride = cfg != null && cfg.isPrintSql();
-        env.setPrintSql(this.printSqlOverride);
         return self();
     }
 
     public SELF printSql(boolean print) {
         this.printSqlOverride = print;
-        env.setPrintSql(print);
         return self();
     }
 
@@ -122,5 +120,6 @@ public abstract class AbstractStatementBuilder<SELF extends AbstractStatementBui
     protected abstract void applyDataSourceRouter(DataSourceRouter<?> router);
 
     protected void applyAllowFullShardingScan(boolean allow) {
+        throw new UnsupportedOperationException("allowFullShardingScan is not supported on " + getClass().getSimpleName());
     }
 }
